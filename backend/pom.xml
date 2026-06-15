@@ -32,6 +32,8 @@
 		<bucket4j.version>8.10.1</bucket4j.version>
 		<uuid-creator.version>6.1.1</uuid-creator.version>
 		<archunit.version>1.4.1</archunit.version>
+		<checkstyle.version>13.6.0</checkstyle.version>
+		<maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
 		<jacoco.version>0.8.13</jacoco.version>
 		<jacoco.line.coverage>0.80</jacoco.line.coverage>
 		<jacoco.branch.coverage>0.70</jacoco.branch.coverage>
@@ -174,6 +176,37 @@
 						<include>**/*IT.java</include>
 					</includes>
 				</configuration>
+			</plugin>
+
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-checkstyle-plugin</artifactId>
+				<version>${maven-checkstyle-plugin.version}</version>
+				<dependencies>
+					<dependency>
+						<groupId>com.puppycrawl.tools</groupId>
+						<artifactId>checkstyle</artifactId>
+						<version>${checkstyle.version}</version>
+					</dependency>
+				</dependencies>
+				<configuration>
+					<configLocation>config/checkstyle/checkstyle.xml</configLocation>
+					<suppressionsLocation>config/checkstyle/suppressions.xml</suppressionsLocation>
+					<inputEncoding>UTF-8</inputEncoding>
+					<consoleOutput>true</consoleOutput>
+					<failsOnError>true</failsOnError>
+					<violationSeverity>error</violationSeverity>
+					<includeTestSourceDirectory>true</includeTestSourceDirectory>
+				</configuration>
+				<executions>
+					<execution>
+						<id>checkstyle-validate</id>
+						<phase>validate</phase>
+						<goals>
+							<goal>check</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 
 			<plugin>
