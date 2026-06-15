@@ -1,0 +1,7 @@
+spring:
+  datasource:
+    url: ${ARGUS_DB_URL}
+    username: ${ARGUS_DB_USER}
+    password: ${ARGUS_DB_PASSWORD}
+    hikari:
+      pool-name: argus-pool
