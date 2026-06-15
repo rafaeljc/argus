@@ -1,0 +1,17 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: argus-postgres
+    environment:
+      POSTGRES_DB: argus
+      POSTGRES_USER: argus
+      POSTGRES_PASSWORD: argus
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U argus -d argus"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
