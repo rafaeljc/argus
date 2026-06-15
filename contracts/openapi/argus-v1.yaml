@@ -1,0 +1,1091 @@
+openapi: 3.1.0
+info:
+  title: Argus v1
+  version: 1.0.0
+  description: |
+    End-of-day portfolio monitoring SaaS for retail investors.
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development
+
+tags:
+  - name: account
+    description: Self-service account endpoints
+  - name: auth
+    description: Authentication, sessions, password reset
+  - name: transactions
+    description: Manual buy/sell entry
+  - name: portfolio
+    description: Holdings + portfolio value
+  - name: alerts
+    description: Alert rules + firing history
+  - name: admin
+    description: Admin-only operations on users + audit log
+  - name: eod-pipeline
+    description: Admin-only post-close pipeline
+
+security:
+  - sessionCookie: []
+    csrfToken: []
+
+paths:
+  # ─── account / self-service (module:users) ───────────────────────────
+  /account/me:
+    get:
+      tags: [account]
+      summary: Get the current user's account
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          $ref: "#/components/responses/AccountMe"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /account:
+    delete:
+      tags: [account]
+      summary: Soft-delete the current user's account
+      description: Re-authentication required. Clears session cookie.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password]
+              properties:
+                current_password: { type: string, format: password }
+      responses:
+        "204":
+          description: Account soft-deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  # ─── auth (module:auth) ──────────────────────────────────────────────
+  /auth/signup:
+    post:
+      tags: [auth]
+      summary: Create a new account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password, minLength: 8 }
+      responses:
+        "201":
+          description: Account created; verification email enqueued
+          headers:
+            Location:
+              schema: { type: string }
+              description: URI of the new account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeSignupResult"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Establish a session
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+      responses:
+        "200":
+          description: Session established; sets `argus_session` and `argus_csrf` cookies
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeSessionResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: Terminate the current session
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      responses:
+        "204": { description: Session terminated }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/verify-email:
+    post:
+      tags: [auth]
+      summary: Consume an email-verification token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        "204": { description: Email verified }
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /auth/password-reset-requests:
+    post:
+      tags: [auth]
+      summary: Request a password-reset email
+      description: Always returns 202 to avoid leaking account existence.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "202":
+          description: Acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeMessage"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /auth/password-resets:
+    post:
+      tags: [auth]
+      summary: Reset password with a single-use token
+      description: Invalidates all existing sessions for the user; issues a fresh one.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, new_password]
+              properties:
+                token: { type: string }
+                new_password: { type: string, format: password, minLength: 8 }
+      responses:
+        "200":
+          description: Password reset; new session established
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeSessionResult"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /auth/status:
+    get:
+      tags: [auth]
+      summary: Check whether the current session is valid
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: Session valid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeSessionResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ─── transactions (module:transactions) ──────────────────────────────
+  /transactions:
+    post:
+      tags: [transactions]
+      summary: Record a buy or sell
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransactionInput"
+      responses:
+        "201":
+          description: Transaction recorded
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTransaction"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    get:
+      tags: [transactions]
+      summary: List the current user's transactions
+      security:
+        - sessionCookie: []
+      parameters:
+        - { in: query, name: ticker, schema: { type: string } }
+        - { in: query, name: from, schema: { type: string, format: date } }
+        - { in: query, name: to, schema: { type: string, format: date } }
+        - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
+        - { in: query, name: per_page, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { in: query, name: sort, schema: { type: string, default: "-trade_date,-id" } }
+      responses:
+        "200":
+          description: Transactions collection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTransactionCollection"
+
+  /transactions/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [transactions]
+      summary: Get a single transaction
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTransaction"
+          description: Transaction
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [transactions]
+      summary: Edit a transaction (in place)
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransactionPatch"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeTransaction"
+          description: Transaction updated
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [transactions]
+      summary: Hard-delete a transaction
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      responses:
+        "204": { description: Transaction removed }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  # ─── portfolio (module:portfolio) ────────────────────────────────────
+  /portfolio:
+    get:
+      tags: [portfolio]
+      summary: Get the current portfolio (holdings + total value)
+      security:
+        - sessionCookie: []
+      parameters:
+        - in: query
+          name: as_of
+          schema: { type: string, format: date }
+          description: Defaults to the latest snapshot date.
+      responses:
+        "200":
+          description: Portfolio
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopePortfolio"
+
+  /portfolio/snapshots:
+    get:
+      tags: [portfolio]
+      summary: List historical daily portfolio values
+      security:
+        - sessionCookie: []
+      parameters:
+        - { in: query, name: from, schema: { type: string, format: date } }
+        - { in: query, name: to, schema: { type: string, format: date } }
+        - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
+        - { in: query, name: per_page, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: Snapshots collection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeSnapshotCollection"
+
+  # ─── alerts (module:alerts) ──────────────────────────────────────────
+  /alert-rules:
+    post:
+      tags: [alerts]
+      summary: Create an active alert rule
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlertRuleInput"
+      responses:
+        "201":
+          description: Rule created
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeAlertRule"
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    get:
+      tags: [alerts]
+      summary: List the user's active rules
+      security:
+        - sessionCookie: []
+      parameters:
+        - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
+        - { in: query, name: per_page, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: Active rules
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeAlertRuleCollection"
+
+  /alert-rules/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [alerts]
+      summary: Get a single active rule
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeAlertRule"
+          description: Active rule
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [alerts]
+      summary: Cancel an active rule (hard delete)
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      responses:
+        "204": { description: Rule cancelled }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /alert-firings:
+    get:
+      tags: [alerts]
+      summary: List the user's fired rules (history)
+      security:
+        - sessionCookie: []
+      parameters:
+        - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
+        - { in: query, name: per_page, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: Firings collection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeAlertFiringCollection"
+
+  # ─── admin (module:admin) ────────────────────────────────────────────
+  /admin/users:
+    post:
+      tags: [admin]
+      summary: Search admin users
+      description: |
+        POST (not GET) so the only sensitive criterion — `email` — travels in
+        the request body, out of access logs / proxy caches / browser history.
+        Non-sensitive filters stay in query params.
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      parameters:
+        - { in: query, name: is_suspended, schema: { type: boolean } }
+        - { in: query, name: is_deleted, schema: { type: boolean } }
+        - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
+        - { in: query, name: per_page, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "200":
+          description: Users collection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeAdminUserCollection"
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /admin/users/{id}:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [admin]
+      summary: Get a single user (admin view)
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeAdminUser"
+          description: User
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/users/{id}/suspend:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [admin]
+      summary: Suspend a user (idempotent)
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeAdminUserAction"
+          description: Suspend result
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/users/{id}/unsuspend:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [admin]
+      summary: Unsuspend a user (idempotent)
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeAdminUserAction"
+          description: Unsuspend result
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/users/{id}/delete:
+    parameters:
+      - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [admin]
+      summary: Soft-delete a user (idempotent)
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeAdminUserAction"
+          description: Soft-delete result
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/audit-log:
+    get:
+      tags: [admin]
+      summary: List admin audit-log entries
+      security:
+        - sessionCookie: []
+      parameters:
+        - { in: query, name: actor_id, schema: { type: string, format: uuid } }
+        - { in: query, name: target_user_id, schema: { type: string, format: uuid } }
+        - { in: query, name: action, schema: { type: string } }
+        - { in: query, name: from, schema: { type: string, format: date-time } }
+        - { in: query, name: to, schema: { type: string, format: date-time } }
+        - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
+        - { in: query, name: per_page, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: Audit log
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeAuditLogCollection"
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  # ─── eod-pipeline (module:eod-pipeline) ──────────────────────────────
+  /admin/eod-pipeline/runs:
+    post:
+      tags: [eod-pipeline]
+      summary: Manually trigger a pipeline run
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                run_date: { type: string, format: date }
+      responses:
+        "201":
+          description: Run created
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeEodRun"
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    get:
+      tags: [eod-pipeline]
+      summary: List recent pipeline runs
+      security:
+        - sessionCookie: []
+      parameters:
+        - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
+        - { in: query, name: per_page, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: Runs collection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeEodRunCollection"
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /admin/eod-pipeline/runs/{run_id}:
+    parameters:
+      - { in: path, name: run_id, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [eod-pipeline]
+      summary: Get a single pipeline run
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeEodRun"
+          description: Run
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/eod-pipeline/runs/{run_id}/steps/{step}:
+    parameters:
+      - { in: path, name: run_id, required: true, schema: { type: string, format: uuid } }
+      - in: path
+        name: step
+        required: true
+        schema: { type: string, enum: [symbols, prices, evaluate] }
+    post:
+      tags: [eod-pipeline]
+      summary: Re-run a single pipeline step against an existing run
+      security:
+        - sessionCookie: []
+          csrfToken: []
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvelopeEodStep"
+          description: Step re-running
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: argus_session
+    csrfToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+
+  parameters: {}
+
+  responses:
+    Unauthorized:
+      description: No / invalid session, or generic invalid credentials
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Forbidden:
+      description: Owner-scope or admin-scope violation, or account suspended / unverified
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    NotFound:
+      description: Resource not found or not owned by caller
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    Conflict:
+      description: State-machine violation (e.g. duplicate alert rule, run already in progress)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    ValidationError:
+      description: Semantic validation failure with field-level details
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    RateLimited:
+      description: Rate-limit exceeded
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+    AccountMe:
+      description: Current account
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/SuccessEnvelope"
+              - type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      email: { type: string, format: email }
+                      is_verified: { type: boolean }
+                      is_admin: { type: boolean }
+                      created_at: { type: string, format: date-time }
+
+  schemas:
+    SuccessEnvelope:
+      type: object
+      properties:
+        data: {}
+        meta: { $ref: "#/components/schemas/PaginationMeta" }
+        links: { $ref: "#/components/schemas/PaginationLinks" }
+
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field: { type: string }
+                  code: { type: string }
+                  message: { type: string }
+
+    PaginationMeta:
+      type: object
+      properties:
+        total: { type: integer }
+        page: { type: integer }
+        per_page: { type: integer }
+        total_pages: { type: integer }
+
+    PaginationLinks:
+      type: object
+      properties:
+        self: { type: string }
+        next: { type: string, nullable: true }
+        prev: { type: string, nullable: true }
+        last: { type: string }
+
+    EnvelopeMessage:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                message: { type: string }
+
+    EnvelopeSignupResult:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                user_id: { type: string, format: uuid }
+                verification_sent: { type: boolean }
+
+    EnvelopeSessionResult:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                user_id: { type: string, format: uuid }
+                expires_at: { type: string, format: date-time }
+
+    TransactionInput:
+      type: object
+      required: [ticker, operation, quantity, trade_date]
+      properties:
+        ticker: { type: string, pattern: "^[A-Z.]{1,10}$" }
+        operation: { type: string, enum: [BUY, SELL] }
+        quantity: { type: string, description: "Decimal up to 6 places, > 0" }
+        trade_date: { type: string, format: date }
+
+    TransactionPatch:
+      type: object
+      properties:
+        ticker: { type: string, pattern: "^[A-Z.]{1,10}$" }
+        operation: { type: string, enum: [BUY, SELL] }
+        quantity: { type: string }
+        trade_date: { type: string, format: date }
+
+    Transaction:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        ticker: { type: string }
+        operation: { type: string, enum: [BUY, SELL] }
+        quantity: { type: string }
+        trade_date: { type: string, format: date }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    EnvelopeTransaction:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data: { $ref: "#/components/schemas/Transaction" }
+
+    EnvelopeTransactionCollection:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/Transaction" }
+
+    Position:
+      type: object
+      properties:
+        ticker: { type: string }
+        quantity: { type: string }
+        last_close_price: { type: string, nullable: true }
+        last_close_date: { type: string, format: date, nullable: true }
+        position_value: { type: string, nullable: true }
+        percent_of_portfolio: { type: number, nullable: true }
+        price_pending: { type: boolean }
+        price_stale: { type: boolean }
+        stale_since: { type: string, format: date, nullable: true }
+
+    Portfolio:
+      type: object
+      properties:
+        as_of_date: { type: string, format: date }
+        total_value: { type: string, nullable: true }
+        total_value_pending: { type: boolean }
+        positions:
+          type: array
+          items: { $ref: "#/components/schemas/Position" }
+
+    EnvelopePortfolio:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data: { $ref: "#/components/schemas/Portfolio" }
+
+    Snapshot:
+      type: object
+      properties:
+        snapshot_date: { type: string, format: date }
+        total_value: { type: string }
+
+    EnvelopeSnapshotCollection:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/Snapshot" }
+
+    AlertRuleInput:
+      type: object
+      required: [direction, threshold, window_days]
+      properties:
+        direction: { type: string, enum: [UP, DOWN] }
+        threshold:
+          type: number
+          minimum: 0.5
+          maximum: 100
+          multipleOf: 0.1
+        window_days: { type: integer, enum: [1, 7, 30, 90, 365, 1095, 1825] }
+
+    AlertRule:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        direction: { type: string, enum: [UP, DOWN] }
+        threshold: { type: number }
+        window_days: { type: integer }
+        created_at: { type: string, format: date-time }
+
+    EnvelopeAlertRule:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data: { $ref: "#/components/schemas/AlertRule" }
+
+    EnvelopeAlertRuleCollection:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/AlertRule" }
+
+    AlertFiring:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        rule_id: { type: string, format: uuid }
+        direction: { type: string, enum: [UP, DOWN] }
+        threshold: { type: number }
+        window_days: { type: integer }
+        fired_at: { type: string, format: date-time }
+        portfolio_value_start: { type: string }
+        portfolio_value_end: { type: string }
+        percent_change: { type: number }
+        window_start_date: { type: string, format: date }
+        window_end_date: { type: string, format: date }
+
+    EnvelopeAlertFiringCollection:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/AlertFiring" }
+
+    AdminUser:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        is_verified: { type: boolean }
+        is_suspended: { type: boolean }
+        is_deleted: { type: boolean }
+        is_admin: { type: boolean }
+        created_at: { type: string, format: date-time }
+        deleted_at: { type: string, format: date-time, nullable: true }
+
+    EnvelopeAdminUser:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data: { $ref: "#/components/schemas/AdminUser" }
+
+    EnvelopeAdminUserCollection:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/AdminUser" }
+
+    EnvelopeAdminUserAction:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                id: { type: string, format: uuid }
+                is_suspended: { type: boolean }
+                is_deleted: { type: boolean }
+                deleted_at: { type: string, format: date-time, nullable: true }
+                audit_id: { type: string, format: uuid }
+
+    AuditLogEntry:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        actor_id: { type: string, format: uuid }
+        action: { type: string }
+        target_user_id: { type: string, format: uuid }
+        metadata: { type: object }
+        created_at: { type: string, format: date-time }
+
+    EnvelopeAuditLogCollection:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/AuditLogEntry" }
+
+    EodPipelineRun:
+      type: object
+      properties:
+        run_id: { type: string, format: uuid }
+        run_date: { type: string, format: date }
+        trigger: { type: string, enum: [cron, admin] }
+        status: { type: string }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time, nullable: true }
+        step_symbols_status: { type: string }
+        step_prices_status: { type: string }
+        step_evaluate_status: { type: string }
+        error_message: { type: string, nullable: true }
+
+    EnvelopeEodRun:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data: { $ref: "#/components/schemas/EodPipelineRun" }
+
+    EnvelopeEodRunCollection:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: array
+              items: { $ref: "#/components/schemas/EodPipelineRun" }
+
+    EnvelopeEodStep:
+      allOf:
+        - $ref: "#/components/schemas/SuccessEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                run_id: { type: string, format: uuid }
+                step: { type: string, enum: [symbols, prices, evaluate] }
+                status: { type: string }
+                started_at: { type: string, format: date-time }
