@@ -1,0 +1,7 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/argus
+    username: argus
+    password: argus
+    hikari:
+      pool-name: argus-pool
