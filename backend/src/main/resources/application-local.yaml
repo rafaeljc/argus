@@ -6,6 +6,11 @@ spring:
     hikari:
       pool-name: argus-pool
 
+management:
+  endpoint:
+    health:
+      show-details: always
+
 logging:
   level:
     io.github.rafaeljc.argus: DEBUG
