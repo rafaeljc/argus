@@ -31,6 +31,7 @@
 		<resilience4j.version>2.3.0</resilience4j.version>
 		<bucket4j.version>8.10.1</bucket4j.version>
 		<uuid-creator.version>6.1.1</uuid-creator.version>
+		<logstash-logback-encoder.version>8.0</logstash-logback-encoder.version>
 		<archunit.version>1.4.1</archunit.version>
 		<checkstyle.version>13.6.0</checkstyle.version>
 		<maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
@@ -93,6 +94,12 @@
 			<groupId>com.bucket4j</groupId>
 			<artifactId>bucket4j-caffeine</artifactId>
 			<version>${bucket4j.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>net.logstash.logback</groupId>
+			<artifactId>logstash-logback-encoder</artifactId>
+			<version>${logstash-logback-encoder.version}</version>
 		</dependency>
 
 		<dependency>
