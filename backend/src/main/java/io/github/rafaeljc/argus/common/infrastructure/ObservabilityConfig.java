@@ -18,9 +18,9 @@ public class ObservabilityConfig {
         return new SystemClock();
     }
 
-    // TODO(PR 1.6): revisit once the application security chain lands. Management port
-    // is intended to be reachable only from the internal network, so permit-all here
-    // is acceptable as the transient state until the auth chain owns this decision.
+    // TODO: revisit once the application security chain lands. Management port is
+    // intended to be reachable only from the internal network, so permit-all here is
+    // acceptable as the transient state until the auth chain owns this decision.
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE)
     SecurityFilterChain actuatorSecurityFilterChain(HttpSecurity http) throws Exception {
