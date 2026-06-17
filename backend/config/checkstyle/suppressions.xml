@@ -4,5 +4,6 @@
   "https://checkstyle.org/dtds/suppressions_1_2.dtd">
 
 <suppressions>
-  <!-- Add file/check suppressions here as needed. -->
+  <!-- Integration test classes use the *IT suffix per backend testing conventions. -->
+  <suppress checks="AbbreviationAsWordInName" files="[\\/]src[\\/]test[\\/]java[\\/].*IT\.java$"/>
 </suppressions>
