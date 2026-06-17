@@ -5,3 +5,7 @@ spring:
     password: argus
     hikari:
       pool-name: argus-pool
+
+logging:
+  level:
+    io.github.rafaeljc.argus: DEBUG
