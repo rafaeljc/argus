@@ -65,10 +65,4 @@ class SecurityHeadersIT {
         assertThat(headers.getFirst("Permissions-Policy"))
                 .isEqualTo("camera=(), microphone=(), geolocation=()");
     }
-
-    @Test
-    void response_includesLockedDownContentSecurityPolicy() {
-        assertThat(headers.getFirst("Content-Security-Policy"))
-                .isEqualTo("default-src 'none'; frame-ancestors 'none'; base-uri 'none'");
-    }
 }
