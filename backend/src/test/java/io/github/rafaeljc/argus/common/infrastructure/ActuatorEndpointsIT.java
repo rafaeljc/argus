@@ -2,7 +2,7 @@ package io.github.rafaeljc.argus.common.infrastructure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.github.rafaeljc.argus.TestcontainersConfiguration;
+import io.github.rafaeljc.argus.support.annotations.NoDatabase;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,10 +10,9 @@ import org.springframework.boot.micrometer.metrics.test.autoconfigure.AutoConfig
 import org.springframework.boot.resttestclient.TestRestTemplate;
 import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.ResponseEntity;
 
-@Import(TestcontainersConfiguration.class)
+@NoDatabase
 @AutoConfigureTestRestTemplate
 @AutoConfigureMetrics
 @SpringBootTest(
