@@ -31,6 +31,7 @@
 		<resilience4j.version>2.3.0</resilience4j.version>
 		<bucket4j.version>8.10.1</bucket4j.version>
 		<uuid-creator.version>6.1.1</uuid-creator.version>
+		<bouncycastle.version>1.79</bouncycastle.version>
 		<logstash-logback-encoder.version>8.0</logstash-logback-encoder.version>
 		<archunit.version>1.4.1</archunit.version>
 		<checkstyle.version>13.6.0</checkstyle.version>
@@ -76,6 +77,14 @@
 		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+
+		<!-- argon2id provider for Spring Security's Argon2PasswordEncoder -->
+		<dependency>
+			<groupId>org.bouncycastle</groupId>
+			<artifactId>bcprov-jdk18on</artifactId>
+			<version>${bouncycastle.version}</version>
 			<scope>runtime</scope>
 		</dependency>
 
