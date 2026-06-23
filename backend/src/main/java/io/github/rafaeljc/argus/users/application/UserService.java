@@ -8,11 +8,9 @@ import io.github.rafaeljc.argus.users.application.port.PasswordEncoder;
 import io.github.rafaeljc.argus.users.application.port.UserRepository;
 import io.github.rafaeljc.argus.users.domain.User;
 import java.time.Instant;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-@Lazy
 @Service
 @Transactional(readOnly = true)
 public class UserService {

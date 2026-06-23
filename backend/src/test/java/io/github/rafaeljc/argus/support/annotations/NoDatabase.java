@@ -5,16 +5,9 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
-import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.ActiveProfiles;
 
 @Target(TYPE)
 @Retention(RUNTIME)
-@TestPropertySource(
-        properties = {
-            "spring.autoconfigure.exclude="
-                    + "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,"
-                    + "org.springframework.boot.jdbc.autoconfigure.DataSourceTransactionManagerAutoConfiguration,"
-                    + "org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration,"
-                    + "org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration"
-        })
+@ActiveProfiles("no-db")
 public @interface NoDatabase {}
