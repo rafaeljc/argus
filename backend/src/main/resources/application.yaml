@@ -1,6 +1,9 @@
 spring:
   application:
     name: argus
+  mvc:
+    servlet:
+      path: /api/v1
   jpa:
     hibernate:
       ddl-auto: validate
