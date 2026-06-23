@@ -5,10 +5,8 @@ import io.github.rafaeljc.argus.users.application.port.UserRepository;
 import io.github.rafaeljc.argus.users.domain.User;
 import java.util.Locale;
 import java.util.Optional;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Repository;
 
-@Lazy
 @Repository
 public class JpaUserRepository implements UserRepository {
 

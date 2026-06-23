@@ -29,7 +29,7 @@ class SecurityHeadersIT {
     @BeforeEach
     void fetchResponseHeaders() {
         ResponseEntity<String> response =
-                restTemplate.getForEntity("http://localhost:" + port + "/", String.class);
+                restTemplate.getForEntity("http://localhost:" + port + "/api/v1/", String.class);
         headers = response.getHeaders();
     }
 

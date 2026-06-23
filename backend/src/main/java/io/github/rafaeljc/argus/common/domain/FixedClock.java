@@ -1,6 +1,7 @@
 package io.github.rafaeljc.argus.common.domain;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 public final class FixedClock extends Clock {
 
@@ -10,7 +11,8 @@ public final class FixedClock extends Clock {
         if (now == null) {
             throw new IllegalArgumentException("FixedClock now must not be null");
         }
-        this.now = now;
+        // Match SystemClock precision so tests see the same shape as production reads.
+        this.now = now.truncatedTo(ChronoUnit.MICROS);
     }
 
     @Override

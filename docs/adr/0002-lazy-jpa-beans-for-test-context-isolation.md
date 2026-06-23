@@ -1,6 +1,6 @@
 # Lazy JPA-backed beans for test-context isolation
 
-- Status: accepted
+- Status: superseded by [ADR 0003](0003-no-db-profile-for-test-context-isolation.md)
 - Date: 2026-06-22
 - Deciders: Rafael Clemente
 - Consulted: —
