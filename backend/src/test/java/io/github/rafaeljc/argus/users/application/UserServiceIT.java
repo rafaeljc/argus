@@ -86,10 +86,10 @@ class UserServiceIT {
     }
 
     @Test
-    void softDelete_persistsFlagAndDeletedAt_andLookupStillFindsRow() {
+    void softDelete_persistsFlagAndDeletedAt_andRawLookupStillFindsRow() {
         User created = userService.createUnverified(EMAIL, RAW_PASSWORD);
 
-        userService.softDelete(created.id());
+        userService.softDelete(created.id(), RAW_PASSWORD);
 
         User reloaded = userService.lookup(created.id());
         assertThat(reloaded.isDeleted()).isTrue();
@@ -98,14 +98,32 @@ class UserServiceIT {
     }
 
     @Test
-    void softDelete_calledTwice_preservesOriginalDeletedAt() {
+    void softDelete_secondCallOnDeletedUser_throwsResourceNotFoundAndPreservesDeletedAt() {
         User created = userService.createUnverified(EMAIL, RAW_PASSWORD);
-        userService.softDelete(created.id());
+        userService.softDelete(created.id(), RAW_PASSWORD);
         Instant firstDeletedAt = userService.lookup(created.id()).deletedAt();
 
-        userService.softDelete(created.id());
+        assertThatThrownBy(() -> userService.softDelete(created.id(), RAW_PASSWORD))
+                .isInstanceOf(ResourceNotFoundException.class);
 
         assertThat(userService.lookup(created.id()).deletedAt()).isEqualTo(firstDeletedAt);
+    }
+
+    @Test
+    void findActiveById_existingActiveUser_returnsUser() {
+        User created = userService.createUnverified(EMAIL, RAW_PASSWORD);
+
+        assertThat(userRepository.findActiveById(created.id()))
+                .map(User::id)
+                .contains(created.id());
+    }
+
+    @Test
+    void findActiveById_softDeletedUser_returnsEmpty() {
+        User created = userService.createUnverified(EMAIL, RAW_PASSWORD);
+        userService.softDelete(created.id(), RAW_PASSWORD);
+
+        assertThat(userRepository.findActiveById(created.id())).isEmpty();
     }
 
     @Test
@@ -120,7 +138,7 @@ class UserServiceIT {
     @Test
     void findByEmail_softDeletedUser_returnsEmpty() {
         User created = userService.createUnverified(EMAIL, RAW_PASSWORD);
-        userService.softDelete(created.id());
+        userService.softDelete(created.id(), RAW_PASSWORD);
 
         assertThat(userRepository.findActiveByEmail(EMAIL)).isEmpty();
     }
@@ -128,7 +146,7 @@ class UserServiceIT {
     @Test
     void emailUniquenessAllowsReSignupAfterSoftDelete() {
         User first = userService.createUnverified(EMAIL, RAW_PASSWORD);
-        userService.softDelete(first.id());
+        userService.softDelete(first.id(), RAW_PASSWORD);
 
         User second = userService.createUnverified(EMAIL, RAW_PASSWORD);
 
