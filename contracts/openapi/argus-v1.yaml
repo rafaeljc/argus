@@ -42,8 +42,6 @@ paths:
           $ref: "#/components/responses/AccountMe"
         "401":
           $ref: "#/components/responses/Unauthorized"
-
-  /account:
     delete:
       tags: [account]
       summary: Soft-delete the current user's account
@@ -65,6 +63,8 @@ paths:
           description: Account soft-deleted
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "422":
           $ref: "#/components/responses/ValidationError"
 
