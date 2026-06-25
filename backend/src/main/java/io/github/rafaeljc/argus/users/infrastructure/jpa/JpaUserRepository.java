@@ -22,6 +22,11 @@ public class JpaUserRepository implements UserRepository {
     }
 
     @Override
+    public Optional<User> findActiveById(UserId id) {
+        return jpa.findByIdAndDeletedFalse(id.value()).map(UserEntityMapper::toDomain);
+    }
+
+    @Override
     public Optional<User> findActiveByEmail(String email) {
         if (email == null) {
             return Optional.empty();

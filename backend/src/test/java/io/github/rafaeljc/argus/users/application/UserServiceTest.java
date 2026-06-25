@@ -156,15 +156,16 @@ class UserServiceTest {
     // --- softDelete ----------------------------------------------------------------------------
 
     @Test
-    void softDelete_existingUser_setsDeletedFlagsAndTimestamps() {
+    void softDelete_correctPassword_softDeletesUser() {
         UserId id = newUserId();
         User active = existing(id, Instant.parse("2026-06-01T00:00:00Z"));
-        when(repository.findById(id)).thenReturn(Optional.of(active));
+        when(repository.findActiveById(id)).thenReturn(Optional.of(active));
+        when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_HASH)).thenReturn(true);
         when(repository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         clock = new FixedClock(LATER);
         service = new UserService(repository, passwordEncoder, clock);
 
-        User result = service.softDelete(id);
+        User result = service.softDelete(id, RAW_PASSWORD);
 
         assertThat(result.isDeleted()).isTrue();
         assertThat(result.deletedAt()).isEqualTo(LATER);
@@ -172,30 +173,25 @@ class UserServiceTest {
     }
 
     @Test
-    void softDelete_alreadyDeletedUser_returnsUnchangedAndDoesNotSave() {
+    void softDelete_wrongPassword_throwsInvalidCurrentPasswordAndDoesNotSave() {
         UserId id = newUserId();
-        Instant originalDeletedAt = Instant.parse("2026-06-01T00:00:00Z");
-        User alreadyDeleted = new User(
-                id, EMAIL, ENCODED_HASH, true, false, true, false,
-                originalDeletedAt, originalDeletedAt, originalDeletedAt);
-        when(repository.findById(id)).thenReturn(Optional.of(alreadyDeleted));
-        clock = new FixedClock(LATER);
-        service = new UserService(repository, passwordEncoder, clock);
+        User active = existing(id, Instant.parse("2026-06-01T00:00:00Z"));
+        when(repository.findActiveById(id)).thenReturn(Optional.of(active));
+        when(passwordEncoder.matches("wrong", ENCODED_HASH)).thenReturn(false);
 
-        User result = service.softDelete(id);
-
-        assertThat(result).isSameAs(alreadyDeleted);
-        assertThat(result.deletedAt()).isEqualTo(originalDeletedAt);
+        assertThatThrownBy(() -> service.softDelete(id, "wrong"))
+                .isInstanceOf(InvalidCurrentPasswordException.class);
         verify(repository, never()).save(any());
     }
 
     @Test
-    void softDelete_missingUser_throwsResourceNotFound() {
+    void softDelete_alreadyDeletedUser_throwsResourceNotFoundWithoutCheckingPassword() {
         UserId id = newUserId();
-        when(repository.findById(id)).thenReturn(Optional.empty());
+        when(repository.findActiveById(id)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.softDelete(id))
+        assertThatThrownBy(() -> service.softDelete(id, RAW_PASSWORD))
                 .isInstanceOf(ResourceNotFoundException.class);
+        verify(passwordEncoder, never()).matches(any(), any());
         verify(repository, never()).save(any());
     }
 

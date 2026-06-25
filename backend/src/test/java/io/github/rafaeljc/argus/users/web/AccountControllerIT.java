@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
 import io.github.rafaeljc.argus.users.application.UserService;
 import io.github.rafaeljc.argus.users.domain.User;
+import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.TestRestTemplate;
@@ -15,6 +16,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -25,6 +27,7 @@ import tools.jackson.databind.ObjectMapper;
 class AccountControllerIT {
 
     private static final String ENDPOINT = "/api/v1/account/me";
+    private static final String PASSWORD = "correct horse battery staple";
 
     @LocalServerPort
     private int port;
@@ -40,9 +43,9 @@ class AccountControllerIT {
 
     @Test
     void getMe_authenticatedUser_returns200WithSafeAccountEnvelope() throws Exception {
-        User seeded = userService.createUnverified("alice@example.com", "correct horse battery staple");
+        User seeded = userService.createUnverified("alice@example.com", PASSWORD);
 
-        ResponseEntity<String> response = exchange(seeded);
+        ResponseEntity<String> response = exchange(seeded, HttpMethod.GET, null);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(response.getHeaders().getContentType().toString()).startsWith("application/json");
@@ -70,13 +73,93 @@ class AccountControllerIT {
         assertThat(data.get("created_at").asString()).isEqualTo(seeded.createdAt().toString());
     }
 
-    private ResponseEntity<String> exchange(User authenticatedAs) {
+    @Test
+    void deleteMe_authenticatedUserWithCorrectPassword_returns204AndSoftDeletes() {
+        User seeded = userService.createUnverified("bob@example.com", PASSWORD);
+
+        ResponseEntity<String> response = exchange(seeded, HttpMethod.DELETE, passwordBody(PASSWORD));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(204);
+        assertThat(response.getBody()).isNull();
+
+        User after = userService.lookup(seeded.id());
+        assertThat(after.isDeleted()).isTrue();
+        assertThat(after.deletedAt()).isNotNull();
+    }
+
+    @Test
+    void deleteMe_secondCallOnDeletedUser_returns404AndPreservesDeletedAt() throws Exception {
+        User seeded = userService.createUnverified("carol@example.com", PASSWORD);
+
+        ResponseEntity<String> first = exchange(seeded, HttpMethod.DELETE, passwordBody(PASSWORD));
+        assertThat(first.getStatusCode().value()).isEqualTo(204);
+        Instant firstDeletedAt = userService.lookup(seeded.id()).deletedAt();
+        assertThat(firstDeletedAt).isNotNull();
+
+        ResponseEntity<String> second = exchange(seeded, HttpMethod.DELETE, passwordBody(PASSWORD));
+        assertThat(second.getStatusCode().value()).isEqualTo(404);
+        assertThat(json.readTree(second.getBody()).get("error").get("code").asString())
+                .isEqualTo("NOT_FOUND");
+        assertThat(userService.lookup(seeded.id()).deletedAt()).isEqualTo(firstDeletedAt);
+    }
+
+    @Test
+    void deleteMe_wrongPasswordOnDeletedUser_returns404NotFoundForAntiEnumeration() throws Exception {
+        User seeded = userService.createUnverified("frank@example.com", PASSWORD);
+        userService.softDelete(seeded.id(), PASSWORD);
+
+        ResponseEntity<String> response = exchange(seeded, HttpMethod.DELETE, passwordBody("anything"));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(404);
+        assertThat(json.readTree(response.getBody()).get("error").get("code").asString())
+                .isEqualTo("NOT_FOUND");
+    }
+
+    @Test
+    void deleteMe_wrongPassword_returns422InvalidCurrentPasswordAndDoesNotDelete() throws Exception {
+        User seeded = userService.createUnverified("dave@example.com", PASSWORD);
+
+        ResponseEntity<String> response = exchange(seeded, HttpMethod.DELETE, passwordBody("not the password"));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(422);
+        JsonNode error = json.readTree(response.getBody()).get("error");
+        assertThat(error.get("code").asString()).isEqualTo("INVALID_CURRENT_PASSWORD");
+
+        User after = userService.lookup(seeded.id());
+        assertThat(after.isDeleted()).isFalse();
+        assertThat(after.deletedAt()).isNull();
+    }
+
+    @Test
+    void deleteMe_blankPassword_returns422ValidationErrorWithCurrentPasswordField() throws Exception {
+        User seeded = userService.createUnverified("erin@example.com", PASSWORD);
+
+        ResponseEntity<String> response = exchange(seeded, HttpMethod.DELETE, passwordBody(""));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(422);
+        JsonNode error = json.readTree(response.getBody()).get("error");
+        assertThat(error.get("code").asString()).isEqualTo("VALIDATION_ERROR");
+        assertThat(error.get("details")).hasSize(1);
+        assertThat(error.get("details").get(0).get("field").asString()).isEqualTo("current_password");
+
+        User after = userService.lookup(seeded.id());
+        assertThat(after.isDeleted()).isFalse();
+    }
+
+    private static String passwordBody(String currentPassword) {
+        return "{\"current_password\":\"" + currentPassword + "\"}";
+    }
+
+    private ResponseEntity<String> exchange(User authenticatedAs, HttpMethod method, String jsonBody) {
         HttpHeaders headers = new HttpHeaders();
         headers.add(TestCurrentUserIdConfig.HEADER, authenticatedAs.id().value().toString());
+        if (jsonBody != null) {
+            headers.setContentType(MediaType.APPLICATION_JSON);
+        }
         return http.exchange(
                 "http://localhost:" + port + ENDPOINT,
-                HttpMethod.GET,
-                new HttpEntity<>(headers),
+                method,
+                new HttpEntity<>(jsonBody, headers),
                 String.class);
     }
 }

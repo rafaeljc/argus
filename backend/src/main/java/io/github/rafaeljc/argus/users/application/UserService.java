@@ -30,6 +30,11 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("user not found: " + id.value()));
     }
 
+    public User lookupActive(UserId id) {
+        return repository.findActiveById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("user not found: " + id.value()));
+    }
+
     @Transactional
     public User createUnverified(String email, String rawPassword) {
         Instant now = clock.now();
@@ -63,10 +68,10 @@ public class UserService {
     }
 
     @Transactional
-    public User softDelete(UserId id) {
-        User current = lookup(id);
-        if (current.isDeleted()) {
-            return current;
+    public User softDelete(UserId id, String rawPassword) {
+        User current = lookupActive(id);
+        if (!passwordEncoder.matches(rawPassword, current.passwordHash())) {
+            throw new InvalidCurrentPasswordException(id);
         }
         Instant now = clock.now();
         User deleted = new User(

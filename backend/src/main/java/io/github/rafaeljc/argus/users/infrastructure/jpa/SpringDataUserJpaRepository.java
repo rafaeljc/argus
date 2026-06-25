@@ -7,4 +7,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 interface SpringDataUserJpaRepository extends JpaRepository<UserJpaEntity, UUID> {
 
     Optional<UserJpaEntity> findByEmailAndDeletedFalse(String email);
+
+    Optional<UserJpaEntity> findByIdAndDeletedFalse(UUID id);
 }
