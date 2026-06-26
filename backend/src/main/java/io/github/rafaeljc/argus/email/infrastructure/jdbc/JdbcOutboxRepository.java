@@ -51,6 +51,21 @@ public class JdbcOutboxRepository implements OutboxRepository {
                       last_error, published_by_worker_id
             """.formatted(MAX_ERROR_COUNT);
 
+    private static final String MARK_PUBLISHED_SQL =
+            """
+            UPDATE outbox
+               SET published_at = :published_at
+             WHERE id = :id
+            """;
+
+    private static final String RECORD_FAILURE_SQL =
+            """
+            UPDATE outbox
+               SET error_count = error_count + 1,
+                   last_error  = :last_error
+             WHERE id = :id
+            """;
+
     private static final RowMapper<OutboxMessage> ROW_MAPPER = JdbcOutboxRepository::mapRow;
 
     private final NamedParameterJdbcTemplate jdbc;
@@ -78,6 +93,22 @@ public class JdbcOutboxRepository implements OutboxRepository {
                 .addValue("limit", limit)
                 .addValue("now", toOffsetDateTime(now));
         return jdbc.query(CLAIM_SQL, params, ROW_MAPPER);
+    }
+
+    @Override
+    public void markPublished(OutboxId id, Instant publishedAt) {
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("id", id.value())
+                .addValue("published_at", toOffsetDateTime(publishedAt));
+        jdbc.update(MARK_PUBLISHED_SQL, params);
+    }
+
+    @Override
+    public void recordFailure(OutboxId id, String errorMessage) {
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("id", id.value())
+                .addValue("last_error", errorMessage);
+        jdbc.update(RECORD_FAILURE_SQL, params);
     }
 
     private static OutboxMessage mapRow(ResultSet rs, int rowNum) throws SQLException {

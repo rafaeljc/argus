@@ -7,3 +7,12 @@ spring:
       - org.springframework.boot.jdbc.autoconfigure.DataSourceTransactionManagerAutoConfiguration
       - org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration
       - org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration
+
+# Override the production readiness group: in no-db tests, the 'db' health contributor isn't
+# registered (DataSource autoconfig is excluded) and referencing it would fail startup.
+management:
+  endpoint:
+    health:
+      group:
+        readiness:
+          include: readinessState

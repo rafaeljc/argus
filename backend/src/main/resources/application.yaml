@@ -31,6 +31,9 @@ management:
       probes:
         enabled: true
       show-details: when-authorized
+      group:
+        readiness:
+          include: readinessState,db,vendorEmail
   info:
     env:
       enabled: true
@@ -48,3 +51,19 @@ logging:
   level:
     root: INFO
     io.github.rafaeljc.argus: INFO
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      vendor-email:
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+
+argus:
+  email:
+    poll:
+      interval-ms: 30000
