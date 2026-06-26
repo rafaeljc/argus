@@ -173,6 +173,64 @@ class OutboxRepositoryIT {
     }
 
     @Test
+    void markPublished_setsPublishedAt_excludesRowFromSubsequentClaim() {
+        OutboxMessage msg = build(0, NOW);
+        repository.insertIfAbsent(msg);
+        repository.claimUnpublishedBatch(10, "worker-a", NOW.plusSeconds(1));
+        Instant publishedAt = NOW.plusSeconds(5);
+
+        repository.markPublished(msg.id(), publishedAt);
+
+        List<OutboxMessage> claimed = repository.claimUnpublishedBatch(10, "worker-b", NOW.plusSeconds(60));
+        assertThat(claimed).isEmpty();
+    }
+
+    @Test
+    void recordFailure_incrementsErrorCount_setsLastError_keepsRowClaimable() {
+        OutboxMessage msg = build(0, NOW);
+        repository.insertIfAbsent(msg);
+        repository.claimUnpublishedBatch(10, "worker-a", NOW.plusSeconds(1));
+
+        repository.recordFailure(msg.id(), "vendor 503");
+
+        List<OutboxMessage> claimed = repository.claimUnpublishedBatch(10, "worker-b", NOW.plusSeconds(60));
+        assertThat(claimed).hasSize(1);
+        OutboxMessage row = claimed.get(0);
+        assertThat(row.errorCount()).isEqualTo(1);
+        assertThat(row.lastError()).isEqualTo("vendor 503");
+        assertThat(row.publishedAt()).isNull();
+    }
+
+    @Test
+    void recordFailure_repeated_keepsAccumulatingErrorCount() {
+        OutboxMessage msg = build(0, NOW);
+        repository.insertIfAbsent(msg);
+        repository.claimUnpublishedBatch(10, "worker-a", NOW.plusSeconds(1));
+
+        repository.recordFailure(msg.id(), "first");
+        repository.recordFailure(msg.id(), "second");
+        repository.recordFailure(msg.id(), "third");
+
+        List<OutboxMessage> claimed = repository.claimUnpublishedBatch(10, "worker-b", NOW.plusSeconds(60));
+        assertThat(claimed).hasSize(1);
+        assertThat(claimed.get(0).errorCount()).isEqualTo(3);
+        assertThat(claimed.get(0).lastError()).isEqualTo("third");
+    }
+
+    @Test
+    void claim_excludesRowWithErrorCountAtMax() {
+        OutboxMessage msg = build(0, NOW);
+        repository.insertIfAbsent(msg);
+        repository.claimUnpublishedBatch(10, "worker-a", NOW.plusSeconds(1));
+        for (int i = 0; i < 10; i++) {
+            repository.recordFailure(msg.id(), "fail " + i);
+        }
+
+        List<OutboxMessage> claimed = repository.claimUnpublishedBatch(10, "worker-b", NOW.plusSeconds(60));
+        assertThat(claimed).isEmpty();
+    }
+
+    @Test
     void emailService_enqueueDuplicate_swallowsAndKeepsOriginalRow() {
         UUID aggregateId = UuidCreator.getTimeOrderedEpoch();
         String idempotenceKey = "verification:" + aggregateId;
