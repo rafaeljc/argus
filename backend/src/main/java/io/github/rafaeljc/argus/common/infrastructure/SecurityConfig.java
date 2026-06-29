@@ -1,5 +1,6 @@
 package io.github.rafaeljc.argus.common.infrastructure;
 
+import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -15,8 +16,9 @@ class SecurityConfig {
     private static final String PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=()";
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        return http
+    SecurityFilterChain securityFilterChain(HttpSecurity http, List<SecurityFilterChainCustomizer> customizers)
+            throws Exception {
+        http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
                 .headers(headers -> headers
@@ -31,7 +33,10 @@ class SecurityConfig {
                         .contentTypeOptions(c -> {})
                         .frameOptions(FrameOptionsConfig::deny)
                         .referrerPolicy(r -> r.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
-                        .permissionsPolicyHeader(p -> p.policy(PERMISSIONS_POLICY)))
-                .build();
+                        .permissionsPolicyHeader(p -> p.policy(PERMISSIONS_POLICY)));
+        for (SecurityFilterChainCustomizer customizer : customizers) {
+            customizer.customize(http);
+        }
+        return http.build();
     }
 }

@@ -1,6 +1,7 @@
 package io.github.rafaeljc.argus.auth.infrastructure.jpa;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.github.f4b6a3.uuid.UuidCreator;
@@ -98,6 +99,51 @@ class JpaSessionRepositoryIT {
         UserId unknown = new UserId(UuidCreator.getTimeOrderedEpoch());
 
         assertThat(sessionRepository.findByUserId(unknown)).isEmpty();
+    }
+
+    @Test
+    void touch_updatesExpiresLastActivityIpAndUserAgent() {
+        UserId userId = newUser();
+        Session saved = sessionRepository.save(newSession(userId, TOKEN_HASH, "10.0.0.1", "old-agent"));
+        Instant newNow = CREATED.plusSeconds(60 * 60);
+        Instant newExpires = newNow.plusSeconds(30L * 24 * 60 * 60);
+
+        sessionRepository.touch(saved.id(), newNow, newExpires, "203.0.113.7", "new-agent");
+
+        Session reloaded = sessionRepository.findByTokenHash(TOKEN_HASH).orElseThrow();
+        assertThat(reloaded.lastActivityAt()).isEqualTo(newNow);
+        assertThat(reloaded.expiresAt()).isEqualTo(newExpires);
+        assertThat(reloaded.ipAddress()).isEqualTo("203.0.113.7");
+        assertThat(reloaded.userAgent()).isEqualTo("new-agent");
+        // Immutable fields untouched.
+        assertThat(reloaded.id()).isEqualTo(saved.id());
+        assertThat(reloaded.createdAt()).isEqualTo(saved.createdAt());
+        assertThat(reloaded.sessionTokenHash()).isEqualTo(TOKEN_HASH);
+    }
+
+    @Test
+    void touch_unknownSession_doesNotThrow() {
+        SessionId unknown = new SessionId(UuidCreator.getTimeOrderedEpoch());
+
+        assertThatNoException().isThrownBy(() ->
+                sessionRepository.touch(unknown, CREATED, EXPIRES, "10.0.0.1", "agent"));
+    }
+
+    @Test
+    void deleteById_removesSession() {
+        UserId userId = newUser();
+        Session saved = sessionRepository.save(newSession(userId, TOKEN_HASH, null, null));
+
+        sessionRepository.deleteById(saved.id());
+
+        assertThat(sessionRepository.findByTokenHash(TOKEN_HASH)).isEmpty();
+    }
+
+    @Test
+    void deleteById_unknownSession_doesNotThrow() {
+        SessionId unknown = new SessionId(UuidCreator.getTimeOrderedEpoch());
+
+        assertThatNoException().isThrownBy(() -> sessionRepository.deleteById(unknown));
     }
 
     private UserId newUser() {
