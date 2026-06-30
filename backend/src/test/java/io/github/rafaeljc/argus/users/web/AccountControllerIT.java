@@ -2,10 +2,20 @@ package io.github.rafaeljc.argus.users.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.github.f4b6a3.uuid.UuidCreator;
+import io.github.rafaeljc.argus.auth.application.port.SessionRepository;
+import io.github.rafaeljc.argus.auth.domain.Session;
+import io.github.rafaeljc.argus.auth.infrastructure.security.CsrfCookieFactory;
+import io.github.rafaeljc.argus.auth.infrastructure.security.SessionCookieFactory;
+import io.github.rafaeljc.argus.common.domain.SessionId;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
 import io.github.rafaeljc.argus.users.application.UserService;
 import io.github.rafaeljc.argus.users.domain.User;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.HexFormat;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.TestRestTemplate;
@@ -28,6 +38,7 @@ class AccountControllerIT {
 
     private static final String ENDPOINT = "/api/v1/account/me";
     private static final String PASSWORD = "correct horse battery staple";
+    private static final String CSRF_VALUE = "account-it-csrf-token";
 
     @LocalServerPort
     private int port;
@@ -40,6 +51,9 @@ class AccountControllerIT {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private SessionRepository sessionRepository;
 
     @Test
     void getMe_authenticatedUser_returns200WithSafeAccountEnvelope() throws Exception {
@@ -151,8 +165,13 @@ class AccountControllerIT {
     }
 
     private ResponseEntity<String> exchange(User authenticatedAs, HttpMethod method, String jsonBody) {
+        String sessionToken = seedSession(authenticatedAs);
         HttpHeaders headers = new HttpHeaders();
         headers.add(TestCurrentUserIdConfig.HEADER, authenticatedAs.id().value().toString());
+        headers.add(HttpHeaders.COOKIE,
+                SessionCookieFactory.COOKIE_NAME + "=" + sessionToken
+                        + "; " + CsrfCookieFactory.COOKIE_NAME + "=" + CSRF_VALUE);
+        headers.add("X-CSRF-Token", CSRF_VALUE);
         if (jsonBody != null) {
             headers.setContentType(MediaType.APPLICATION_JSON);
         }
@@ -161,5 +180,29 @@ class AccountControllerIT {
                 method,
                 new HttpEntity<>(jsonBody, headers),
                 String.class);
+    }
+
+    private String seedSession(User user) {
+        String token = "account-it-session-" + UuidCreator.getTimeOrderedEpoch();
+        Instant now = Instant.now();
+        sessionRepository.save(new Session(
+                new SessionId(UuidCreator.getTimeOrderedEpoch()),
+                user.id(),
+                sha256Hex(token),
+                "10.0.0.1",
+                "IT-Agent",
+                now,
+                now.plus(Duration.ofDays(30)),
+                now));
+        return token;
+    }
+
+    private static String sha256Hex(String value) {
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
     }
 }
