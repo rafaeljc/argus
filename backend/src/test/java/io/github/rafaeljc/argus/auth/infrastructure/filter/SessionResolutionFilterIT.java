@@ -134,9 +134,11 @@ class SessionResolutionFilterIT {
     }
 
     private UserId newUser() {
-        return userService.createUnverified(
+        UserId id = userService.createUnverified(
                 "user-" + UuidCreator.getTimeOrderedEpoch() + "@example.com",
                 "correct horse battery staple").id();
+        userService.markVerified(id);
+        return id;
     }
 
     private static SessionId newSessionId() {

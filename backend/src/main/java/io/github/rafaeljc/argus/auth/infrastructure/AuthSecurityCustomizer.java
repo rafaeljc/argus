@@ -1,5 +1,6 @@
 package io.github.rafaeljc.argus.auth.infrastructure;
 
+import io.github.rafaeljc.argus.auth.infrastructure.filter.AccountStateGateFilter;
 import io.github.rafaeljc.argus.auth.infrastructure.filter.CsrfFilter;
 import io.github.rafaeljc.argus.auth.infrastructure.filter.SessionResolutionFilter;
 import io.github.rafaeljc.argus.common.infrastructure.SecurityFilterChainCustomizer;
@@ -12,18 +13,22 @@ class AuthSecurityCustomizer implements SecurityFilterChainCustomizer {
 
     private final SessionResolutionFilter sessionResolutionFilter;
     private final CsrfFilter csrfFilter;
+    private final AccountStateGateFilter accountStateGateFilter;
 
     AuthSecurityCustomizer(SessionResolutionFilter sessionResolutionFilter,
-                           CsrfFilter csrfFilter) {
+                           CsrfFilter csrfFilter,
+                           AccountStateGateFilter accountStateGateFilter) {
         this.sessionResolutionFilter = sessionResolutionFilter;
         this.csrfFilter = csrfFilter;
+        this.accountStateGateFilter = accountStateGateFilter;
     }
 
     @Override
     public void customize(HttpSecurity http) throws Exception {
         // UsernamePasswordAuthenticationFilter is a stable anchor in Spring Security's chain.
-        // Order downstream of it: SessionResolution -> Csrf.
+        // Order downstream of it: SessionResolution -> Csrf -> AccountStateGate.
         http.addFilterBefore(sessionResolutionFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterAfter(csrfFilter, SessionResolutionFilter.class);
+                .addFilterAfter(csrfFilter, SessionResolutionFilter.class)
+                .addFilterAfter(accountStateGateFilter, CsrfFilter.class);
     }
 }
