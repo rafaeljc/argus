@@ -1,6 +1,7 @@
 package io.github.rafaeljc.argus.common.domain;
 
 import java.util.List;
+import java.util.Map;
 
 public abstract class DomainException extends RuntimeException {
 
@@ -20,5 +21,9 @@ public abstract class DomainException extends RuntimeException {
 
     public List<FieldError> details() {
         return List.of();
+    }
+
+    public Map<String, String> headers() {
+        return Map.of();
     }
 }
