@@ -86,11 +86,11 @@ class SessionResolutionFilterIT {
 
         ResponseEntity<String> response = exchangeWithCookie(WHOAMI_PATH, RAW_TOKEN);
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isEqualTo("anonymous");
-        // Confirms the cleared cookie reached the wire with empty value;
-        // SessionResolutionFilterTest already pins Max-Age=0 / SameSite / HttpOnly / Secure
-        // on the Cookie model.
+        // The filter does not authenticate an expired session, so the authorization layer rejects
+        // the request with 403 — proof that no authenticated principal was placed on the context.
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        // The filter still clears the wire cookie before the rejection. SessionResolutionFilterTest
+        // pins Max-Age=0 / SameSite / HttpOnly / Secure on the Cookie model.
         assertThat(response.getHeaders().get(HttpHeaders.SET_COOKIE))
                 .anyMatch(h -> h.startsWith(SessionCookieFactory.COOKIE_NAME + "=;"));
         assertThat(sessionRepository.findByTokenHash(sha256Hex(RAW_TOKEN))).isEmpty();
@@ -100,8 +100,7 @@ class SessionResolutionFilterIT {
     void noCookie_doesNotAuthenticate_andEmitsNoSessionCookie() {
         ResponseEntity<String> response = http.getForEntity(url(WHOAMI_PATH), String.class);
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isEqualTo("anonymous");
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
         assertThat(response.getHeaders().get(HttpHeaders.SET_COOKIE))
                 .satisfiesAnyOf(
                         list -> assertThat(list).isNullOrEmpty(),
@@ -112,8 +111,7 @@ class SessionResolutionFilterIT {
     void unknownToken_doesNotAuthenticate() {
         ResponseEntity<String> response = exchangeWithCookie(WHOAMI_PATH, "not-a-real-token");
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).isEqualTo("anonymous");
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
     private Session save(SessionId sessionId, UserId userId, String ip, String ua,

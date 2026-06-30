@@ -27,6 +27,11 @@ public final class SessionAuthenticationToken extends AbstractAuthenticationToke
     }
 
     @Override
+    public String getName() {
+        return principal.userId().value().toString();
+    }
+
+    @Override
     public void setAuthenticated(boolean authenticated) {
         if (authenticated) {
             throw new IllegalArgumentException(

@@ -2,7 +2,9 @@ package io.github.rafaeljc.argus.common.web;
 
 import io.github.rafaeljc.argus.common.domain.DomainException;
 import io.github.rafaeljc.argus.common.domain.FieldError;
+import io.github.rafaeljc.argus.common.domain.RateLimitExceededException;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -35,6 +37,13 @@ public class ApiErrorHandler {
     public ResponseEntity<ErrorEnvelope> handleDomain(DomainException ex) {
         LOG.info("domain error code={} traceId={} message={}", ex.code(), traceId(), ex.getMessage());
         return response(ex.status(), ex.code(), ex.getMessage(), ex.details());
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ErrorEnvelope> handleRateLimitExceeded(RateLimitExceededException ex) {
+        LOG.info("rate limit exceeded code={} traceId={} retryAfterSeconds={}",
+                ex.code(), traceId(), ex.retryAfterSeconds());
+        return response(ex.status(), ex.code(), ex.getMessage(), ex.details(), ex.headers());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -84,7 +93,14 @@ public class ApiErrorHandler {
 
     private static ResponseEntity<ErrorEnvelope> response(
             int status, String code, String message, List<FieldError> details) {
-        return ResponseEntity.status(status).body(new ErrorEnvelope(new ApiError(code, message, details)));
+        return response(status, code, message, details, Map.of());
+    }
+
+    private static ResponseEntity<ErrorEnvelope> response(
+            int status, String code, String message, List<FieldError> details, Map<String, String> headers) {
+        ResponseEntity.BodyBuilder builder = ResponseEntity.status(status);
+        headers.forEach(builder::header);
+        return builder.body(new ErrorEnvelope(new ApiError(code, message, details)));
     }
 
     private static FieldError toFieldError(org.springframework.validation.FieldError binding) {

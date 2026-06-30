@@ -736,10 +736,23 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
     RateLimited:
-      description: Rate-limit exceeded
+      description: |
+        Rate-limit exceeded. All API responses (including success) carry the
+        `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`
+        headers; on 429 a `Retry-After` header is also set.
       headers:
         Retry-After:
-          schema: { type: integer }
+          description: Seconds the client should wait before retrying.
+          schema: { type: integer, minimum: 0 }
+        X-RateLimit-Limit:
+          description: Maximum number of requests permitted in the current bucket window.
+          schema: { type: integer, minimum: 0 }
+        X-RateLimit-Remaining:
+          description: Requests remaining in the current bucket window.
+          schema: { type: integer, minimum: 0 }
+        X-RateLimit-Reset:
+          description: Seconds until the bucket fully refills.
+          schema: { type: integer, minimum: 0 }
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
