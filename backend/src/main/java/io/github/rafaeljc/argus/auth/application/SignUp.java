@@ -10,14 +10,9 @@ import io.github.rafaeljc.argus.email.application.EmailService;
 import io.github.rafaeljc.argus.email.domain.EventType;
 import io.github.rafaeljc.argus.users.application.UserService;
 import io.github.rafaeljc.argus.users.domain.User;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.HexFormat;
 import java.util.Map;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -32,7 +27,6 @@ public class SignUp {
     private static final String EMAIL_UNIQUE_INDEX = "users_email_active_uidx";
 
     private static final Duration VERIFICATION_TTL = Duration.ofHours(24);
-    private static final int TOKEN_BYTE_LENGTH = 32;
 
     private final UserService userService;
     private final EmailVerificationRepository emailVerificationRepository;
@@ -51,14 +45,14 @@ public class SignUp {
         this.emailService = emailService;
         this.clock = clock;
         this.objectMapper = objectMapper;
-        this.secureRandom = strongSecureRandom();
+        this.secureRandom = Tokens.strongSecureRandom();
     }
 
     @Transactional
     public SignUpResult execute(String email, String password) {
         User user = createUser(email, password);
-        String plainToken = generatePlainToken();
-        EmailVerification verification = persistVerificationToken(user, sha256Hex(plainToken));
+        String plainToken = Tokens.plain(secureRandom);
+        EmailVerification verification = persistVerificationToken(user, Tokens.sha256Hex(plainToken));
         enqueueVerificationEmail(user, verification, plainToken);
         return new SignUpResult(user.id(), true);
     }
@@ -86,14 +80,6 @@ public class SignUp {
         return emailVerificationRepository.save(verification);
     }
 
-    // The plain token is emitted once — in the verification email link — and never persisted.
-    // Only its SHA-256 hash lives in the database, so a DB read can't reveal live tokens.
-    private String generatePlainToken() {
-        byte[] randomBytes = new byte[TOKEN_BYTE_LENGTH];
-        secureRandom.nextBytes(randomBytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
-    }
-
     private void enqueueVerificationEmail(User user, EmailVerification verification, String plainToken) {
         Map<String, String> payload = Map.of(
                 "user_id", user.id().value().toString(),
@@ -109,23 +95,5 @@ public class SignUp {
         Throwable cause = ex.getMostSpecificCause();
         String message = cause == null ? ex.getMessage() : cause.getMessage();
         return message != null && message.contains(EMAIL_UNIQUE_INDEX);
-    }
-
-    private static String sha256Hex(String input) {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(input.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 unavailable", e);
-        }
-    }
-
-    private static SecureRandom strongSecureRandom() {
-        try {
-            return SecureRandom.getInstanceStrong();
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("no strong SecureRandom available", e);
-        }
     }
 }
