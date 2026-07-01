@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.github.f4b6a3.uuid.UuidCreator;
 import io.github.rafaeljc.argus.auth.application.port.SessionRepository;
 import io.github.rafaeljc.argus.auth.domain.Session;
-import io.github.rafaeljc.argus.auth.infrastructure.security.CsrfCookieFactory;
-import io.github.rafaeljc.argus.auth.infrastructure.security.SessionCookieFactory;
+import io.github.rafaeljc.argus.auth.web.CsrfCookieFactory;
+import io.github.rafaeljc.argus.auth.web.SessionCookieFactory;
 import io.github.rafaeljc.argus.common.domain.SessionId;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
 import io.github.rafaeljc.argus.users.application.UserService;
@@ -63,15 +63,21 @@ class RateLimitIT {
         assertThat(first.getStatusCode().value()).isEqualTo(200);
         assertThat(second.getStatusCode().value()).isEqualTo(200);
 
-        // RL.read bucket: capacity 300, user-keyed. Two consecutive reads from the same user
-        // share one bucket; remaining decrements by exactly one per call.
+        // RL.read bucket: capacity 300, user-keyed, greedy refill of 300 tokens per minute
+        // (~5 tokens/s). Two consecutive reads from the same user share one bucket; the
+        // invariant asserted is that the second call sees no more tokens than the first —
+        // an exact decrement is not asserted because wall-clock jitter between requests can
+        // refill a fractional token during Spring/Tomcat processing.
         assertThat(first.getHeaders().getFirst(LIMIT_HEADER)).isEqualTo("300");
-        assertThat(first.getHeaders().getFirst(REMAINING_HEADER)).isEqualTo("299");
         assertThat(first.getHeaders().getFirst(RESET_HEADER)).isNotNull();
+        long firstRemaining = Long.parseLong(first.getHeaders().getFirst(REMAINING_HEADER));
+        assertThat(firstRemaining).isEqualTo(299L);
 
         assertThat(second.getHeaders().getFirst(LIMIT_HEADER)).isEqualTo("300");
-        assertThat(second.getHeaders().getFirst(REMAINING_HEADER)).isEqualTo("298");
         assertThat(second.getHeaders().getFirst(RESET_HEADER)).isNotNull();
+        long secondRemaining = Long.parseLong(second.getHeaders().getFirst(REMAINING_HEADER));
+        assertThat(secondRemaining).isLessThanOrEqualTo(firstRemaining);
+        assertThat(secondRemaining).isLessThan(300L);
     }
 
     private ResponseEntity<String> get(User authenticatedAs, String sessionToken) {
