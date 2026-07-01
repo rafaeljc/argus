@@ -1,0 +1,131 @@
+package io.github.rafaeljc.argus.auth.application;
+
+import com.github.f4b6a3.uuid.UuidCreator;
+import io.github.rafaeljc.argus.auth.application.port.EmailVerificationRepository;
+import io.github.rafaeljc.argus.auth.domain.EmailAlreadyTakenException;
+import io.github.rafaeljc.argus.auth.domain.EmailVerification;
+import io.github.rafaeljc.argus.common.domain.Clock;
+import io.github.rafaeljc.argus.common.domain.VerificationId;
+import io.github.rafaeljc.argus.email.application.EmailService;
+import io.github.rafaeljc.argus.email.domain.EventType;
+import io.github.rafaeljc.argus.users.application.UserService;
+import io.github.rafaeljc.argus.users.domain.User;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Base64;
+import java.util.HexFormat;
+import java.util.Map;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
+
+@Service
+public class SignUp {
+
+    // Partial unique index on users(email) WHERE is_deleted = FALSE — enforces one active
+    // account per email. Postgres surfaces the index name inside the driver's error message.
+    private static final String EMAIL_UNIQUE_INDEX = "users_email_active_uidx";
+
+    private static final Duration VERIFICATION_TTL = Duration.ofHours(24);
+    private static final int TOKEN_BYTE_LENGTH = 32;
+
+    private final UserService userService;
+    private final EmailVerificationRepository emailVerificationRepository;
+    private final EmailService emailService;
+    private final Clock clock;
+    private final ObjectMapper objectMapper;
+    private final SecureRandom secureRandom;
+
+    public SignUp(UserService userService,
+                  EmailVerificationRepository emailVerificationRepository,
+                  EmailService emailService,
+                  Clock clock,
+                  ObjectMapper objectMapper) {
+        this.userService = userService;
+        this.emailVerificationRepository = emailVerificationRepository;
+        this.emailService = emailService;
+        this.clock = clock;
+        this.objectMapper = objectMapper;
+        this.secureRandom = strongSecureRandom();
+    }
+
+    @Transactional
+    public SignUpResult execute(String email, String password) {
+        User user = createUser(email, password);
+        String plainToken = generatePlainToken();
+        EmailVerification verification = persistVerificationToken(user, sha256Hex(plainToken));
+        enqueueVerificationEmail(user, verification, plainToken);
+        return new SignUpResult(user.id(), true);
+    }
+
+    private User createUser(String email, String password) {
+        try {
+            return userService.createUnverified(email, password);
+        } catch (DataIntegrityViolationException ex) {
+            if (isEmailUniqueViolation(ex)) {
+                throw new EmailAlreadyTakenException(email);
+            }
+            throw ex;
+        }
+    }
+
+    private EmailVerification persistVerificationToken(User user, String tokenHash) {
+        Instant now = clock.now();
+        EmailVerification verification = new EmailVerification(
+                new VerificationId(UuidCreator.getTimeOrderedEpoch()),
+                user.id(),
+                tokenHash,
+                now,
+                now.plus(VERIFICATION_TTL),
+                null);
+        return emailVerificationRepository.save(verification);
+    }
+
+    // The plain token is emitted once — in the verification email link — and never persisted.
+    // Only its SHA-256 hash lives in the database, so a DB read can't reveal live tokens.
+    private String generatePlainToken() {
+        byte[] randomBytes = new byte[TOKEN_BYTE_LENGTH];
+        secureRandom.nextBytes(randomBytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes);
+    }
+
+    private void enqueueVerificationEmail(User user, EmailVerification verification, String plainToken) {
+        Map<String, String> payload = Map.of(
+                "user_id", user.id().value().toString(),
+                "email", user.email(),
+                "token", plainToken,
+                "expires_at", verification.expiresAt().toString());
+        String serialized = objectMapper.writeValueAsString(payload);
+        String idempotenceKey = "email.verification:" + verification.id().value();
+        emailService.enqueue(EventType.VERIFICATION, user.id().value(), serialized, idempotenceKey);
+    }
+
+    private static boolean isEmailUniqueViolation(DataIntegrityViolationException ex) {
+        Throwable cause = ex.getMostSpecificCause();
+        String message = cause == null ? ex.getMessage() : cause.getMessage();
+        return message != null && message.contains(EMAIL_UNIQUE_INDEX);
+    }
+
+    private static String sha256Hex(String input) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(input.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 unavailable", e);
+        }
+    }
+
+    private static SecureRandom strongSecureRandom() {
+        try {
+            return SecureRandom.getInstanceStrong();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("no strong SecureRandom available", e);
+        }
+    }
+}

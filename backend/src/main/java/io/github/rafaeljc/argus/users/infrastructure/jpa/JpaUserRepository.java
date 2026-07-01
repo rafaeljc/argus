@@ -37,7 +37,11 @@ public class JpaUserRepository implements UserRepository {
 
     @Override
     public User save(User user) {
-        UserJpaEntity persisted = jpa.save(UserEntityMapper.toEntity(user));
+        // saveAndFlush forces the INSERT/UPDATE now so constraint violations
+        // (e.g. users_email_active_uidx on signup) surface as a
+        // DataIntegrityViolationException from this call rather than at commit,
+        // letting the caller translate them into a domain exception.
+        UserJpaEntity persisted = jpa.saveAndFlush(UserEntityMapper.toEntity(user));
         return UserEntityMapper.toDomain(persisted);
     }
 }
