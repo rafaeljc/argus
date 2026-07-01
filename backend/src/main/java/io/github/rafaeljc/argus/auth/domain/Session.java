@@ -2,6 +2,7 @@ package io.github.rafaeljc.argus.auth.domain;
 
 import io.github.rafaeljc.argus.common.domain.SessionId;
 import io.github.rafaeljc.argus.common.domain.UserId;
+import java.time.Duration;
 import java.time.Instant;
 
 public record Session(SessionId id,
@@ -12,6 +13,10 @@ public record Session(SessionId id,
                       Instant createdAt,
                       Instant expiresAt,
                       Instant lastActivityAt) {
+
+    // Rolling session window: every request that resolves this session shifts expiresAt to
+    // (now + ROLLING_WINDOW). Login sets the initial expiry; SessionResolutionFilter refreshes it.
+    public static final Duration ROLLING_WINDOW = Duration.ofDays(30);
 
     public Session {
         if (id == null) {

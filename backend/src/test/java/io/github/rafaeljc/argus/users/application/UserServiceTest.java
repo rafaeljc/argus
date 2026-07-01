@@ -29,6 +29,7 @@ class UserServiceTest {
     private static final String EMAIL = "alice@example.com";
     private static final String RAW_PASSWORD = "correct horse battery staple";
     private static final String ENCODED_HASH = "$argon2id$v=19$m=65536,t=3,p=1$encoded";
+    private static final String DUMMY_HASH = "$argon2id$v=19$m=65536,t=3,p=1$dummy";
 
     private UserRepository repository;
     private PasswordEncoder passwordEncoder;
@@ -39,6 +40,9 @@ class UserServiceTest {
     void setUp() {
         repository = Mockito.mock(UserRepository.class);
         passwordEncoder = Mockito.mock(PasswordEncoder.class);
+        // Stub the anti-enumeration seed encode before constructing the service so the pre-
+        // computed dummy hash used by verifyPasswordForUnknownUser is deterministic in tests.
+        when(passwordEncoder.encode(any())).thenReturn(DUMMY_HASH);
         clock = new FixedClock(NOW);
         service = new UserService(repository, passwordEncoder, clock);
     }
@@ -67,6 +71,26 @@ class UserServiceTest {
 
         assertThatThrownBy(() -> service.lookup(id))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    // --- lookupActiveByEmail -------------------------------------------------------------------
+
+    @Test
+    void lookupActiveByEmail_existingActiveUser_returnsUser() {
+        UserId id = newUserId();
+        User stored = existing(id, NOW);
+        when(repository.findActiveByEmail(EMAIL)).thenReturn(Optional.of(stored));
+
+        Optional<User> found = service.lookupActiveByEmail(EMAIL);
+
+        assertThat(found).containsSame(stored);
+    }
+
+    @Test
+    void lookupActiveByEmail_unknownEmail_returnsEmpty() {
+        when(repository.findActiveByEmail("nobody@example.com")).thenReturn(Optional.empty());
+
+        assertThat(service.lookupActiveByEmail("nobody@example.com")).isEmpty();
     }
 
     // --- createUnverified ----------------------------------------------------------------------
@@ -229,6 +253,18 @@ class UserServiceTest {
 
         assertThatThrownBy(() -> service.verifyPassword(id, RAW_PASSWORD))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    // --- verifyPasswordForUnknownUser ----------------------------------------------------------
+
+    @Test
+    void verifyPasswordForUnknownUser_matchesAgainstPreComputedDummyHash() {
+        service.verifyPasswordForUnknownUser(RAW_PASSWORD);
+
+        // The dummy hash is computed once in the constructor and reused per invocation, so the
+        // wall-clock cost of the "unknown email" branch matches the "wrong password" branch.
+        verify(passwordEncoder).matches(RAW_PASSWORD, DUMMY_HASH);
+        verify(repository, never()).findById(any());
     }
 
     private static UserId newUserId() {
