@@ -3,6 +3,7 @@ package io.github.rafaeljc.argus.common.infrastructure.ratelimit;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.github.bucket4j.caffeine.CaffeineProxyManager;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
+import io.github.rafaeljc.argus.common.application.ratelimit.RateLimiter;
 import java.time.Duration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;

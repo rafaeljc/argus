@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.github.bucket4j.caffeine.CaffeineProxyManager;
+import io.github.rafaeljc.argus.common.application.ratelimit.ConsumptionResult;
+import io.github.rafaeljc.argus.common.application.ratelimit.RateLimiter;
 import java.time.Duration;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;

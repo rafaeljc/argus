@@ -1,7 +1,8 @@
-package io.github.rafaeljc.argus.common.infrastructure.ratelimit;
+package io.github.rafaeljc.argus.common.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.github.rafaeljc.argus.common.application.ratelimit.BucketSelection;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;

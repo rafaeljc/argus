@@ -1,4 +1,4 @@
-package io.github.rafaeljc.argus.common.infrastructure.ratelimit;
+package io.github.rafaeljc.argus.common.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -9,7 +9,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.github.f4b6a3.uuid.UuidCreator;
-import io.github.rafaeljc.argus.auth.infrastructure.security.SessionAuthenticationToken;
+import io.github.rafaeljc.argus.auth.web.SessionAuthenticationToken;
+import io.github.rafaeljc.argus.common.application.ratelimit.BucketSelection;
+import io.github.rafaeljc.argus.common.application.ratelimit.ConsumptionResult;
+import io.github.rafaeljc.argus.common.application.ratelimit.RateLimiter;
 import io.github.rafaeljc.argus.common.domain.FixedClock;
 import io.github.rafaeljc.argus.common.domain.RateLimitExceededException;
 import io.github.rafaeljc.argus.common.domain.SessionId;

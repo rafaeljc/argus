@@ -1,5 +1,6 @@
-package io.github.rafaeljc.argus.common.infrastructure.ratelimit;
+package io.github.rafaeljc.argus.common.web;
 
+import io.github.rafaeljc.argus.common.application.ratelimit.BucketSelection;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Optional;
 import java.util.Set;

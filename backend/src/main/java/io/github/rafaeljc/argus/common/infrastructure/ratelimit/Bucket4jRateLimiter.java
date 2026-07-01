@@ -6,6 +6,8 @@ import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.ConsumptionProbe;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
+import io.github.rafaeljc.argus.common.application.ratelimit.ConsumptionResult;
+import io.github.rafaeljc.argus.common.application.ratelimit.RateLimiter;
 import java.util.Map;
 import java.util.Objects;
 

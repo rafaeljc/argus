@@ -1,9 +1,7 @@
-package io.github.rafaeljc.argus.auth.infrastructure.filter;
+package io.github.rafaeljc.argus.auth.web;
 
 import io.github.rafaeljc.argus.auth.application.port.SessionRepository;
 import io.github.rafaeljc.argus.auth.domain.Session;
-import io.github.rafaeljc.argus.auth.infrastructure.security.SessionAuthenticationToken;
-import io.github.rafaeljc.argus.auth.infrastructure.security.SessionCookieFactory;
 import io.github.rafaeljc.argus.common.domain.Clock;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -76,7 +74,7 @@ public class SessionResolutionFilter extends OncePerRequestFilter {
     }
 
     private void refreshSession(Session session, HttpServletRequest request, Instant now) {
-        Instant newExpiresAt = now.plus(SessionCookieFactory.ROLLING_WINDOW);
+        Instant newExpiresAt = now.plus(Session.ROLLING_WINDOW);
         String ip = request.getRemoteAddr();
         String userAgent = truncate(request.getHeader(USER_AGENT_HEADER), USER_AGENT_MAX_CHARS);
         sessionRepository.touch(session.id(), now, newExpiresAt, ip, userAgent);

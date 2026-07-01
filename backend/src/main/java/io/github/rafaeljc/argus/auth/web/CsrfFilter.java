@@ -1,6 +1,5 @@
-package io.github.rafaeljc.argus.auth.infrastructure.filter;
+package io.github.rafaeljc.argus.auth.web;
 
-import io.github.rafaeljc.argus.auth.infrastructure.security.CsrfCookieFactory;
 import io.github.rafaeljc.argus.common.domain.SessionRequiredException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

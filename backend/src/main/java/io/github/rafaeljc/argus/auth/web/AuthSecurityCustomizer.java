@@ -1,10 +1,7 @@
-package io.github.rafaeljc.argus.auth.infrastructure;
+package io.github.rafaeljc.argus.auth.web;
 
-import io.github.rafaeljc.argus.auth.infrastructure.filter.AccountStateGateFilter;
-import io.github.rafaeljc.argus.auth.infrastructure.filter.CsrfFilter;
-import io.github.rafaeljc.argus.auth.infrastructure.filter.SessionResolutionFilter;
-import io.github.rafaeljc.argus.common.infrastructure.SecurityFilterChainCustomizer;
-import io.github.rafaeljc.argus.common.infrastructure.ratelimit.RateLimitFilter;
+import io.github.rafaeljc.argus.common.web.RateLimitFilter;
+import io.github.rafaeljc.argus.common.web.SecurityFilterChainCustomizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.stereotype.Component;

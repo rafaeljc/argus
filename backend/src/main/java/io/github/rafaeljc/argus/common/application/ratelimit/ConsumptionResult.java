@@ -1,4 +1,4 @@
-package io.github.rafaeljc.argus.common.infrastructure.ratelimit;
+package io.github.rafaeljc.argus.common.application.ratelimit;
 
 public record ConsumptionResult(
         boolean allowed,

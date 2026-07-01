@@ -1,4 +1,4 @@
-package io.github.rafaeljc.argus.common.infrastructure;
+package io.github.rafaeljc.argus.common.web;
 
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 

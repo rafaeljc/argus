@@ -1,4 +1,4 @@
-package io.github.rafaeljc.argus.auth.infrastructure.security;
+package io.github.rafaeljc.argus.auth.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

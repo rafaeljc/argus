@@ -1,4 +1,4 @@
-package io.github.rafaeljc.argus.auth.infrastructure.filter;
+package io.github.rafaeljc.argus.auth.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -11,9 +11,6 @@ import static org.mockito.Mockito.when;
 import com.github.f4b6a3.uuid.UuidCreator;
 import io.github.rafaeljc.argus.auth.application.port.SessionRepository;
 import io.github.rafaeljc.argus.auth.domain.Session;
-import io.github.rafaeljc.argus.auth.infrastructure.security.AuthenticatedSession;
-import io.github.rafaeljc.argus.auth.infrastructure.security.SessionAuthenticationToken;
-import io.github.rafaeljc.argus.auth.infrastructure.security.SessionCookieFactory;
 import io.github.rafaeljc.argus.common.domain.FixedClock;
 import io.github.rafaeljc.argus.common.domain.SessionId;
 import io.github.rafaeljc.argus.common.domain.UserId;

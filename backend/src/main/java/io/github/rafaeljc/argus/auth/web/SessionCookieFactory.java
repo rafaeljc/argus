@@ -1,21 +1,20 @@
-package io.github.rafaeljc.argus.auth.infrastructure.security;
+package io.github.rafaeljc.argus.auth.web;
 
+import io.github.rafaeljc.argus.auth.domain.Session;
 import jakarta.servlet.http.Cookie;
-import java.time.Duration;
 import org.springframework.stereotype.Component;
 
 @Component
 public class SessionCookieFactory {
 
     public static final String COOKIE_NAME = "argus_session";
-    public static final Duration ROLLING_WINDOW = Duration.ofDays(30);
 
     private static final String SAME_SITE = "Lax";
     private static final String PATH = "/";
 
     public Cookie forToken(String rawToken) {
         Cookie cookie = baseCookie(rawToken);
-        cookie.setMaxAge((int) ROLLING_WINDOW.toSeconds());
+        cookie.setMaxAge((int) Session.ROLLING_WINDOW.toSeconds());
         return cookie;
     }
 

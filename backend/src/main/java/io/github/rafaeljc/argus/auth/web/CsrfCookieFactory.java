@@ -1,4 +1,4 @@
-package io.github.rafaeljc.argus.auth.infrastructure.security;
+package io.github.rafaeljc.argus.auth.web;
 
 import jakarta.servlet.http.Cookie;
 import java.time.Duration;

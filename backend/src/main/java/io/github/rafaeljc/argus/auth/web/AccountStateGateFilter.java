@@ -1,6 +1,5 @@
-package io.github.rafaeljc.argus.auth.infrastructure.filter;
+package io.github.rafaeljc.argus.auth.web;
 
-import io.github.rafaeljc.argus.auth.infrastructure.security.AuthenticatedSession;
 import io.github.rafaeljc.argus.common.domain.SessionRequiredException;
 import io.github.rafaeljc.argus.users.application.UserService;
 import io.github.rafaeljc.argus.users.domain.AccountSuspendedException;

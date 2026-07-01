@@ -1,4 +1,4 @@
-package io.github.rafaeljc.argus.common.infrastructure;
+package io.github.rafaeljc.argus.common.web;
 
 import java.util.List;
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;

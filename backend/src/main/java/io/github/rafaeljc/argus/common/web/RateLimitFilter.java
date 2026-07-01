@@ -1,5 +1,8 @@
-package io.github.rafaeljc.argus.common.infrastructure.ratelimit;
+package io.github.rafaeljc.argus.common.web;
 
+import io.github.rafaeljc.argus.common.application.ratelimit.BucketSelection;
+import io.github.rafaeljc.argus.common.application.ratelimit.ConsumptionResult;
+import io.github.rafaeljc.argus.common.application.ratelimit.RateLimiter;
 import io.github.rafaeljc.argus.common.domain.Clock;
 import io.github.rafaeljc.argus.common.domain.RateLimitExceededException;
 import jakarta.servlet.FilterChain;

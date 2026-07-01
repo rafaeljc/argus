@@ -1,4 +1,4 @@
-package io.github.rafaeljc.argus.auth.infrastructure.security;
+package io.github.rafaeljc.argus.auth.web;
 
 import io.github.rafaeljc.argus.common.domain.SessionId;
 import io.github.rafaeljc.argus.common.domain.UserId;
