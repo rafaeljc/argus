@@ -41,6 +41,11 @@ public class JpaSessionRepository implements SessionRepository {
     }
 
     @Override
+    public Optional<Session> findById(SessionId id) {
+        return jpa.findById(id.value()).map(SessionEntityMapper::toDomain);
+    }
+
+    @Override
     public Optional<Session> findByTokenHash(String sessionTokenHash) {
         return jpa.findBySessionTokenHash(sessionTokenHash).map(SessionEntityMapper::toDomain);
     }

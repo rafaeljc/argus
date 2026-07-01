@@ -83,9 +83,10 @@ class SessionResolutionFilterIT {
 
         ResponseEntity<String> response = exchangeWithCookie(WHOAMI_PATH, RAW_TOKEN);
 
-        // The filter does not authenticate an expired session, so the authorization layer rejects
-        // the request with 403 — proof that no authenticated principal was placed on the context.
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        // The filter does not authenticate an expired session, so the authenticated endpoint
+        // rejects the request with 401 UNAUTHORIZED — proof that no principal was placed on the
+        // context and the anti-enumeration entry point kicked in.
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         // The filter still clears the wire cookie before the rejection. SessionResolutionFilterTest
         // pins Max-Age=0 / SameSite / HttpOnly / Secure on the Cookie model.
         assertThat(response.getHeaders().get(HttpHeaders.SET_COOKIE))
@@ -97,7 +98,7 @@ class SessionResolutionFilterIT {
     void noCookie_doesNotAuthenticate_andEmitsNoSessionCookie() {
         ResponseEntity<String> response = http.getForEntity(url(WHOAMI_PATH), String.class);
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(response.getHeaders().get(HttpHeaders.SET_COOKIE))
                 .satisfiesAnyOf(
                         list -> assertThat(list).isNullOrEmpty(),
@@ -108,7 +109,7 @@ class SessionResolutionFilterIT {
     void unknownToken_doesNotAuthenticate() {
         ResponseEntity<String> response = exchangeWithCookie(WHOAMI_PATH, "not-a-real-token");
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     private Session save(SessionId sessionId, UserId userId, String ip, String ua,

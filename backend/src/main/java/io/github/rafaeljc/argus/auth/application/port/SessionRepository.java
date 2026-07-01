@@ -11,6 +11,8 @@ public interface SessionRepository {
 
     Session save(Session session);
 
+    Optional<Session> findById(SessionId id);
+
     Optional<Session> findByTokenHash(String sessionTokenHash);
 
     List<Session> findByUserId(UserId userId);

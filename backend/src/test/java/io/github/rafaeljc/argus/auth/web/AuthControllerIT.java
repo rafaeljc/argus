@@ -4,8 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
 import io.github.rafaeljc.argus.users.application.UserService;
+import io.github.rafaeljc.argus.users.domain.User;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.TestRestTemplate;
@@ -28,6 +31,9 @@ import tools.jackson.databind.ObjectMapper;
 class AuthControllerIT {
 
     private static final String ENDPOINT = "/api/v1/auth/signup";
+    private static final String LOGIN_ENDPOINT = "/api/v1/auth/login";
+    private static final String LOGOUT_ENDPOINT = "/api/v1/auth/logout";
+    private static final String STATUS_ENDPOINT = "/api/v1/auth/status";
     private static final String VALID_PASSWORD = "correct horse battery staple";
 
     @LocalServerPort
@@ -135,6 +141,206 @@ class AuthControllerIT {
         assertThat(storedEmail).isEqualTo("dave@example.com");
     }
 
+    // --- POST /auth/login ----------------------------------------------------------------------
+
+    @Test
+    void postLogin_validCredentials_returns200SetsBothCookiesAndPersistsSession() throws Exception {
+        String email = "login-valid@example.com";
+        UUID userId = createVerifiedUser(email);
+
+        ResponseEntity<String> response = postLogin(loginBody(email, VALID_PASSWORD));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+
+        JsonNode data = json.readTree(response.getBody()).get("data");
+        assertThat(data.get("user_id").asString()).isEqualTo(userId.toString());
+        assertThat(data.get("expires_at").asString()).isNotEmpty();
+
+        Map<String, String> cookies = setCookiesByName(response);
+        assertThat(cookies).containsKeys("argus_session", "argus_csrf");
+        assertThat(cookies.get("argus_session")).isNotBlank();
+        assertThat(cookies.get("argus_csrf")).isNotBlank();
+
+        Integer sessionCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sessions WHERE user_id = ?", Integer.class, userId);
+        assertThat(sessionCount).isEqualTo(1);
+    }
+
+    @Test
+    void postLogin_unknownEmail_returns401Unauthorized() throws Exception {
+        ResponseEntity<String> response = postLogin(loginBody("no-such-user@example.com", VALID_PASSWORD));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(401);
+        assertThat(json.readTree(response.getBody()).get("error").get("code").asString())
+                .isEqualTo("UNAUTHORIZED");
+    }
+
+    @Test
+    void postLogin_wrongPassword_returns401Unauthorized() throws Exception {
+        String email = "login-wrongpw@example.com";
+        createVerifiedUser(email);
+
+        ResponseEntity<String> response = postLogin(loginBody(email, "not-the-password"));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(401);
+        assertThat(json.readTree(response.getBody()).get("error").get("code").asString())
+                .isEqualTo("UNAUTHORIZED");
+    }
+
+    @Test
+    void postLogin_unverifiedUser_returns401ToPreventEnumeration() throws Exception {
+        String email = "login-unverified@example.com";
+        userService.createUnverified(email, VALID_PASSWORD);
+
+        ResponseEntity<String> response = postLogin(loginBody(email, VALID_PASSWORD));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(401);
+        assertThat(json.readTree(response.getBody()).get("error").get("code").asString())
+                .isEqualTo("UNAUTHORIZED");
+    }
+
+    @Test
+    void postLogin_missingPassword_returns422ValidationError() throws Exception {
+        ResponseEntity<String> response = postLogin("{\"email\":\"login-blank@example.com\"}");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(422);
+        assertThat(json.readTree(response.getBody()).get("error").get("code").asString())
+                .isEqualTo("VALIDATION_ERROR");
+    }
+
+    // --- POST /auth/logout ---------------------------------------------------------------------
+
+    @Test
+    void postLogout_validSession_returns204ClearsCookiesAndDeletesSessionRow() throws Exception {
+        String email = "logout-happy@example.com";
+        final UUID userId = createVerifiedUser(email);
+        Session session = login(email);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(HttpHeaders.COOKIE,
+                "argus_session=" + session.sessionCookie + "; argus_csrf=" + session.csrfCookie);
+        headers.add("X-CSRF-Token", session.csrfCookie);
+        ResponseEntity<String> response = http.exchange(
+                url(LOGOUT_ENDPOINT), HttpMethod.POST, new HttpEntity<>(headers), String.class);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(204);
+
+        // Jakarta's Cookie.setMaxAge(0) renders as a past Expires date rather than "Max-Age=0";
+        // browsers treat both as an immediate deletion. Anchor on the value being empty (the
+        // "cleared" wire signal) rather than the header syntax.
+        List<String> setCookies = response.getHeaders().get("Set-Cookie");
+        assertThat(setCookies).anyMatch(c -> c.startsWith("argus_session=;"));
+        assertThat(setCookies).anyMatch(c -> c.startsWith("argus_csrf=;"));
+
+        Integer sessionCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sessions WHERE user_id = ?", Integer.class, userId);
+        assertThat(sessionCount).isZero();
+    }
+
+    @Test
+    void postLogout_noSession_returns401Unauthorized() {
+        ResponseEntity<String> response = http.exchange(
+                url(LOGOUT_ENDPOINT), HttpMethod.POST, new HttpEntity<>(new HttpHeaders()), String.class);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(401);
+    }
+
+    @Test
+    void postLogout_missingCsrfHeader_returns403Forbidden() throws Exception {
+        String email = "logout-nocsrf@example.com";
+        createVerifiedUser(email);
+        Session session = login(email);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(HttpHeaders.COOKIE,
+                "argus_session=" + session.sessionCookie + "; argus_csrf=" + session.csrfCookie);
+        // Deliberately omit X-CSRF-Token.
+        ResponseEntity<String> response = http.exchange(
+                url(LOGOUT_ENDPOINT), HttpMethod.POST, new HttpEntity<>(headers), String.class);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(403);
+    }
+
+    // --- GET /auth/status ----------------------------------------------------------------------
+
+    @Test
+    void getStatus_validSession_returns200WithUserIdAndExpiresAt() throws Exception {
+        String email = "status-happy@example.com";
+        UUID userId = createVerifiedUser(email);
+        Session session = login(email);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(HttpHeaders.COOKIE, "argus_session=" + session.sessionCookie);
+        ResponseEntity<String> response = http.exchange(
+                url(STATUS_ENDPOINT), HttpMethod.GET, new HttpEntity<>(headers), String.class);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        JsonNode data = json.readTree(response.getBody()).get("data");
+        assertThat(data.get("user_id").asString()).isEqualTo(userId.toString());
+        assertThat(data.get("expires_at").asString()).isNotEmpty();
+    }
+
+    @Test
+    void getStatus_noSession_returns401Unauthorized() {
+        ResponseEntity<String> response = http.exchange(
+                url(STATUS_ENDPOINT), HttpMethod.GET, new HttpEntity<>(new HttpHeaders()), String.class);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(401);
+    }
+
+    // --- Helpers -------------------------------------------------------------------------------
+
+    private UUID createVerifiedUser(String email) {
+        User created = userService.createUnverified(email, VALID_PASSWORD);
+        userService.markVerified(created.id());
+        return created.id().value();
+    }
+
+    private Session login(String email) throws Exception {
+        ResponseEntity<String> response = postLogin(loginBody(email, VALID_PASSWORD));
+        Map<String, String> cookies = setCookiesByName(response);
+        return new Session(cookies.get("argus_session"), cookies.get("argus_csrf"));
+    }
+
+    private static Map<String, String> setCookiesByName(ResponseEntity<String> response) {
+        List<String> setCookies = response.getHeaders().get("Set-Cookie");
+        if (setCookies == null) {
+            return Map.of();
+        }
+        // If a name appears more than once (e.g. logout produces refreshed + cleared), the last
+        // Set-Cookie wins, which mirrors the browser's application order.
+        return setCookies.stream().collect(Collectors.toMap(
+                AuthControllerIT::cookieName,
+                AuthControllerIT::cookieValue,
+                (first, second) -> second));
+    }
+
+    private static String cookieName(String setCookie) {
+        int eq = setCookie.indexOf('=');
+        return setCookie.substring(0, eq);
+    }
+
+    private static String cookieValue(String setCookie) {
+        int eq = setCookie.indexOf('=');
+        int semi = setCookie.indexOf(';');
+        return semi < 0 ? setCookie.substring(eq + 1) : setCookie.substring(eq + 1, semi);
+    }
+
+    private String url(String path) {
+        return "http://localhost:" + port + path;
+    }
+
+    private ResponseEntity<String> postLogin(String jsonBody) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return http.exchange(url(LOGIN_ENDPOINT), HttpMethod.POST,
+                new HttpEntity<>(jsonBody, headers), String.class);
+    }
+
+    private static String loginBody(String email, String password) {
+        return "{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}";
+    }
+
     private static String body(String email, String password) {
         // Hand-built JSON avoids leaking test-side serialization choices into the wire format.
         return "{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}";
@@ -155,4 +361,6 @@ class AuthControllerIT {
         details.forEach(node -> names.add(node.get("field").asString()));
         return names;
     }
+
+    private record Session(String sessionCookie, String csrfCookie) {}
 }

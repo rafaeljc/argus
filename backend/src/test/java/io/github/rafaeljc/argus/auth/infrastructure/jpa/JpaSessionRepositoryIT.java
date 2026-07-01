@@ -69,6 +69,27 @@ class JpaSessionRepositoryIT {
     }
 
     @Test
+    void findById_existingSession_returnsPersistedSession() {
+        UserId userId = newUser();
+        Session saved = sessionRepository.save(newSession(userId, TOKEN_HASH, "10.0.0.1", "JUnit/5"));
+
+        Optional<Session> loaded = sessionRepository.findById(saved.id());
+
+        assertThat(loaded).isPresent();
+        Session session = loaded.get();
+        assertThat(session.id()).isEqualTo(saved.id());
+        assertThat(session.userId()).isEqualTo(userId);
+        assertThat(session.expiresAt()).isEqualTo(EXPIRES);
+    }
+
+    @Test
+    void findById_unknownId_returnsEmpty() {
+        SessionId unknown = new SessionId(UuidCreator.getTimeOrderedEpoch());
+
+        assertThat(sessionRepository.findById(unknown)).isEmpty();
+    }
+
+    @Test
     void save_duplicateTokenHash_throwsDataIntegrityViolation() {
         UserId userId = newUser();
         sessionRepository.save(newSession(userId, TOKEN_HASH, null, null));
