@@ -3,15 +3,12 @@ package io.github.rafaeljc.argus.email.infrastructure.scheduler;
 import io.github.rafaeljc.argus.email.application.PollOutboxOnce;
 import jakarta.annotation.PostConstruct;
 import java.util.UUID;
-import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
-@ConditionalOnBean(DataSource.class)
 public class OutboxPollerScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(OutboxPollerScheduler.class);
