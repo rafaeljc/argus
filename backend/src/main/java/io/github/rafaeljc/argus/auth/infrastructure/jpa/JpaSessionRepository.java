@@ -26,6 +26,12 @@ public class JpaSessionRepository implements SessionRepository {
              WHERE id = :id
             """;
 
+    private static final String DELETE_ALL_FOR_USER_SQL =
+            """
+            DELETE FROM sessions
+             WHERE user_id = :userId
+            """;
+
     private final SpringDataSessionJpaRepository jpa;
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -69,6 +75,12 @@ public class JpaSessionRepository implements SessionRepository {
     @Override
     public void deleteById(SessionId id) {
         jpa.deleteById(id.value());
+    }
+
+    @Override
+    public void deleteAllForUser(UserId userId) {
+        MapSqlParameterSource params = new MapSqlParameterSource("userId", userId.value());
+        jdbc.update(DELETE_ALL_FOR_USER_SQL, params);
     }
 
     // pgjdbc cannot infer a SQL type from java.time.Instant; OffsetDateTime maps to

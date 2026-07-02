@@ -20,4 +20,9 @@ public interface SessionRepository {
     void touch(SessionId id, Instant lastActivityAt, Instant expiresAt, String ipAddress, String userAgent);
 
     void deleteById(SessionId id);
+
+    // Bulk invalidation for a single user (password reset, admin-initiated logout-everywhere).
+    // Preferred over findByUserId + per-row deleteById because it is one round trip and one SQL
+    // statement, atomic under the caller's transaction.
+    void deleteAllForUser(UserId userId);
 }
