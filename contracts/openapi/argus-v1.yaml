@@ -161,7 +161,15 @@ paths:
       responses:
         "204": { description: Email verified }
         "422":
-          $ref: "#/components/responses/ValidationError"
+          description: |
+            Token could not be redeemed. Error code is either `VALIDATION_ERROR`
+            (missing / blank `token` field) or `INVALID_TOKEN` (unknown, expired,
+            or already used). The three token-lifecycle cases collapse to one
+            code so callers cannot probe token existence or state without a
+            valid token.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
 
   /auth/password-reset-requests:
     post:
