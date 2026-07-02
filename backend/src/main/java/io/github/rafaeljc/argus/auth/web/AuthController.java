@@ -1,9 +1,11 @@
 package io.github.rafaeljc.argus.auth.web;
 
+import io.github.rafaeljc.argus.auth.application.CompletePasswordReset;
 import io.github.rafaeljc.argus.auth.application.GetSessionStatus;
 import io.github.rafaeljc.argus.auth.application.Login;
 import io.github.rafaeljc.argus.auth.application.LoginResult;
 import io.github.rafaeljc.argus.auth.application.Logout;
+import io.github.rafaeljc.argus.auth.application.RequestPasswordReset;
 import io.github.rafaeljc.argus.auth.application.SessionStatusResult;
 import io.github.rafaeljc.argus.auth.application.SignUp;
 import io.github.rafaeljc.argus.auth.application.SignUpResult;
@@ -34,6 +36,8 @@ class AuthController {
     private final Logout logout;
     private final GetSessionStatus getSessionStatus;
     private final VerifyEmail verifyEmail;
+    private final RequestPasswordReset requestPasswordReset;
+    private final CompletePasswordReset completePasswordReset;
     private final SessionCookieFactory sessionCookieFactory;
     private final CsrfCookieFactory csrfCookieFactory;
 
@@ -42,6 +46,8 @@ class AuthController {
                    Logout logout,
                    GetSessionStatus getSessionStatus,
                    VerifyEmail verifyEmail,
+                   RequestPasswordReset requestPasswordReset,
+                   CompletePasswordReset completePasswordReset,
                    SessionCookieFactory sessionCookieFactory,
                    CsrfCookieFactory csrfCookieFactory) {
         this.signUp = signUp;
@@ -49,6 +55,8 @@ class AuthController {
         this.logout = logout;
         this.getSessionStatus = getSessionStatus;
         this.verifyEmail = verifyEmail;
+        this.requestPasswordReset = requestPasswordReset;
+        this.completePasswordReset = completePasswordReset;
         this.sessionCookieFactory = sessionCookieFactory;
         this.csrfCookieFactory = csrfCookieFactory;
     }
@@ -64,6 +72,18 @@ class AuthController {
     @PostMapping("/verify-email")
     ResponseEntity<Void> verifyEmail(@Valid @RequestBody VerifyEmailRequest body) {
         verifyEmail.execute(body.token());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/password-reset-requests")
+    ResponseEntity<Void> requestPasswordReset(@Valid @RequestBody RequestPasswordResetRequest body) {
+        requestPasswordReset.execute(body.email());
+        return ResponseEntity.accepted().build();
+    }
+
+    @PostMapping("/password-resets")
+    ResponseEntity<Void> completePasswordReset(@Valid @RequestBody CompletePasswordResetRequest body) {
+        completePasswordReset.execute(body.token(), body.newPassword());
         return ResponseEntity.noContent().build();
     }
 
