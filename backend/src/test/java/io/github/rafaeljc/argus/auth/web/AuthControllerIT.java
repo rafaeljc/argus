@@ -22,18 +22,32 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.TestPropertySource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 @Import(PostgresContainer.class)
 @AutoConfigureTestRestTemplate
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+// Every HTTP test in this class shares one JVM-local bucket store keyed by the localhost IP, so
+// the production 5/h signup budget would exhaust part-way through a run. Bumping the buckets here
+// only relaxes what needs relaxing to exercise the endpoints; a dedicated rate-limit IT stays
+// responsible for enforcing the production numbers.
+@TestPropertySource(properties = {
+        "argus.rate-limit.buckets.[RL.auth.signup].capacity=1000",
+        "argus.rate-limit.buckets.[RL.auth.signup].refill-tokens=1000",
+        "argus.rate-limit.buckets.[RL.auth.signup].refill-duration=PT1M",
+        "argus.rate-limit.buckets.[RL.unauth.global].capacity=1000",
+        "argus.rate-limit.buckets.[RL.unauth.global].refill-tokens=1000",
+        "argus.rate-limit.buckets.[RL.unauth.global].refill-duration=PT1M"
+})
 class AuthControllerIT {
 
     private static final String ENDPOINT = "/api/v1/auth/signup";
     private static final String LOGIN_ENDPOINT = "/api/v1/auth/login";
     private static final String LOGOUT_ENDPOINT = "/api/v1/auth/logout";
     private static final String STATUS_ENDPOINT = "/api/v1/auth/status";
+    private static final String VERIFY_EMAIL_ENDPOINT = "/api/v1/auth/verify-email";
     private static final String VALID_PASSWORD = "correct horse battery staple";
 
     @LocalServerPort
@@ -288,6 +302,80 @@ class AuthControllerIT {
         assertThat(response.getStatusCode().value()).isEqualTo(401);
     }
 
+    // --- POST /auth/verify-email ---------------------------------------------------------------
+
+    @Test
+    void postVerifyEmail_validToken_returns204AndMarksUserAndVerificationVerified() throws Exception {
+        String email = "verify-happy@example.com";
+        SignedUpUser signup = signupAndReadOutboxToken(email);
+
+        ResponseEntity<String> response = postVerifyEmail(verifyBody(signup.plainToken));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(204);
+
+        Boolean isVerified = jdbc.queryForObject(
+                "SELECT is_verified FROM users WHERE id = ?", Boolean.class, signup.userId);
+        assertThat(isVerified).isTrue();
+
+        Object verifiedAt = jdbc.queryForMap(
+                "SELECT verified_at FROM email_verifications WHERE user_id = ?", signup.userId)
+                .get("verified_at");
+        assertThat(verifiedAt).isNotNull();
+    }
+
+    @Test
+    void postVerifyEmail_expiredToken_returns422InvalidTokenAndLeavesUserUnverified() throws Exception {
+        String email = "verify-expired@example.com";
+        SignedUpUser signup = signupAndReadOutboxToken(email);
+        // Domain invariant requires expires_at > created_at; back-date both so the row still
+        // validates when the JPA repository maps it back to the record.
+        jdbc.update("UPDATE email_verifications "
+                        + "SET created_at = now() - interval '2 hours', "
+                        + "    expires_at = now() - interval '1 hour' "
+                        + "WHERE user_id = ?",
+                signup.userId);
+
+        ResponseEntity<String> response = postVerifyEmail(verifyBody(signup.plainToken));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(422);
+        assertThat(json.readTree(response.getBody()).get("error").get("code").asString())
+                .isEqualTo("INVALID_TOKEN");
+        Boolean isVerified = jdbc.queryForObject(
+                "SELECT is_verified FROM users WHERE id = ?", Boolean.class, signup.userId);
+        assertThat(isVerified).isFalse();
+    }
+
+    @Test
+    void postVerifyEmail_alreadyUsedToken_returns422InvalidToken() throws Exception {
+        String email = "verify-replayed@example.com";
+        SignedUpUser signup = signupAndReadOutboxToken(email);
+        assertThat(postVerifyEmail(verifyBody(signup.plainToken)).getStatusCode().value()).isEqualTo(204);
+
+        ResponseEntity<String> response = postVerifyEmail(verifyBody(signup.plainToken));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(422);
+        assertThat(json.readTree(response.getBody()).get("error").get("code").asString())
+                .isEqualTo("INVALID_TOKEN");
+    }
+
+    @Test
+    void postVerifyEmail_unknownToken_returns422InvalidToken() throws Exception {
+        ResponseEntity<String> response = postVerifyEmail(verifyBody("no-such-token"));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(422);
+        assertThat(json.readTree(response.getBody()).get("error").get("code").asString())
+                .isEqualTo("INVALID_TOKEN");
+    }
+
+    @Test
+    void postVerifyEmail_missingToken_returns422ValidationError() throws Exception {
+        ResponseEntity<String> response = postVerifyEmail("{}");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(422);
+        assertThat(json.readTree(response.getBody()).get("error").get("code").asString())
+                .isEqualTo("VALIDATION_ERROR");
+    }
+
     // --- Helpers -------------------------------------------------------------------------------
 
     private UUID createVerifiedUser(String email) {
@@ -363,4 +451,31 @@ class AuthControllerIT {
     }
 
     private record Session(String sessionCookie, String csrfCookie) {}
+
+    private record SignedUpUser(UUID userId, String plainToken) {}
+
+    private SignedUpUser signupAndReadOutboxToken(String email) throws Exception {
+        ResponseEntity<String> signupResponse = post(body(email, VALID_PASSWORD));
+        UUID userId = UUID.fromString(
+                json.readTree(signupResponse.getBody()).get("data").get("user_id").asString());
+        // The plain token only ever exists in the outbox payload (destined for the verification
+        // email); the DB stores just the SHA-256 hash. Reading it here mirrors what the email
+        // gateway will hand to the recipient.
+        String payload = (String) jdbc.queryForMap(
+                "SELECT payload::text AS payload FROM outbox WHERE aggregate_id = ?", userId)
+                .get("payload");
+        String plainToken = json.readTree(payload).get("token").asString();
+        return new SignedUpUser(userId, plainToken);
+    }
+
+    private ResponseEntity<String> postVerifyEmail(String jsonBody) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return http.exchange(url(VERIFY_EMAIL_ENDPOINT), HttpMethod.POST,
+                new HttpEntity<>(jsonBody, headers), String.class);
+    }
+
+    private static String verifyBody(String token) {
+        return "{\"token\":\"" + token + "\"}";
+    }
 }

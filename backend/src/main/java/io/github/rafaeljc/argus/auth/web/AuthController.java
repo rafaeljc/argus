@@ -7,6 +7,7 @@ import io.github.rafaeljc.argus.auth.application.Logout;
 import io.github.rafaeljc.argus.auth.application.SessionStatusResult;
 import io.github.rafaeljc.argus.auth.application.SignUp;
 import io.github.rafaeljc.argus.auth.application.SignUpResult;
+import io.github.rafaeljc.argus.auth.application.VerifyEmail;
 import io.github.rafaeljc.argus.common.web.SuccessEnvelope;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -32,6 +33,7 @@ class AuthController {
     private final Login login;
     private final Logout logout;
     private final GetSessionStatus getSessionStatus;
+    private final VerifyEmail verifyEmail;
     private final SessionCookieFactory sessionCookieFactory;
     private final CsrfCookieFactory csrfCookieFactory;
 
@@ -39,12 +41,14 @@ class AuthController {
                    Login login,
                    Logout logout,
                    GetSessionStatus getSessionStatus,
+                   VerifyEmail verifyEmail,
                    SessionCookieFactory sessionCookieFactory,
                    CsrfCookieFactory csrfCookieFactory) {
         this.signUp = signUp;
         this.login = login;
         this.logout = logout;
         this.getSessionStatus = getSessionStatus;
+        this.verifyEmail = verifyEmail;
         this.sessionCookieFactory = sessionCookieFactory;
         this.csrfCookieFactory = csrfCookieFactory;
     }
@@ -55,6 +59,12 @@ class AuthController {
         SignUpResponse response = new SignUpResponse(
                 result.userId().value().toString(), result.verificationSent());
         return ResponseEntity.created(ACCOUNT_ME_LOCATION).body(new SuccessEnvelope<>(response));
+    }
+
+    @PostMapping("/verify-email")
+    ResponseEntity<Void> verifyEmail(@Valid @RequestBody VerifyEmailRequest body) {
+        verifyEmail.execute(body.token());
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/login")
