@@ -14,6 +14,7 @@ import io.github.rafaeljc.argus.common.domain.ResourceNotFoundException;
 import io.github.rafaeljc.argus.common.domain.UserId;
 import io.github.rafaeljc.argus.users.application.port.PasswordEncoder;
 import io.github.rafaeljc.argus.users.application.port.UserRepository;
+import io.github.rafaeljc.argus.users.domain.AccountSuspendedException;
 import io.github.rafaeljc.argus.users.domain.User;
 import java.time.Instant;
 import java.util.Optional;
@@ -253,6 +254,62 @@ class UserServiceTest {
 
         assertThatThrownBy(() -> service.verifyPassword(id, RAW_PASSWORD))
                 .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    // --- updatePassword ------------------------------------------------------------------------
+
+    @Test
+    void updatePassword_activeUser_replacesHashAndBumpsUpdatedAt() {
+        UserId id = newUserId();
+        User active = existing(id, Instant.parse("2026-06-01T00:00:00Z"));
+        String newHash = "$argon2id$v=19$m=65536,t=3,p=1$new";
+        when(repository.findActiveById(id)).thenReturn(Optional.of(active));
+        when(passwordEncoder.encode("new-secret")).thenReturn(newHash);
+        when(repository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        clock = new FixedClock(LATER);
+        service = new UserService(repository, passwordEncoder, clock);
+
+        User result = service.updatePassword(id, "new-secret");
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(repository).save(captor.capture());
+        User saved = captor.getValue();
+        assertThat(saved).isSameAs(result);
+        assertThat(saved.id()).isEqualTo(id);
+        assertThat(saved.email()).isEqualTo(active.email());
+        assertThat(saved.passwordHash()).isEqualTo(newHash);
+        assertThat(saved.isVerified()).isEqualTo(active.isVerified());
+        assertThat(saved.isSuspended()).isFalse();
+        assertThat(saved.isDeleted()).isFalse();
+        assertThat(saved.isAdmin()).isEqualTo(active.isAdmin());
+        assertThat(saved.createdAt()).isEqualTo(active.createdAt());
+        assertThat(saved.updatedAt()).isEqualTo(LATER);
+        assertThat(saved.deletedAt()).isNull();
+    }
+
+    @Test
+    void updatePassword_suspendedUser_throwsAccountSuspendedAndDoesNotSave() {
+        UserId id = newUserId();
+        User suspended = new User(
+                id, EMAIL, ENCODED_HASH, true, true, false, false,
+                NOW, NOW, null);
+        when(repository.findActiveById(id)).thenReturn(Optional.of(suspended));
+
+        assertThatThrownBy(() -> service.updatePassword(id, "new-secret"))
+                .isInstanceOf(AccountSuspendedException.class);
+        verify(passwordEncoder, never()).encode("new-secret");
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void updatePassword_missingOrDeletedUser_throwsResourceNotFoundAndDoesNotSave() {
+        UserId id = newUserId();
+        when(repository.findActiveById(id)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.updatePassword(id, "new-secret"))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(passwordEncoder, never()).encode("new-secret");
+        verify(repository, never()).save(any());
     }
 
     // --- verifyPasswordForUnknownUser ----------------------------------------------------------
