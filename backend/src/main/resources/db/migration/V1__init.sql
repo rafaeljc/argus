@@ -63,7 +63,7 @@ CREATE TABLE password_resets (
 
 -- Single hot path: SHA-256 the token from the email link, resolve by hash.
 CREATE UNIQUE INDEX password_resets_token_hash_uidx  ON password_resets (token_hash);
--- Serves the NFR-Sec7 "≤ 3 / h / email" rate-limit check, which counts recent resets for a user.
+-- Serves the NFR-Sec7 "≤ 5 / h / email" rate-limit check, which counts recent resets for a user.
 CREATE        INDEX password_resets_user_created_idx ON password_resets (user_id, created_at DESC);
 
 CREATE TABLE symbols (
