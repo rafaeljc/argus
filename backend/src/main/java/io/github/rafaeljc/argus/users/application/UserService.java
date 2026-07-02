@@ -6,6 +6,7 @@ import io.github.rafaeljc.argus.common.domain.ResourceNotFoundException;
 import io.github.rafaeljc.argus.common.domain.UserId;
 import io.github.rafaeljc.argus.users.application.port.PasswordEncoder;
 import io.github.rafaeljc.argus.users.application.port.UserRepository;
+import io.github.rafaeljc.argus.users.domain.AccountSuspendedException;
 import io.github.rafaeljc.argus.users.domain.User;
 import java.time.Instant;
 import java.util.Optional;
@@ -103,6 +104,29 @@ public class UserService {
                 now,
                 now);
         return repository.save(deleted);
+    }
+
+    // Suspension is enforced here rather than in each caller so every mutation path — password
+    // reset today, account-settings change tomorrow — inherits the same policy without duplicating
+    // the check. Deleted users are filtered up front by findActiveById.
+    @Transactional
+    public User updatePassword(UserId id, String rawPassword) {
+        User current = lookupActive(id);
+        if (current.isSuspended()) {
+            throw new AccountSuspendedException(current.id(), current.email());
+        }
+        User updated = new User(
+                current.id(),
+                current.email(),
+                passwordEncoder.encode(rawPassword),
+                current.isVerified(),
+                current.isSuspended(),
+                current.isDeleted(),
+                current.isAdmin(),
+                current.createdAt(),
+                clock.now(),
+                current.deletedAt());
+        return repository.save(updated);
     }
 
     public boolean verifyPassword(UserId id, String rawPassword) {

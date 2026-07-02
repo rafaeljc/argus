@@ -42,11 +42,11 @@ class BucketResolverTest {
     }
 
     @Test
-    void resolve_passwordResetRequestsPost_returnsUnauthGlobalKeyedByIp() {
+    void resolve_passwordResetRequestsPost_returnsResetBucketKeyedByIp() {
         BucketSelection selection =
                 resolver.resolve(request("POST", "/api/v1/auth/password-reset-requests"), UNAUTHENTICATED);
 
-        assertThat(selection.bucketName()).isEqualTo("RL.unauth.global");
+        assertThat(selection.bucketName()).isEqualTo("RL.auth.reset");
         assertThat(selection.key()).isEqualTo(IP);
     }
 

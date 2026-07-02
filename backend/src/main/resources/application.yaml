@@ -80,8 +80,8 @@ argus:
         refill-tokens: 10
         refill-duration: PT15M
       "[RL.auth.reset]":
-        capacity: 3
-        refill-tokens: 3
+        capacity: 5
+        refill-tokens: 5
         refill-duration: PT1H
       "[RL.unauth.global]":
         capacity: 100
