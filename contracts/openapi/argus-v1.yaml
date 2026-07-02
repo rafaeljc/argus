@@ -175,7 +175,7 @@ paths:
     post:
       tags: [auth]
       summary: Request a password-reset email
-      description: Always returns 202 to avoid leaking account existence.
+      description: Always returns 202 to avoid leaking account existence or state.
       security: []
       requestBody:
         required: true
@@ -189,10 +189,8 @@ paths:
       responses:
         "202":
           description: Acknowledged
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/EnvelopeMessage"
+        "422":
+          $ref: "#/components/responses/ValidationError"
         "429":
           $ref: "#/components/responses/RateLimited"
 
@@ -200,7 +198,7 @@ paths:
     post:
       tags: [auth]
       summary: Reset password with a single-use token
-      description: Invalidates all existing sessions for the user; issues a fresh one.
+      description: Invalidates all existing sessions; client re-authenticates via `POST /auth/login`.
       security: []
       requestBody:
         required: true
@@ -213,17 +211,22 @@ paths:
                 token: { type: string }
                 new_password: { type: string, format: password, minLength: 8 }
       responses:
-        "200":
-          description: Password reset; new session established
-          headers:
-            Set-Cookie:
-              schema: { type: string }
+        "204":
+          description: Password reset
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "422":
+          description: |
+            Error code is either `VALIDATION_ERROR` (missing / blank / too-short
+            field) or `INVALID_TOKEN` (unknown, expired, or already used). The
+            three token-lifecycle cases collapse to one code so callers cannot
+            probe token existence or state without a valid token.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/EnvelopeSessionResult"
-        "422":
-          $ref: "#/components/responses/ValidationError"
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "429":
+          $ref: "#/components/responses/RateLimited"
 
   /auth/status:
     get:
