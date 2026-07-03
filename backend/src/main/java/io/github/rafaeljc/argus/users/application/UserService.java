@@ -1,7 +1,9 @@
 package io.github.rafaeljc.argus.users.application;
 
 import com.github.f4b6a3.uuid.UuidCreator;
+import io.github.rafaeljc.argus.common.application.audit.AuthAuditEvent;
 import io.github.rafaeljc.argus.common.domain.Clock;
+import io.github.rafaeljc.argus.common.domain.DomainException;
 import io.github.rafaeljc.argus.common.domain.ResourceNotFoundException;
 import io.github.rafaeljc.argus.common.domain.UserId;
 import io.github.rafaeljc.argus.users.application.port.PasswordEncoder;
@@ -10,6 +12,7 @@ import io.github.rafaeljc.argus.users.domain.AccountSuspendedException;
 import io.github.rafaeljc.argus.users.domain.User;
 import java.time.Instant;
 import java.util.Optional;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,16 +27,21 @@ public class UserService {
     private final UserRepository repository;
     private final PasswordEncoder passwordEncoder;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
     // Pre-computed Argon2id hash with the same cost parameters as production user hashes.
     // Login runs a match against this hash when the email is unknown so that the total time
     // spent in verify() is indistinguishable from the wrong-password branch, closing the
     // timing side-channel that would otherwise reveal account existence.
     private final String dummyPasswordHash;
 
-    public UserService(UserRepository repository, PasswordEncoder passwordEncoder, Clock clock) {
+    public UserService(UserRepository repository,
+                       PasswordEncoder passwordEncoder,
+                       Clock clock,
+                       ApplicationEventPublisher events) {
         this.repository = repository;
         this.passwordEncoder = passwordEncoder;
         this.clock = clock;
+        this.events = events;
         this.dummyPasswordHash = passwordEncoder.encode(DUMMY_SEED);
     }
 
@@ -87,6 +95,17 @@ public class UserService {
 
     @Transactional
     public User softDelete(UserId id, String rawPassword) {
+        try {
+            User deleted = performSoftDelete(id, rawPassword);
+            events.publishEvent(new AuthAuditEvent.AccountDeleted(deleted.id(), deleted.email()));
+            return deleted;
+        } catch (DomainException ex) {
+            events.publishEvent(new AuthAuditEvent.AccountDeletionFailed(id, ex.code()));
+            throw ex;
+        }
+    }
+
+    private User performSoftDelete(UserId id, String rawPassword) {
         User current = lookupActive(id);
         if (!passwordEncoder.matches(rawPassword, current.passwordHash())) {
             throw new InvalidCurrentPasswordException(id);

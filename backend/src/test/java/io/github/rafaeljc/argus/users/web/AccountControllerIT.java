@@ -10,6 +10,7 @@ import io.github.rafaeljc.argus.auth.web.SessionCookieFactory;
 import io.github.rafaeljc.argus.common.domain.SessionId;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
 import io.github.rafaeljc.argus.users.application.UserService;
+import io.github.rafaeljc.argus.users.application.port.UserRepository;
 import io.github.rafaeljc.argus.users.domain.User;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -53,6 +54,9 @@ class AccountControllerIT {
     private UserService userService;
 
     @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
     private SessionRepository sessionRepository;
 
     @Test
@@ -89,7 +93,7 @@ class AccountControllerIT {
 
     @Test
     void deleteMe_authenticatedUserWithCorrectPassword_returns204AndSoftDeletes() {
-        User seeded = userService.createUnverified("bob@example.com", PASSWORD);
+        User seeded = seedVerified("bob@example.com");
 
         ResponseEntity<String> response = exchange(seeded, HttpMethod.DELETE, passwordBody(PASSWORD));
 
@@ -102,8 +106,8 @@ class AccountControllerIT {
     }
 
     @Test
-    void deleteMe_secondCallOnDeletedUser_returns404AndPreservesDeletedAt() throws Exception {
-        User seeded = userService.createUnverified("carol@example.com", PASSWORD);
+    void deleteMe_secondCallOnDeletedUser_returns401AndPreservesDeletedAt() throws Exception {
+        User seeded = seedVerified("carol@example.com");
 
         ResponseEntity<String> first = exchange(seeded, HttpMethod.DELETE, passwordBody(PASSWORD));
         assertThat(first.getStatusCode().value()).isEqualTo(204);
@@ -111,27 +115,27 @@ class AccountControllerIT {
         assertThat(firstDeletedAt).isNotNull();
 
         ResponseEntity<String> second = exchange(seeded, HttpMethod.DELETE, passwordBody(PASSWORD));
-        assertThat(second.getStatusCode().value()).isEqualTo(404);
+        assertThat(second.getStatusCode().value()).isEqualTo(401);
         assertThat(json.readTree(second.getBody()).get("error").get("code").asString())
-                .isEqualTo("NOT_FOUND");
+                .isEqualTo("UNAUTHORIZED");
         assertThat(userService.lookup(seeded.id()).deletedAt()).isEqualTo(firstDeletedAt);
     }
 
     @Test
-    void deleteMe_wrongPasswordOnDeletedUser_returns404NotFoundForAntiEnumeration() throws Exception {
-        User seeded = userService.createUnverified("frank@example.com", PASSWORD);
+    void deleteMe_wrongPasswordOnDeletedUser_returns401UnauthorizedForAntiEnumeration() throws Exception {
+        User seeded = seedVerified("frank@example.com");
         userService.softDelete(seeded.id(), PASSWORD);
 
         ResponseEntity<String> response = exchange(seeded, HttpMethod.DELETE, passwordBody("anything"));
 
-        assertThat(response.getStatusCode().value()).isEqualTo(404);
+        assertThat(response.getStatusCode().value()).isEqualTo(401);
         assertThat(json.readTree(response.getBody()).get("error").get("code").asString())
-                .isEqualTo("NOT_FOUND");
+                .isEqualTo("UNAUTHORIZED");
     }
 
     @Test
     void deleteMe_wrongPassword_returns422InvalidCurrentPasswordAndDoesNotDelete() throws Exception {
-        User seeded = userService.createUnverified("dave@example.com", PASSWORD);
+        User seeded = seedVerified("dave@example.com");
 
         ResponseEntity<String> response = exchange(seeded, HttpMethod.DELETE, passwordBody("not the password"));
 
@@ -146,7 +150,7 @@ class AccountControllerIT {
 
     @Test
     void deleteMe_blankPassword_returns422ValidationErrorWithCurrentPasswordField() throws Exception {
-        User seeded = userService.createUnverified("erin@example.com", PASSWORD);
+        User seeded = seedVerified("erin@example.com");
 
         ResponseEntity<String> response = exchange(seeded, HttpMethod.DELETE, passwordBody(""));
 
@@ -158,6 +162,27 @@ class AccountControllerIT {
 
         User after = userService.lookup(seeded.id());
         assertThat(after.isDeleted()).isFalse();
+    }
+
+    @Test
+    void deleteMe_suspendedLiveSession_returns403AccountSuspended() throws Exception {
+        User seeded = seedVerified("gina@example.com");
+        userRepository.save(new User(seeded.id(), seeded.email(), seeded.passwordHash(),
+                true, true, false, seeded.isAdmin(),
+                seeded.createdAt(), seeded.updatedAt(), null));
+
+        ResponseEntity<String> response = exchange(seeded, HttpMethod.DELETE, passwordBody(PASSWORD));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(403);
+        assertThat(json.readTree(response.getBody()).get("error").get("code").asString())
+                .isEqualTo("ACCOUNT_SUSPENDED");
+        User after = userService.lookup(seeded.id());
+        assertThat(after.isDeleted()).isFalse();
+    }
+
+    private User seedVerified(String email) {
+        User u = userService.createUnverified(email, PASSWORD);
+        return userService.markVerified(u.id());
     }
 
     private static String passwordBody(String currentPassword) {

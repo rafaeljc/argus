@@ -21,12 +21,14 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 @Component
 public class AccountStateGateFilter extends OncePerRequestFilter {
 
-    // Endpoints reachable by a session-bearing user regardless of verify/suspend status: the
-    // user must still be able to inspect themselves and sign out without being trapped.
+    // (method, path) pairs reachable by a session-bearing user regardless of verify/suspend
+    // status: the user must still be able to inspect themselves and sign out without being
+    // trapped. DELETE /account/me is deliberately not exempt — a session that outlived a
+    // suspension must not be able to self-delete before the freeze is lifted.
     private static final Set<String> EXEMPT_FROM_STATE_GATE = Set.of(
-            "/api/v1/account/me",
-            "/api/v1/auth/logout",
-            "/api/v1/auth/status");
+            "GET /api/v1/account/me",
+            "POST /api/v1/auth/logout",
+            "GET /api/v1/auth/status");
 
     private final UserService userService;
     private final HandlerExceptionResolver exceptionResolver;
@@ -42,7 +44,8 @@ public class AccountStateGateFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         AuthenticatedSession principal = currentPrincipal();
-        if (principal == null || EXEMPT_FROM_STATE_GATE.contains(request.getRequestURI())) {
+        if (principal == null || EXEMPT_FROM_STATE_GATE.contains(
+                request.getMethod() + " " + request.getRequestURI())) {
             chain.doFilter(request, response);
             return;
         }

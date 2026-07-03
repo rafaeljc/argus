@@ -3,7 +3,9 @@ package io.github.rafaeljc.argus.auth.application;
 import com.github.f4b6a3.uuid.UuidCreator;
 import io.github.rafaeljc.argus.auth.application.port.PasswordResetRepository;
 import io.github.rafaeljc.argus.auth.domain.PasswordReset;
+import io.github.rafaeljc.argus.common.application.audit.AuthAuditEvent;
 import io.github.rafaeljc.argus.common.domain.Clock;
+import io.github.rafaeljc.argus.common.domain.DomainException;
 import io.github.rafaeljc.argus.common.domain.ResetId;
 import io.github.rafaeljc.argus.email.application.EmailService;
 import io.github.rafaeljc.argus.email.domain.EventType;
@@ -15,6 +17,7 @@ import java.time.Instant;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
@@ -29,18 +32,21 @@ public class RequestPasswordReset {
     private final EmailService emailService;
     private final Clock clock;
     private final ObjectMapper objectMapper;
+    private final ApplicationEventPublisher events;
     private final SecureRandom secureRandom;
 
     public RequestPasswordReset(UserService userService,
                                 PasswordResetRepository passwordResetRepository,
                                 EmailService emailService,
                                 Clock clock,
-                                ObjectMapper objectMapper) {
+                                ObjectMapper objectMapper,
+                                ApplicationEventPublisher events) {
         this.userService = userService;
         this.passwordResetRepository = passwordResetRepository;
         this.emailService = emailService;
         this.clock = clock;
         this.objectMapper = objectMapper;
+        this.events = events;
         this.secureRandom = Tokens.strongSecureRandom();
     }
 
@@ -55,6 +61,16 @@ public class RequestPasswordReset {
     @Transactional
     public void execute(String email) {
         String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
+        try {
+            issue(normalizedEmail);
+            events.publishEvent(new AuthAuditEvent.PasswordResetRequested(normalizedEmail));
+        } catch (DomainException ex) {
+            events.publishEvent(new AuthAuditEvent.PasswordResetRequestFailed(normalizedEmail, ex.code()));
+            throw ex;
+        }
+    }
+
+    private void issue(String normalizedEmail) {
         Optional<User> maybeUser = userService.lookupActiveByEmail(normalizedEmail);
         if (maybeUser.isEmpty()) {
             return;

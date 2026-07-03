@@ -32,6 +32,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import tools.jackson.databind.ObjectMapper;
 
@@ -51,6 +52,9 @@ class SignUpTest {
     @Mock
     private EmailService emailService;
 
+    @Mock
+    private ApplicationEventPublisher events;
+
     private FixedClock clock;
     private ObjectMapper objectMapper;
     private SignUp signUp;
@@ -59,7 +63,8 @@ class SignUpTest {
     void setUp() {
         clock = new FixedClock(FIXED_NOW);
         objectMapper = new ObjectMapper();
-        signUp = new SignUp(userService, emailVerificationRepository, emailService, clock, objectMapper);
+        signUp = new SignUp(
+                userService, emailVerificationRepository, emailService, clock, objectMapper, events);
     }
 
     @Test

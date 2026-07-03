@@ -17,6 +17,7 @@ import io.github.rafaeljc.argus.common.domain.ResetId;
 import io.github.rafaeljc.argus.common.domain.UserId;
 import io.github.rafaeljc.argus.users.application.UserService;
 import io.github.rafaeljc.argus.users.domain.AccountSuspendedException;
+import io.github.rafaeljc.argus.users.domain.User;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class CompletePasswordResetTest {
@@ -44,6 +46,9 @@ class CompletePasswordResetTest {
     @Mock
     private SessionRepository sessionRepository;
 
+    @Mock
+    private ApplicationEventPublisher events;
+
     private FixedClock clock;
     private CompletePasswordReset completePasswordReset;
 
@@ -51,7 +56,7 @@ class CompletePasswordResetTest {
     void setUp() {
         clock = new FixedClock(FIXED_NOW);
         completePasswordReset = new CompletePasswordReset(
-                userService, passwordResetRepository, sessionRepository, clock);
+                userService, passwordResetRepository, sessionRepository, clock, events);
     }
 
     @Test
@@ -63,6 +68,7 @@ class CompletePasswordResetTest {
                 .thenReturn(Optional.of(stored));
         when(passwordResetRepository.save(any(PasswordReset.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
+        when(userService.updatePassword(userId, NEW_PASSWORD)).thenReturn(activeUser(userId));
 
         completePasswordReset.execute(PLAIN_TOKEN, NEW_PASSWORD);
 
@@ -151,5 +157,10 @@ class CompletePasswordResetTest {
                 FIXED_NOW.minus(Duration.ofHours(1)),
                 expiresAt,
                 claimedAt);
+    }
+
+    private static User activeUser(UserId id) {
+        return new User(id, "alice@example.com", "hash", true, false, false, false,
+                FIXED_NOW, FIXED_NOW, null);
     }
 }
