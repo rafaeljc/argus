@@ -32,6 +32,18 @@ public class JpaSessionRepository implements SessionRepository {
              WHERE user_id = :userId
             """;
 
+    // Postgres does not support LIMIT on DELETE directly; the subquery form is portable and lets
+    // us cap each batch so a large sweep doesn't hold one long lock over the whole table.
+    private static final String DELETE_EXPIRED_BEFORE_SQL =
+            """
+            DELETE FROM sessions
+             WHERE id IN (
+                 SELECT id FROM sessions
+                  WHERE expires_at < :before
+                  LIMIT :batchSize
+             )
+            """;
+
     private final SpringDataSessionJpaRepository jpa;
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -81,6 +93,14 @@ public class JpaSessionRepository implements SessionRepository {
     public void deleteAllForUser(UserId userId) {
         MapSqlParameterSource params = new MapSqlParameterSource("userId", userId.value());
         jdbc.update(DELETE_ALL_FOR_USER_SQL, params);
+    }
+
+    @Override
+    public int deleteExpiredBefore(Instant before, int batchSize) {
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("before", asTimestampTz(before))
+                .addValue("batchSize", batchSize);
+        return jdbc.update(DELETE_EXPIRED_BEFORE_SQL, params);
     }
 
     // pgjdbc cannot infer a SQL type from java.time.Instant; OffsetDateTime maps to

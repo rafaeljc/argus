@@ -167,6 +167,58 @@ class JpaSessionRepositoryIT {
         assertThatNoException().isThrownBy(() -> sessionRepository.deleteById(unknown));
     }
 
+    @Test
+    void deleteExpiredBefore_removesOnlyRowsWithExpiresAtStrictlyBeforeCutoff() {
+        UserId userId = newUser();
+        Instant cutoff = Instant.parse("2026-07-01T00:00:00Z");
+        Session expiredOne = saveWithExpiry(userId, TOKEN_HASH + "-a", cutoff.minusSeconds(3600));
+        Session expiredTwo = saveWithExpiry(userId, TOKEN_HASH + "-b", cutoff.minusSeconds(1));
+        Session boundary = saveWithExpiry(userId, TOKEN_HASH + "-c", cutoff);
+        Session future = saveWithExpiry(userId, TOKEN_HASH + "-d", cutoff.plusSeconds(3600));
+
+        int deleted = sessionRepository.deleteExpiredBefore(cutoff, 1000);
+
+        assertThat(deleted).isEqualTo(2);
+        assertThat(sessionRepository.findByUserId(userId))
+                .extracting(Session::id)
+                .containsExactlyInAnyOrder(boundary.id(), future.id())
+                .doesNotContain(expiredOne.id(), expiredTwo.id());
+    }
+
+    @Test
+    void deleteExpiredBefore_nothingExpired_returnsZeroAndKeepsAllRows() {
+        UserId userId = newUser();
+        Instant cutoff = Instant.parse("2026-07-01T00:00:00Z");
+        saveWithExpiry(userId, TOKEN_HASH + "-x", cutoff.plusSeconds(3600));
+        saveWithExpiry(userId, TOKEN_HASH + "-y", cutoff.plusSeconds(7200));
+
+        int deleted = sessionRepository.deleteExpiredBefore(cutoff, 1000);
+
+        assertThat(deleted).isZero();
+        assertThat(sessionRepository.findByUserId(userId)).hasSize(2);
+    }
+
+    @Test
+    void deleteExpiredBefore_batchSizeCapsRowsDeletedInASingleCall() {
+        UserId userId = newUser();
+        Instant cutoff = Instant.parse("2026-07-01T00:00:00Z");
+        saveWithExpiry(userId, TOKEN_HASH + "-1", cutoff.minusSeconds(10));
+        saveWithExpiry(userId, TOKEN_HASH + "-2", cutoff.minusSeconds(20));
+        saveWithExpiry(userId, TOKEN_HASH + "-3", cutoff.minusSeconds(30));
+
+        int deleted = sessionRepository.deleteExpiredBefore(cutoff, 2);
+
+        assertThat(deleted).isEqualTo(2);
+        assertThat(sessionRepository.findByUserId(userId)).hasSize(1);
+    }
+
+    private Session saveWithExpiry(UserId userId, String tokenHash, Instant expiresAt) {
+        Session session = new Session(
+                new SessionId(UuidCreator.getTimeOrderedEpoch()),
+                userId, tokenHash, null, null, CREATED, expiresAt, CREATED);
+        return sessionRepository.save(session);
+    }
+
     private UserId newUser() {
         return userService.createUnverified(
                 "user-" + UuidCreator.getTimeOrderedEpoch() + "@example.com",
