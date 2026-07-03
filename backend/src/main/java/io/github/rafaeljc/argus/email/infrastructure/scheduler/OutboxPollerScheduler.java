@@ -24,12 +24,12 @@ public class OutboxPollerScheduler {
     }
 
     @Scheduled(fixedDelayString = "${argus.email.poll.interval-ms:30000}")
-    public void tick() {
+    public void poll() {
         try {
             pollOutboxOnce.pollOnce(workerId);
         } catch (RuntimeException e) {
-            // Swallow so a single bad tick doesn't kill the scheduler thread; next tick retries.
-            log.error("outbox poll tick failed", e);
+            // Swallow so a single bad run doesn't kill the scheduler thread; next run retries.
+            log.error("outbox poll failed", e);
         }
     }
 }

@@ -18,19 +18,19 @@ class OutboxPollerSchedulerTest {
     private PollOutboxOnce pollOutboxOnce;
 
     @Test
-    void tick_delegatesToPollOutboxOnceWithWorkerId() {
+    void poll_delegatesToPollOutboxOnceWithWorkerId() {
         OutboxPollerScheduler scheduler = new OutboxPollerScheduler(pollOutboxOnce);
 
-        scheduler.tick();
+        scheduler.poll();
 
         verify(pollOutboxOnce).pollOnce(anyString());
     }
 
     @Test
-    void tick_swallowsRuntimeExceptionsSoSchedulerThreadKeepsRunning() {
+    void poll_swallowsRuntimeExceptionsSoSchedulerThreadKeepsRunning() {
         doThrow(new RuntimeException("boom")).when(pollOutboxOnce).pollOnce(anyString());
         OutboxPollerScheduler scheduler = new OutboxPollerScheduler(pollOutboxOnce);
 
-        assertThatCode(scheduler::tick).doesNotThrowAnyException();
+        assertThatCode(scheduler::poll).doesNotThrowAnyException();
     }
 }
