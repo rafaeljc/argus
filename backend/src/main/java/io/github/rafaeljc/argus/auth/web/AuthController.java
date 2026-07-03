@@ -107,7 +107,7 @@ class AuthController {
     @PostMapping("/logout")
     ResponseEntity<Void> logout(@AuthenticationPrincipal AuthenticatedSession principal,
                                 HttpServletResponse response) {
-        logout.execute(principal.sessionId());
+        logout.execute(principal.sessionId(), principal.userId());
 
         // SessionResolutionFilter has already added refreshed cookies to this response; append
         // the cleared cookies so the browser applies Max-Age=0 last for both names.

@@ -4,7 +4,9 @@ import com.github.f4b6a3.uuid.UuidCreator;
 import io.github.rafaeljc.argus.auth.application.port.EmailVerificationRepository;
 import io.github.rafaeljc.argus.auth.domain.EmailAlreadyTakenException;
 import io.github.rafaeljc.argus.auth.domain.EmailVerification;
+import io.github.rafaeljc.argus.common.application.audit.AuthAuditEvent;
 import io.github.rafaeljc.argus.common.domain.Clock;
+import io.github.rafaeljc.argus.common.domain.DomainException;
 import io.github.rafaeljc.argus.common.domain.VerificationId;
 import io.github.rafaeljc.argus.email.application.EmailService;
 import io.github.rafaeljc.argus.email.domain.EventType;
@@ -14,6 +16,7 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,28 +36,37 @@ public class SignUp {
     private final EmailService emailService;
     private final Clock clock;
     private final ObjectMapper objectMapper;
+    private final ApplicationEventPublisher events;
     private final SecureRandom secureRandom;
 
     public SignUp(UserService userService,
                   EmailVerificationRepository emailVerificationRepository,
                   EmailService emailService,
                   Clock clock,
-                  ObjectMapper objectMapper) {
+                  ObjectMapper objectMapper,
+                  ApplicationEventPublisher events) {
         this.userService = userService;
         this.emailVerificationRepository = emailVerificationRepository;
         this.emailService = emailService;
         this.clock = clock;
         this.objectMapper = objectMapper;
+        this.events = events;
         this.secureRandom = Tokens.strongSecureRandom();
     }
 
     @Transactional
     public SignUpResult execute(String email, String password) {
-        User user = createUser(email, password);
-        String plainToken = Tokens.plain(secureRandom);
-        EmailVerification verification = persistVerificationToken(user, Tokens.sha256Hex(plainToken));
-        enqueueVerificationEmail(user, verification, plainToken);
-        return new SignUpResult(user.id(), true);
+        try {
+            User user = createUser(email, password);
+            String plainToken = Tokens.plain(secureRandom);
+            EmailVerification verification = persistVerificationToken(user, Tokens.sha256Hex(plainToken));
+            enqueueVerificationEmail(user, verification, plainToken);
+            events.publishEvent(new AuthAuditEvent.SignupSucceeded(user.id(), user.email()));
+            return new SignUpResult(user.id(), true);
+        } catch (DomainException ex) {
+            events.publishEvent(new AuthAuditEvent.SignupFailed(email, ex.code()));
+            throw ex;
+        }
     }
 
     private User createUser(String email, String password) {

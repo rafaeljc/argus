@@ -26,6 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class LoginTest {
@@ -42,13 +43,16 @@ class LoginTest {
     @Mock
     private SessionRepository sessionRepository;
 
+    @Mock
+    private ApplicationEventPublisher events;
+
     private FixedClock clock;
     private Login login;
 
     @BeforeEach
     void setUp() {
         clock = new FixedClock(FIXED_NOW);
-        login = new Login(userService, sessionRepository, clock);
+        login = new Login(userService, sessionRepository, clock, events);
     }
 
     @Test

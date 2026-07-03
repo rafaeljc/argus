@@ -15,6 +15,7 @@ import io.github.rafaeljc.argus.common.domain.FixedClock;
 import io.github.rafaeljc.argus.common.domain.UserId;
 import io.github.rafaeljc.argus.common.domain.VerificationId;
 import io.github.rafaeljc.argus.users.application.UserService;
+import io.github.rafaeljc.argus.users.domain.User;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -25,6 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class VerifyEmailTest {
@@ -38,13 +40,16 @@ class VerifyEmailTest {
     @Mock
     private UserService userService;
 
+    @Mock
+    private ApplicationEventPublisher events;
+
     private FixedClock clock;
     private VerifyEmail verifyEmail;
 
     @BeforeEach
     void setUp() {
         clock = new FixedClock(FIXED_NOW);
-        verifyEmail = new VerifyEmail(emailVerificationRepository, userService, clock);
+        verifyEmail = new VerifyEmail(emailVerificationRepository, userService, clock, events);
     }
 
     @Test
@@ -54,6 +59,7 @@ class VerifyEmailTest {
                 .thenReturn(Optional.of(stored));
         when(emailVerificationRepository.save(any(EmailVerification.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
+        when(userService.markVerified(stored.userId())).thenReturn(verifiedUser(stored.userId()));
 
         verifyEmail.execute(PLAIN_TOKEN);
 
@@ -135,5 +141,10 @@ class VerifyEmailTest {
                 FIXED_NOW.minus(Duration.ofHours(1)),
                 expiresAt,
                 verifiedAt);
+    }
+
+    private static User verifiedUser(UserId id) {
+        return new User(id, "alice@example.com", "hash", true, false, false, false,
+                FIXED_NOW, FIXED_NOW, null);
     }
 }

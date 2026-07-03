@@ -26,6 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import tools.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
@@ -43,6 +44,9 @@ class RequestPasswordResetTest {
     @Mock
     private EmailService emailService;
 
+    @Mock
+    private ApplicationEventPublisher events;
+
     private FixedClock clock;
     private ObjectMapper objectMapper;
     private RequestPasswordReset requestPasswordReset;
@@ -52,7 +56,7 @@ class RequestPasswordResetTest {
         clock = new FixedClock(FIXED_NOW);
         objectMapper = new ObjectMapper();
         requestPasswordReset = new RequestPasswordReset(
-                userService, passwordResetRepository, emailService, clock, objectMapper);
+                userService, passwordResetRepository, emailService, clock, objectMapper, events);
     }
 
     @Test

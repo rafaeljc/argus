@@ -22,6 +22,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.springframework.context.ApplicationEventPublisher;
 
 class UserServiceTest {
 
@@ -35,6 +36,7 @@ class UserServiceTest {
     private UserRepository repository;
     private PasswordEncoder passwordEncoder;
     private FixedClock clock;
+    private ApplicationEventPublisher events;
     private UserService service;
 
     @BeforeEach
@@ -45,7 +47,8 @@ class UserServiceTest {
         // computed dummy hash used by verifyPasswordForUnknownUser is deterministic in tests.
         when(passwordEncoder.encode(any())).thenReturn(DUMMY_HASH);
         clock = new FixedClock(NOW);
-        service = new UserService(repository, passwordEncoder, clock);
+        events = Mockito.mock(ApplicationEventPublisher.class);
+        service = new UserService(repository, passwordEncoder, clock, events);
     }
 
     private static User existing(UserId id, Instant at) {
@@ -140,7 +143,7 @@ class UserServiceTest {
         when(repository.findById(id)).thenReturn(Optional.of(unverified));
         when(repository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         clock = new FixedClock(LATER);
-        service = new UserService(repository, passwordEncoder, clock);
+        service = new UserService(repository, passwordEncoder, clock, events);
 
         User result = service.markVerified(id);
 
@@ -159,7 +162,7 @@ class UserServiceTest {
                 originalUpdatedAt, originalUpdatedAt, null);
         when(repository.findById(id)).thenReturn(Optional.of(alreadyVerified));
         clock = new FixedClock(LATER);
-        service = new UserService(repository, passwordEncoder, clock);
+        service = new UserService(repository, passwordEncoder, clock, events);
 
         User result = service.markVerified(id);
 
@@ -188,7 +191,7 @@ class UserServiceTest {
         when(passwordEncoder.matches(RAW_PASSWORD, ENCODED_HASH)).thenReturn(true);
         when(repository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         clock = new FixedClock(LATER);
-        service = new UserService(repository, passwordEncoder, clock);
+        service = new UserService(repository, passwordEncoder, clock, events);
 
         User result = service.softDelete(id, RAW_PASSWORD);
 
@@ -267,7 +270,7 @@ class UserServiceTest {
         when(passwordEncoder.encode("new-secret")).thenReturn(newHash);
         when(repository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
         clock = new FixedClock(LATER);
-        service = new UserService(repository, passwordEncoder, clock);
+        service = new UserService(repository, passwordEncoder, clock, events);
 
         User result = service.updatePassword(id, "new-secret");
 
