@@ -24,7 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockFilterChain;
@@ -76,12 +76,14 @@ class AccountStateGateFilterTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {
-            "/api/v1/account/me",
-            "/api/v1/auth/logout",
-            "/api/v1/auth/status"})
-    void doFilter_exemptPath_passesThroughAndSkipsUserLookup(String path) throws Exception {
+    @CsvSource({
+            "GET,  /api/v1/account/me",
+            "POST, /api/v1/auth/logout",
+            "GET,  /api/v1/auth/status"})
+    void doFilter_exemptMethodAndPath_passesThroughAndSkipsUserLookup(String method, String path)
+            throws Exception {
         authenticate();
+        request.setMethod(method);
         request.setRequestURI(path);
 
         filter.doFilter(request, response, chain);
@@ -89,6 +91,20 @@ class AccountStateGateFilterTest {
         verifyNoInteractions(userService);
         verify(exceptionResolver, never()).resolveException(any(), any(), any(), any());
         assertChainProceeded();
+    }
+
+    @Test
+    void doFilter_deleteAccountMe_suspendedUser_delegatesAccountSuspended() throws Exception {
+        UserId userId = authenticate();
+        request.setMethod("DELETE");
+        request.setRequestURI("/api/v1/account/me");
+        when(userService.lookup(userId)).thenReturn(user(userId, true, true, false));
+
+        filter.doFilter(request, response, chain);
+
+        verify(exceptionResolver).resolveException(eq(request), eq(response), isNull(),
+                any(AccountSuspendedException.class));
+        assertChainDidNotProceed();
     }
 
     @Test
