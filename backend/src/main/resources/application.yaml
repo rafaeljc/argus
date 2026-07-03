@@ -67,6 +67,10 @@ argus:
   email:
     poll:
       interval-ms: 30000
+  auth:
+    session:
+      sweep:
+        interval-ms: 3600000
   rate-limit:
     # Bucket keys are wrapped in "[...]" so Spring's relaxed binder treats the dots as part of
     # the map key instead of nesting (RL.auth.signup -> RL -> auth -> signup). Do not unquote.

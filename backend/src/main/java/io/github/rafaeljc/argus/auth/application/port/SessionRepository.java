@@ -25,4 +25,9 @@ public interface SessionRepository {
     // Preferred over findByUserId + per-row deleteById because it is one round trip and one SQL
     // statement, atomic under the caller's transaction.
     void deleteAllForUser(UserId userId);
+
+    // Delete up to batchSize rows whose expires_at is strictly before the given instant. Returns
+    // the number of rows actually deleted. Callers loop until the returned count is < batchSize
+    // to drain the table in chunks without holding one long lock.
+    int deleteExpiredBefore(Instant before, int batchSize);
 }
