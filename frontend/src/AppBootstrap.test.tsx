@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 import { server } from './mocks/server';
 import { apiClient } from './shared/api/client';
@@ -21,6 +22,24 @@ const USER_FIXTURE = {
   created_at: '2026-01-01T00:00:00Z',
 };
 
+function renderWithRouter(initialPath = '/starting-point') {
+  return render(
+    <MemoryRouter initialEntries={[initialPath]}>
+      <Routes>
+        <Route
+          path="*"
+          element={
+            <AppBootstrap>
+              <div data-testid="location-probe">{window.location.pathname}</div>
+              <div>child content</div>
+            </AppBootstrap>
+          }
+        />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
 describe('AppBootstrap', () => {
   beforeEach(() => {
     resetAuthStoreForTest();
@@ -39,11 +58,7 @@ describe('AppBootstrap', () => {
       ),
     );
 
-    render(
-      <AppBootstrap>
-        <div>child content</div>
-      </AppBootstrap>,
-    );
+    renderWithRouter();
 
     expect(screen.getByText('child content')).toBeInTheDocument();
   });
@@ -55,11 +70,7 @@ describe('AppBootstrap', () => {
       ),
     );
 
-    render(
-      <AppBootstrap>
-        <div />
-      </AppBootstrap>,
-    );
+    renderWithRouter();
 
     await waitFor(() => {
       expect(useAuthStore.getState().status).toBe('authenticated');
@@ -77,11 +88,7 @@ describe('AppBootstrap', () => {
       ),
     );
 
-    render(
-      <AppBootstrap>
-        <div />
-      </AppBootstrap>,
-    );
+    renderWithRouter();
 
     await waitFor(() => {
       expect(useAuthStore.getState().status).toBe('anonymous');
@@ -89,7 +96,7 @@ describe('AppBootstrap', () => {
     expect(useAuthStore.getState().user).toBeNull();
   });
 
-  it('registers a global 401 handler that clears the store on later requests', async () => {
+  it('clears the auth store when a later request returns 401', async () => {
     server.use(
       http.get(`${BASE_URL}/account/me`, () =>
         HttpResponse.json({ data: USER_FIXTURE }),
@@ -102,11 +109,7 @@ describe('AppBootstrap', () => {
       ),
     );
 
-    render(
-      <AppBootstrap>
-        <div />
-      </AppBootstrap>,
-    );
+    renderWithRouter();
     await waitFor(() => {
       expect(useAuthStore.getState().status).toBe('authenticated');
     });
@@ -115,5 +118,113 @@ describe('AppBootstrap', () => {
 
     expect(useAuthStore.getState().status).toBe('anonymous');
     expect(useAuthStore.getState().user).toBeNull();
+  });
+
+  it('navigates to /login when a request returns 401', async () => {
+    server.use(
+      http.get(`${BASE_URL}/account/me`, () =>
+        HttpResponse.json(
+          { error: { code: 'UNAUTHORIZED', message: 'nope' } },
+          { status: 401 },
+        ),
+      ),
+    );
+
+    render(
+      <MemoryRouter initialEntries={['/somewhere']}>
+        <Routes>
+          <Route
+            path="*"
+            element={
+              <AppBootstrap>
+                <div>somewhere page</div>
+              </AppBootstrap>
+            }
+          />
+          <Route path="/login" element={<div>login destination</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('login destination')).toBeInTheDocument();
+  });
+
+  it('navigates to /verify-email on 403 EMAIL_NOT_VERIFIED', async () => {
+    server.use(
+      http.get(`${BASE_URL}/account/me`, () =>
+        HttpResponse.json({ data: USER_FIXTURE }),
+      ),
+      http.get(`${BASE_URL}/protected`, () =>
+        HttpResponse.json(
+          { error: { code: 'EMAIL_NOT_VERIFIED', message: 'verify first' } },
+          { status: 403 },
+        ),
+      ),
+    );
+
+    render(
+      <MemoryRouter initialEntries={['/somewhere']}>
+        <Routes>
+          <Route
+            path="*"
+            element={
+              <AppBootstrap>
+                <div>somewhere page</div>
+              </AppBootstrap>
+            }
+          />
+          <Route path="/verify-email" element={<div>verify email destination</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(useAuthStore.getState().status).toBe('authenticated');
+    });
+
+    await expect(apiClient.get('/protected')).rejects.toThrow();
+
+    expect(await screen.findByText('verify email destination')).toBeInTheDocument();
+  });
+
+  it('navigates to /account/suspended on 403 ACCOUNT_SUSPENDED', async () => {
+    server.use(
+      http.get(`${BASE_URL}/account/me`, () =>
+        HttpResponse.json({ data: USER_FIXTURE }),
+      ),
+      http.get(`${BASE_URL}/protected`, () =>
+        HttpResponse.json(
+          { error: { code: 'ACCOUNT_SUSPENDED', message: 'suspended' } },
+          { status: 403 },
+        ),
+      ),
+    );
+
+    render(
+      <MemoryRouter initialEntries={['/somewhere']}>
+        <Routes>
+          <Route
+            path="*"
+            element={
+              <AppBootstrap>
+                <div>somewhere page</div>
+              </AppBootstrap>
+            }
+          />
+          <Route
+            path="/account/suspended"
+            element={<div>suspended destination</div>}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(useAuthStore.getState().status).toBe('authenticated');
+    });
+
+    await expect(apiClient.get('/protected')).rejects.toThrow();
+
+    expect(
+      await screen.findByText('suspended destination'),
+    ).toBeInTheDocument();
   });
 });
