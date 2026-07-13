@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AppBootstrap } from './AppBootstrap';
 import reactLogo from './assets/react.svg';
 import viteLogo from './assets/vite.svg';
 import heroImg from './assets/hero.png';
@@ -8,7 +9,7 @@ function App() {
   const [count, setCount] = useState(0);
 
   return (
-    <>
+    <AppBootstrap>
       <section id="center">
         <div className="hero">
           <img src={heroImg} className="base" width="170" height="179" alt="" />
@@ -95,7 +96,7 @@ function App() {
 
       <div className="ticks"></div>
       <section id="spacer"></section>
-    </>
+    </AppBootstrap>
   );
 }
 
