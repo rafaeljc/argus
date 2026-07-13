@@ -22,7 +22,8 @@
     "clsx": "^2.1.1",
     "decimal.js": "^10.6.0",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
