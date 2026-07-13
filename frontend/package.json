@@ -18,6 +18,8 @@
     "e2e": "playwright test"
   },
   "dependencies": {
+    "clsx": "^2.1.1",
+    "decimal.js": "^10.6.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },
