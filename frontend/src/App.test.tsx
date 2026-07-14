@@ -94,4 +94,11 @@ describe('App route table', () => {
       expect(screen.getByRole('heading', { name: /not found/i })).toBeInTheDocument();
     });
   });
+
+  it('mounts the ToastProvider so notifications can be surfaced from anywhere', async () => {
+    respondAsAnonymous();
+    renderAppAt('/login');
+    await screen.findByRole('heading', { name: /login/i });
+    expect(screen.getByRole('region', { name: /notifications/i })).toBeInTheDocument();
+  });
 });

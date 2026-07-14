@@ -23,12 +23,14 @@ import {
 } from './features/_placeholders/pages';
 import { AppLayout } from './shared/components/layout/AppLayout';
 import { NotFound } from './shared/components/NotFound';
+import { ToastProvider } from './shared/components/ui/ToastProvider';
 import { RequireAdmin } from './shared/routing/RequireAdmin';
 import { RequireAuth } from './shared/routing/RequireAuth';
 
 function App() {
   return (
     <AppBootstrap>
+      <ToastProvider />
       <Routes>
         <Route element={<AppLayout />}>
           <Route path="/" element={<Navigate to="/account" replace />} />
