@@ -82,7 +82,9 @@ describe('App route table', () => {
   it('renders the admin users placeholder for admin users', async () => {
     respondAsUser(ADMIN_USER);
     renderAppAt('/admin/users');
-    expect(await screen.findByRole('heading', { name: /admin users/i })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /admin users/i })).toBeInTheDocument();
+    });
   });
 
   it('serves the not-found page for unknown paths', async () => {
