@@ -126,9 +126,7 @@ describe('Pagination', () => {
   });
 
   it('disables every control while isLoading', () => {
-    render(
-      <Pagination meta={buildMeta()} links={buildLinks()} onPageChange={vi.fn()} isLoading />,
-    );
+    render(<Pagination meta={buildMeta()} links={buildLinks()} onPageChange={vi.fn()} isLoading />);
     const buttons = within(getNav()).getAllByRole('button');
     for (const button of buttons) {
       expect(button).toBeDisabled();

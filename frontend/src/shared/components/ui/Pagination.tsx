@@ -14,13 +14,7 @@ export interface PaginationProps {
 type PageItem = { kind: 'page'; page: number } | { kind: 'ellipsis'; key: string };
 
 function buildPageItems(currentPage: number, totalPages: number): PageItem[] {
-  const anchors = new Set<number>([
-    1,
-    totalPages,
-    currentPage - 1,
-    currentPage,
-    currentPage + 1,
-  ]);
+  const anchors = new Set<number>([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
   const pages = [...anchors].filter((p) => p >= 1 && p <= totalPages).sort((a, b) => a - b);
 
   const pageItems: PageItem[] = [];
