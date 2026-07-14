@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { registerApiErrorHandlers } from './shared/api/errors';
 import { useAuthStore } from './shared/hooks/useAuthStore';
+import { rateLimitMessage, toast } from './shared/hooks/useToastStore';
 
 interface AppBootstrapProps {
   children: ReactNode;
@@ -22,6 +23,9 @@ export function AppBootstrap({ children }: AppBootstrapProps) {
       },
       onAccountSuspended: () => {
         navigate('/account/suspended', { replace: true });
+      },
+      onRateLimited: (err) => {
+        toast.error(rateLimitMessage(err.retryAfterSeconds), { durationMs: null });
       },
     });
     void useAuthStore.getState().fetchUser();

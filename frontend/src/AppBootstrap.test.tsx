@@ -7,6 +7,7 @@ import { server } from './mocks/server';
 import { apiClient } from './shared/api/client';
 import { resetApiErrorHandlers } from './shared/api/errors';
 import { resetAuthStoreForTest, useAuthStore } from './shared/hooks/useAuthStore';
+import { resetToastStoreForTest, useToastStore } from './shared/hooks/useToastStore';
 import { AppBootstrap } from './AppBootstrap';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -41,11 +42,13 @@ describe('AppBootstrap', () => {
   beforeEach(() => {
     resetAuthStoreForTest();
     resetApiErrorHandlers();
+    resetToastStoreForTest();
   });
 
   afterEach(() => {
     resetAuthStoreForTest();
     resetApiErrorHandlers();
+    resetToastStoreForTest();
   });
 
   it('renders its children', () => {
@@ -163,6 +166,31 @@ describe('AppBootstrap', () => {
     await expect(apiClient.get('/protected')).rejects.toThrow();
 
     expect(await screen.findByText('verify email destination')).toBeInTheDocument();
+  });
+
+  it('pushes an error toast with the parsed Retry-After on 429 RATE_LIMITED', async () => {
+    server.use(
+      http.get(`${BASE_URL}/account/me`, () => HttpResponse.json({ data: USER_FIXTURE })),
+      http.get(`${BASE_URL}/limited`, () =>
+        HttpResponse.json(
+          { error: { code: 'RATE_LIMITED', message: 'slow down' } },
+          { status: 429, headers: { 'Retry-After': '30' } },
+        ),
+      ),
+    );
+
+    renderWithRouter();
+    await waitFor(() => {
+      expect(useAuthStore.getState().status).toBe('authenticated');
+    });
+
+    await expect(apiClient.get('/limited')).rejects.toThrow();
+
+    const { toasts } = useToastStore.getState();
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0]?.variant).toBe('error');
+    expect(toasts[0]?.message).toBe('Please wait 30 seconds before trying again.');
+    expect(toasts[0]?.durationMs).toBeNull();
   });
 
   it('navigates to /account/suspended on 403 ACCOUNT_SUSPENDED', async () => {
