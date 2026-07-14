@@ -48,23 +48,20 @@ describe('CSRF request interceptor', () => {
     clearAllCookies();
   });
 
-  it.each(['get', 'head'] as const)(
-    'does not attach X-CSRF-Token on %s',
-    async (method) => {
-      setCsrfCookie('should-not-be-sent');
-      const capturedHeaders = vi.fn();
-      server.use(
-        http.all(`${BASE_URL}/probe`, ({ request }) => {
-          capturedHeaders(request.headers.get('X-CSRF-Token'));
-          return new HttpResponse(null, { status: 204 });
-        }),
-      );
+  it.each(['get', 'head'] as const)('does not attach X-CSRF-Token on %s', async (method) => {
+    setCsrfCookie('should-not-be-sent');
+    const capturedHeaders = vi.fn();
+    server.use(
+      http.all(`${BASE_URL}/probe`, ({ request }) => {
+        capturedHeaders(request.headers.get('X-CSRF-Token'));
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
 
-      await apiClient.request({ url: '/probe', method });
+    await apiClient.request({ url: '/probe', method });
 
-      expect(capturedHeaders).toHaveBeenCalledWith(null);
-    },
-  );
+    expect(capturedHeaders).toHaveBeenCalledWith(null);
+  });
 
   it.each(['post', 'put', 'patch', 'delete'] as const)(
     'attaches X-CSRF-Token from the argus_csrf cookie on %s',
@@ -93,9 +90,9 @@ describe('CSRF request interceptor', () => {
       }),
     );
 
-    await expect(
-      apiClient.request({ url: '/probe', method: 'post' }),
-    ).rejects.toMatchObject({ code: 'MISSING_CSRF_TOKEN' });
+    await expect(apiClient.request({ url: '/probe', method: 'post' })).rejects.toMatchObject({
+      code: 'MISSING_CSRF_TOKEN',
+    });
 
     expect(networkSpy).not.toHaveBeenCalled();
   });
@@ -133,9 +130,7 @@ describe('envelope-unwrap response interceptor', () => {
         last: '/transactions?page=1',
       },
     };
-    server.use(
-      http.get(`${BASE_URL}/paginated`, () => HttpResponse.json(paginated)),
-    );
+    server.use(http.get(`${BASE_URL}/paginated`, () => HttpResponse.json(paginated)));
 
     const response = await apiClient.get('/paginated');
 
@@ -144,9 +139,7 @@ describe('envelope-unwrap response interceptor', () => {
 
   it('leaves 204 No Content responses untouched', async () => {
     setCsrfCookie('csrf');
-    server.use(
-      http.post(`${BASE_URL}/logout`, () => new HttpResponse(null, { status: 204 })),
-    );
+    server.use(http.post(`${BASE_URL}/logout`, () => new HttpResponse(null, { status: 204 })));
 
     const response = await apiClient.post('/logout');
 
@@ -154,9 +147,7 @@ describe('envelope-unwrap response interceptor', () => {
   });
 
   it('passes through bodies that do not match any envelope shape', async () => {
-    server.use(
-      http.get(`${BASE_URL}/raw`, () => HttpResponse.json({ foo: 'bar' })),
-    );
+    server.use(http.get(`${BASE_URL}/raw`, () => HttpResponse.json({ foo: 'bar' })));
 
     const response = await apiClient.get('/raw');
 
@@ -195,9 +186,7 @@ describe('error-response interceptor', () => {
       error: { code: 'UNAUTHORIZED', message: 'nope' },
     });
 
-    await expect(apiClient.get('/probe')).rejects.toBeInstanceOf(
-      UnauthorizedError,
-    );
+    await expect(apiClient.get('/probe')).rejects.toBeInstanceOf(UnauthorizedError);
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
     expect(onUnauthorized.mock.calls[0]?.[0]).toBeInstanceOf(UnauthorizedError);
   });
@@ -227,9 +216,7 @@ describe('error-response interceptor', () => {
       error: { code: 'EMAIL_NOT_VERIFIED', message: 'verify first' },
     });
 
-    await expect(apiClient.get('/probe')).rejects.toBeInstanceOf(
-      EmailNotVerifiedError,
-    );
+    await expect(apiClient.get('/probe')).rejects.toBeInstanceOf(EmailNotVerifiedError);
     expect(onEmailNotVerified).toHaveBeenCalledTimes(1);
     expect(onAccountSuspended).not.toHaveBeenCalled();
   });
@@ -242,9 +229,7 @@ describe('error-response interceptor', () => {
       error: { code: 'ACCOUNT_SUSPENDED', message: 'frozen' },
     });
 
-    await expect(apiClient.get('/probe')).rejects.toBeInstanceOf(
-      AccountSuspendedError,
-    );
+    await expect(apiClient.get('/probe')).rejects.toBeInstanceOf(AccountSuspendedError);
     expect(onAccountSuspended).toHaveBeenCalledTimes(1);
     expect(onEmailNotVerified).not.toHaveBeenCalled();
   });
@@ -321,10 +306,7 @@ describe('error-response interceptor', () => {
 
   it('rejects a non-envelope error body as an ApiError with code UNKNOWN', async () => {
     server.use(
-      http.get(
-        `${BASE_URL}/probe`,
-        () => new HttpResponse('<html>oops</html>', { status: 502 }),
-      ),
+      http.get(`${BASE_URL}/probe`, () => new HttpResponse('<html>oops</html>', { status: 502 })),
     );
 
     const promise = apiClient.get('/probe');

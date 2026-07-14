@@ -116,9 +116,7 @@ describe('API error handler registry', () => {
 
   it('defaults every handler to a no-op', () => {
     const handlers = getApiErrorHandlers();
-    expect(() =>
-      handlers.onUnauthorized(new UnauthorizedError({ message: 'x' })),
-    ).not.toThrow();
+    expect(() => handlers.onUnauthorized(new UnauthorizedError({ message: 'x' }))).not.toThrow();
     expect(() =>
       handlers.onEmailNotVerified(new EmailNotVerifiedError({ message: 'x' })),
     ).not.toThrow();
@@ -126,9 +124,7 @@ describe('API error handler registry', () => {
       handlers.onAccountSuspended(new AccountSuspendedError({ message: 'x' })),
     ).not.toThrow();
     expect(() =>
-      handlers.onRateLimited(
-        new RateLimitedError({ message: 'x', retryAfterSeconds: 0 }),
-      ),
+      handlers.onRateLimited(new RateLimitedError({ message: 'x', retryAfterSeconds: 0 })),
     ).not.toThrow();
   });
 
@@ -152,9 +148,7 @@ describe('API error handler registry', () => {
     registerApiErrorHandlers({ onUnauthorized });
     resetApiErrorHandlers();
 
-    getApiErrorHandlers().onUnauthorized(
-      new UnauthorizedError({ message: 'x' }),
-    );
+    getApiErrorHandlers().onUnauthorized(new UnauthorizedError({ message: 'x' }));
 
     expect(onUnauthorized).not.toHaveBeenCalled();
   });

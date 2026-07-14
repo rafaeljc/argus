@@ -6,10 +6,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { server } from './mocks/server';
 import { apiClient } from './shared/api/client';
 import { resetApiErrorHandlers } from './shared/api/errors';
-import {
-  resetAuthStoreForTest,
-  useAuthStore,
-} from './shared/hooks/useAuthStore';
+import { resetAuthStoreForTest, useAuthStore } from './shared/hooks/useAuthStore';
 import { AppBootstrap } from './AppBootstrap';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -52,11 +49,7 @@ describe('AppBootstrap', () => {
   });
 
   it('renders its children', () => {
-    server.use(
-      http.get(`${BASE_URL}/account/me`, () =>
-        HttpResponse.json({ data: USER_FIXTURE }),
-      ),
-    );
+    server.use(http.get(`${BASE_URL}/account/me`, () => HttpResponse.json({ data: USER_FIXTURE })));
 
     renderWithRouter();
 
@@ -64,11 +57,7 @@ describe('AppBootstrap', () => {
   });
 
   it('populates the auth store from GET /account/me on mount', async () => {
-    server.use(
-      http.get(`${BASE_URL}/account/me`, () =>
-        HttpResponse.json({ data: USER_FIXTURE }),
-      ),
-    );
+    server.use(http.get(`${BASE_URL}/account/me`, () => HttpResponse.json({ data: USER_FIXTURE })));
 
     renderWithRouter();
 
@@ -81,10 +70,7 @@ describe('AppBootstrap', () => {
   it('lands the auth store on anonymous when /account/me returns 401', async () => {
     server.use(
       http.get(`${BASE_URL}/account/me`, () =>
-        HttpResponse.json(
-          { error: { code: 'UNAUTHORIZED', message: 'nope' } },
-          { status: 401 },
-        ),
+        HttpResponse.json({ error: { code: 'UNAUTHORIZED', message: 'nope' } }, { status: 401 }),
       ),
     );
 
@@ -98,9 +84,7 @@ describe('AppBootstrap', () => {
 
   it('clears the auth store when a later request returns 401', async () => {
     server.use(
-      http.get(`${BASE_URL}/account/me`, () =>
-        HttpResponse.json({ data: USER_FIXTURE }),
-      ),
+      http.get(`${BASE_URL}/account/me`, () => HttpResponse.json({ data: USER_FIXTURE })),
       http.get(`${BASE_URL}/probe`, () =>
         HttpResponse.json(
           { error: { code: 'UNAUTHORIZED', message: 'session gone' } },
@@ -123,10 +107,7 @@ describe('AppBootstrap', () => {
   it('navigates to /login when a request returns 401', async () => {
     server.use(
       http.get(`${BASE_URL}/account/me`, () =>
-        HttpResponse.json(
-          { error: { code: 'UNAUTHORIZED', message: 'nope' } },
-          { status: 401 },
-        ),
+        HttpResponse.json({ error: { code: 'UNAUTHORIZED', message: 'nope' } }, { status: 401 }),
       ),
     );
 
@@ -151,9 +132,7 @@ describe('AppBootstrap', () => {
 
   it('navigates to /verify-email on 403 EMAIL_NOT_VERIFIED', async () => {
     server.use(
-      http.get(`${BASE_URL}/account/me`, () =>
-        HttpResponse.json({ data: USER_FIXTURE }),
-      ),
+      http.get(`${BASE_URL}/account/me`, () => HttpResponse.json({ data: USER_FIXTURE })),
       http.get(`${BASE_URL}/protected`, () =>
         HttpResponse.json(
           { error: { code: 'EMAIL_NOT_VERIFIED', message: 'verify first' } },
@@ -188,9 +167,7 @@ describe('AppBootstrap', () => {
 
   it('navigates to /account/suspended on 403 ACCOUNT_SUSPENDED', async () => {
     server.use(
-      http.get(`${BASE_URL}/account/me`, () =>
-        HttpResponse.json({ data: USER_FIXTURE }),
-      ),
+      http.get(`${BASE_URL}/account/me`, () => HttpResponse.json({ data: USER_FIXTURE })),
       http.get(`${BASE_URL}/protected`, () =>
         HttpResponse.json(
           { error: { code: 'ACCOUNT_SUSPENDED', message: 'suspended' } },
@@ -210,10 +187,7 @@ describe('AppBootstrap', () => {
               </AppBootstrap>
             }
           />
-          <Route
-            path="/account/suspended"
-            element={<div>suspended destination</div>}
-          />
+          <Route path="/account/suspended" element={<div>suspended destination</div>} />
         </Routes>
       </MemoryRouter>,
     );
@@ -223,8 +197,6 @@ describe('AppBootstrap', () => {
 
     await expect(apiClient.get('/protected')).rejects.toThrow();
 
-    expect(
-      await screen.findByText('suspended destination'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('suspended destination')).toBeInTheDocument();
   });
 });

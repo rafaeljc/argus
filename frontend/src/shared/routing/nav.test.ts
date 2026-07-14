@@ -31,42 +31,23 @@ describe('visibleNavItems', () => {
 
   it('exposes only Account and Logout for unverified authenticated users', () => {
     const user = makeUser({ is_verified: false });
-    expect(labels(visibleNavItems(user, 'authenticated'))).toEqual([
-      'Account',
-      'Logout',
-    ]);
+    expect(labels(visibleNavItems(user, 'authenticated'))).toEqual(['Account', 'Logout']);
   });
 
   it('exposes primary items plus Account and Logout for verified non-admin users', () => {
     const user = makeUser({ is_verified: true, is_admin: false });
     const seen = labels(visibleNavItems(user, 'authenticated'));
-    expect(seen).toEqual([
-      'Transactions',
-      'Portfolio',
-      'Alerts',
-      'Account',
-      'Logout',
-    ]);
+    expect(seen).toEqual(['Transactions', 'Portfolio', 'Alerts', 'Account', 'Logout']);
   });
 
   it('exposes admin nav in addition to primary for verified admin users', () => {
     const user = makeUser({ is_verified: true, is_admin: true });
     const seen = labels(visibleNavItems(user, 'authenticated'));
-    expect(seen).toEqual([
-      'Transactions',
-      'Portfolio',
-      'Alerts',
-      'Admin',
-      'Account',
-      'Logout',
-    ]);
+    expect(seen).toEqual(['Transactions', 'Portfolio', 'Alerts', 'Admin', 'Account', 'Logout']);
   });
 
   it('applies the unverified rule even for admins whose email is still unverified', () => {
     const user = makeUser({ is_verified: false, is_admin: true });
-    expect(labels(visibleNavItems(user, 'authenticated'))).toEqual([
-      'Account',
-      'Logout',
-    ]);
+    expect(labels(visibleNavItems(user, 'authenticated'))).toEqual(['Account', 'Logout']);
   });
 });

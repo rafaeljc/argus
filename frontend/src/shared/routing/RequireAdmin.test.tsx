@@ -2,10 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
-import {
-  resetAuthStoreForTest,
-  useAuthStore,
-} from '../hooks/useAuthStore';
+import { resetAuthStoreForTest, useAuthStore } from '../hooks/useAuthStore';
 import type { CurrentUser } from '../types/user';
 import { RequireAdmin } from './RequireAdmin';
 

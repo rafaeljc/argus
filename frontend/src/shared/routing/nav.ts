@@ -36,10 +36,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   ...ACCOUNT_ITEMS,
 ] as const;
 
-export function visibleNavItems(
-  user: CurrentUser | null,
-  status: AuthStatus,
-): readonly NavItem[] {
+export function visibleNavItems(user: CurrentUser | null, status: AuthStatus): readonly NavItem[] {
   if (status !== 'authenticated' || user === null) {
     return AUTH_ITEMS;
   }

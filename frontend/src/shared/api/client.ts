@@ -1,8 +1,4 @@
-import axios, {
-  AxiosError,
-  type AxiosResponse,
-  type InternalAxiosRequestConfig,
-} from 'axios';
+import axios, { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 
 import type { ErrorEnvelope, FieldError } from '../types/envelopes';
 import { readCookie } from './cookies';
@@ -23,9 +19,7 @@ const CSRF_HEADER_NAME = 'X-CSRF-Token';
 const RETRY_AFTER_HEADER = 'retry-after';
 const STATE_CHANGING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
 
-export function attachCsrfHeader(
-  config: InternalAxiosRequestConfig,
-): InternalAxiosRequestConfig {
+export function attachCsrfHeader(config: InternalAxiosRequestConfig): InternalAxiosRequestConfig {
   const method = (config.method ?? 'get').toLowerCase();
   if (!STATE_CHANGING_METHODS.has(method)) {
     return config;
@@ -42,11 +36,7 @@ export function attachCsrfHeader(
 
 function isPaginatedEnvelope(body: unknown): boolean {
   return (
-    typeof body === 'object' &&
-    body !== null &&
-    'data' in body &&
-    'meta' in body &&
-    'links' in body
+    typeof body === 'object' && body !== null && 'data' in body && 'meta' in body && 'links' in body
   );
 }
 
@@ -108,10 +98,7 @@ function parseEnvelope(
 }
 
 function retryAfterFromResponse(response: AxiosResponse | undefined): number {
-  const raw = response?.headers?.[RETRY_AFTER_HEADER] as
-    | string
-    | undefined
-    | null;
+  const raw = response?.headers?.[RETRY_AFTER_HEADER] as string | undefined | null;
   return parseRetryAfterSeconds(raw ?? null);
 }
 
@@ -120,9 +107,7 @@ export function handleResponseError(error: unknown): Promise<never> {
     throw error;
   }
 
-  const response = error.response as
-    | AxiosResponse<ErrorEnvelope>
-    | undefined;
+  const response = error.response as AxiosResponse<ErrorEnvelope> | undefined;
   const skipGlobal = error.config?.skipGlobalAuthHandling === true;
 
   if (!response) {
