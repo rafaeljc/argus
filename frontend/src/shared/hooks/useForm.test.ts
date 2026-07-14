@@ -68,9 +68,7 @@ describe('useForm', () => {
 
   it('handleSubmit resolves happy path and passes current values to onSubmit', async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
-    const { result } = renderHook(() =>
-      useForm<LoginValues>({ initialValues: INITIAL, onSubmit }),
-    );
+    const { result } = renderHook(() => useForm<LoginValues>({ initialValues: INITIAL, onSubmit }));
 
     act(() => {
       result.current.setValue('email', 'me@example.com');
@@ -90,12 +88,12 @@ describe('useForm', () => {
   it('handleSubmit calls preventDefault on the passed FormEvent', async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     const preventDefault = vi.fn();
-    const { result } = renderHook(() =>
-      useForm<LoginValues>({ initialValues: INITIAL, onSubmit }),
-    );
+    const { result } = renderHook(() => useForm<LoginValues>({ initialValues: INITIAL, onSubmit }));
 
     await act(async () => {
-      await result.current.handleSubmit({ preventDefault } as unknown as React.SubmitEvent<HTMLFormElement>);
+      await result.current.handleSubmit({
+        preventDefault,
+      } as unknown as React.SubmitEvent<HTMLFormElement>);
     });
 
     expect(preventDefault).toHaveBeenCalledTimes(1);
@@ -113,9 +111,7 @@ describe('useForm', () => {
         ],
       }),
     );
-    const { result } = renderHook(() =>
-      useForm<LoginValues>({ initialValues: INITIAL, onSubmit }),
-    );
+    const { result } = renderHook(() => useForm<LoginValues>({ initialValues: INITIAL, onSubmit }));
 
     await act(async () => {
       await result.current.handleSubmit();
@@ -141,9 +137,7 @@ describe('useForm', () => {
         ],
       }),
     );
-    const { result } = renderHook(() =>
-      useForm<LoginValues>({ initialValues: INITIAL, onSubmit }),
-    );
+    const { result } = renderHook(() => useForm<LoginValues>({ initialValues: INITIAL, onSubmit }));
 
     await act(async () => {
       await result.current.handleSubmit();
@@ -164,9 +158,7 @@ describe('useForm', () => {
         ],
       }),
     );
-    const { result } = renderHook(() =>
-      useForm<LoginValues>({ initialValues: INITIAL, onSubmit }),
-    );
+    const { result } = renderHook(() => useForm<LoginValues>({ initialValues: INITIAL, onSubmit }));
 
     await act(async () => {
       await result.current.handleSubmit();
@@ -184,9 +176,7 @@ describe('useForm', () => {
         message: 'Rule already exists.',
       }),
     );
-    const { result } = renderHook(() =>
-      useForm<LoginValues>({ initialValues: INITIAL, onSubmit }),
-    );
+    const { result } = renderHook(() => useForm<LoginValues>({ initialValues: INITIAL, onSubmit }));
 
     await act(async () => {
       await result.current.handleSubmit();
@@ -205,9 +195,7 @@ describe('useForm', () => {
       retryAfterSeconds: 30,
     });
     const onSubmit = vi.fn().mockRejectedValue(rateErr);
-    const { result } = renderHook(() =>
-      useForm<LoginValues>({ initialValues: INITIAL, onSubmit }),
-    );
+    const { result } = renderHook(() => useForm<LoginValues>({ initialValues: INITIAL, onSubmit }));
 
     await act(async () => {
       await expect(result.current.handleSubmit()).resolves.toBeUndefined();
@@ -221,9 +209,7 @@ describe('useForm', () => {
 
   it('surfaces unknown errors as a generic formError plus toast', async () => {
     const onSubmit = vi.fn().mockRejectedValue(new Error('network down'));
-    const { result } = renderHook(() =>
-      useForm<LoginValues>({ initialValues: INITIAL, onSubmit }),
-    );
+    const { result } = renderHook(() => useForm<LoginValues>({ initialValues: INITIAL, onSubmit }));
 
     await act(async () => {
       await result.current.handleSubmit();
@@ -242,9 +228,7 @@ describe('useForm', () => {
           resolveOnSubmit = resolve;
         }),
     );
-    const { result } = renderHook(() =>
-      useForm<LoginValues>({ initialValues: INITIAL, onSubmit }),
-    );
+    const { result } = renderHook(() => useForm<LoginValues>({ initialValues: INITIAL, onSubmit }));
 
     let submitPromise: Promise<void>;
     act(() => {
@@ -268,9 +252,7 @@ describe('useForm', () => {
         details: [{ field: 'email', code: 'X', message: 'Bad.' }],
       }),
     );
-    const { result } = renderHook(() =>
-      useForm<LoginValues>({ initialValues: INITIAL, onSubmit }),
-    );
+    const { result } = renderHook(() => useForm<LoginValues>({ initialValues: INITIAL, onSubmit }));
 
     act(() => {
       result.current.setValue('email', 'me@example.com');

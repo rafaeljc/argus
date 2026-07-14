@@ -1,11 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import {
-  rateLimitMessage,
-  resetToastStoreForTest,
-  toast,
-  useToastStore,
-} from './useToastStore';
+import { rateLimitMessage, resetToastStoreForTest, toast, useToastStore } from './useToastStore';
 
 describe('useToastStore', () => {
   beforeEach(() => {

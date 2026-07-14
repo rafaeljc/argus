@@ -73,28 +73,24 @@ export function useForm<TValues extends object>({
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const setValue = useCallback(
-    <K extends StringKeys<TValues>>(name: K, value: TValues[K]) => {
-      setValues((prev) => ({ ...prev, [name]: value }));
-    },
-    [],
-  );
+  const setValue = useCallback(<K extends StringKeys<TValues>>(name: K, value: TValues[K]) => {
+    setValues((prev) => ({ ...prev, [name]: value }));
+  }, []);
 
   const setFieldErrors = useCallback((errors: FieldErrors<TValues>) => {
     setFieldErrorsState(errors);
   }, []);
 
   const handleChange = useCallback(
-    (name: StringKeys<TValues>) =>
-      (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const nextValue = event.target.value as TValues[typeof name];
-        setValues((prev) => ({ ...prev, [name]: nextValue }));
-        setFieldErrorsState((prev) => {
-          if (prev[name] === undefined) return prev;
-          const { [name]: _removed, ...rest } = prev;
-          return rest as FieldErrors<TValues>;
-        });
-      },
+    (name: StringKeys<TValues>) => (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      const nextValue = event.target.value as TValues[typeof name];
+      setValues((prev) => ({ ...prev, [name]: nextValue }));
+      setFieldErrorsState((prev) => {
+        if (prev[name] === undefined) return prev;
+        const { [name]: _removed, ...rest } = prev;
+        return rest as FieldErrors<TValues>;
+      });
+    },
     [],
   );
 
