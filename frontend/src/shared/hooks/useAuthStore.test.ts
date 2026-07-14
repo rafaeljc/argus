@@ -56,11 +56,7 @@ describe('useAuthStore', () => {
   });
 
   it('fetchUser transitions idle → loading → authenticated on 200', async () => {
-    server.use(
-      http.get(`${BASE_URL}/account/me`, () =>
-        HttpResponse.json({ data: USER_FIXTURE }),
-      ),
-    );
+    server.use(http.get(`${BASE_URL}/account/me`, () => HttpResponse.json({ data: USER_FIXTURE })));
 
     const promise = useAuthStore.getState().fetchUser();
     expect(useAuthStore.getState().status).toBe('loading');
@@ -94,10 +90,7 @@ describe('useAuthStore', () => {
   it('fetchUser lands on anonymous with an error message on 500', async () => {
     server.use(
       http.get(`${BASE_URL}/account/me`, () =>
-        HttpResponse.json(
-          { error: { code: 'INTERNAL_ERROR', message: 'boom' } },
-          { status: 500 },
-        ),
+        HttpResponse.json({ error: { code: 'INTERNAL_ERROR', message: 'boom' } }, { status: 500 }),
       ),
     );
 

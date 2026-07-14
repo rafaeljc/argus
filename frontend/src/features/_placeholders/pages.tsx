@@ -4,10 +4,10 @@ interface PlaceholderProps {
 
 function Placeholder({ title }: PlaceholderProps) {
   return (
-    <main className="mx-auto max-w-4xl p-8">
+    <div>
       <h1 className="text-2xl font-semibold">{title}</h1>
       <p className="mt-2 text-slate-600">Coming soon.</p>
-    </main>
+    </div>
   );
 }
 

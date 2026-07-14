@@ -126,9 +126,7 @@ const NOOP_HANDLERS: ApiErrorHandlers = {
 
 let handlers: ApiErrorHandlers = { ...NOOP_HANDLERS };
 
-export function registerApiErrorHandlers(
-  partial: Partial<ApiErrorHandlers>,
-): void {
+export function registerApiErrorHandlers(partial: Partial<ApiErrorHandlers>): void {
   handlers = { ...handlers, ...partial };
 }
 

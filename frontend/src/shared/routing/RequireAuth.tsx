@@ -12,9 +12,7 @@ export function RequireAuth() {
   }
 
   if (status === 'anonymous') {
-    return (
-      <Navigate to="/login" replace state={{ from: location.pathname }} />
-    );
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
   return <Outlet />;

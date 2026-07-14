@@ -25,11 +25,7 @@ describe('fetchCurrentUser', () => {
   });
 
   it('resolves to the CurrentUser payload on 200', async () => {
-    server.use(
-      http.get(`${BASE_URL}/account/me`, () =>
-        HttpResponse.json({ data: USER_FIXTURE }),
-      ),
-    );
+    server.use(http.get(`${BASE_URL}/account/me`, () => HttpResponse.json({ data: USER_FIXTURE })));
 
     const user = await fetchCurrentUser();
 

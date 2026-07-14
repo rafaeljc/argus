@@ -27,18 +27,13 @@ const ADMIN_USER = {
 function respondAsAnonymous() {
   server.use(
     http.get(`${BASE_URL}/account/me`, () =>
-      HttpResponse.json(
-        { error: { code: 'UNAUTHORIZED', message: 'nope' } },
-        { status: 401 },
-      ),
+      HttpResponse.json({ error: { code: 'UNAUTHORIZED', message: 'nope' } }, { status: 401 }),
     ),
   );
 }
 
 function respondAsUser(user: Record<string, unknown>) {
-  server.use(
-    http.get(`${BASE_URL}/account/me`, () => HttpResponse.json({ data: user })),
-  );
+  server.use(http.get(`${BASE_URL}/account/me`, () => HttpResponse.json({ data: user })));
 }
 
 function renderAppAt(path: string) {
@@ -63,50 +58,40 @@ describe('App route table', () => {
   it('renders the login placeholder at /login', async () => {
     respondAsAnonymous();
     renderAppAt('/login');
-    expect(
-      await screen.findByRole('heading', { name: /login/i }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /login/i })).toBeInTheDocument();
   });
 
   it('redirects anonymous users away from /account to /login', async () => {
     respondAsAnonymous();
     renderAppAt('/account');
-    expect(
-      await screen.findByRole('heading', { name: /login/i }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /login/i })).toBeInTheDocument();
   });
 
   it('renders the account placeholder for authenticated users', async () => {
     respondAsUser(NON_ADMIN_USER);
     renderAppAt('/account');
-    expect(
-      await screen.findByRole('heading', { name: /account/i }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /account/i })).toBeInTheDocument();
   });
 
   it('redirects non-admin authenticated users away from /admin/users to the not-found page', async () => {
     respondAsUser(NON_ADMIN_USER);
     renderAppAt('/admin/users');
-    expect(
-      await screen.findByRole('heading', { name: /not found/i }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /not found/i })).toBeInTheDocument();
   });
 
   it('renders the admin users placeholder for admin users', async () => {
     respondAsUser(ADMIN_USER);
     renderAppAt('/admin/users');
-    expect(
-      await screen.findByRole('heading', { name: /admin users/i }),
-    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /admin users/i })).toBeInTheDocument();
+    });
   });
 
   it('serves the not-found page for unknown paths', async () => {
     respondAsAnonymous();
     renderAppAt('/definitely-not-a-real-route');
     await waitFor(() => {
-      expect(
-        screen.getByRole('heading', { name: /not found/i }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /not found/i })).toBeInTheDocument();
     });
   });
 });
