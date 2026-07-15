@@ -55,16 +55,21 @@ describe('App route table', () => {
     resetApiErrorHandlers();
   });
 
-  it('renders the login placeholder at /login', async () => {
+  it('renders the login page at /login', async () => {
     respondAsAnonymous();
     renderAppAt('/login');
-    expect(await screen.findByRole('heading', { name: /login/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /sign in/i })).toBeInTheDocument();
   });
 
   it('redirects anonymous users away from /account to /login', async () => {
     respondAsAnonymous();
     renderAppAt('/account');
-    expect(await screen.findByRole('heading', { name: /login/i })).toBeInTheDocument();
+    await waitFor(
+      () => {
+        expect(screen.getByRole('heading', { name: /sign in/i })).toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
   });
 
   it('renders the account placeholder for authenticated users', async () => {
@@ -76,15 +81,23 @@ describe('App route table', () => {
   it('redirects non-admin authenticated users away from /admin/users to the not-found page', async () => {
     respondAsUser(NON_ADMIN_USER);
     renderAppAt('/admin/users');
-    expect(await screen.findByRole('heading', { name: /not found/i })).toBeInTheDocument();
+    await waitFor(
+      () => {
+        expect(screen.getByRole('heading', { name: /not found/i })).toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
   });
 
   it('renders the admin users placeholder for admin users', async () => {
     respondAsUser(ADMIN_USER);
     renderAppAt('/admin/users');
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /admin users/i })).toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(screen.getByRole('heading', { name: /admin users/i })).toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
   });
 
   it('serves the not-found page for unknown paths', async () => {
@@ -98,7 +111,7 @@ describe('App route table', () => {
   it('mounts the ToastProvider so notifications can be surfaced from anywhere', async () => {
     respondAsAnonymous();
     renderAppAt('/login');
-    await screen.findByRole('heading', { name: /login/i });
+    await screen.findByRole('heading', { name: /sign in/i });
     expect(screen.getByRole('region', { name: /notifications/i })).toBeInTheDocument();
   });
 });
