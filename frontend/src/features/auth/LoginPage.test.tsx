@@ -44,7 +44,10 @@ function setCsrfCookie(value = 'csrf-token'): void {
 
 function anonymousMe() {
   return http.get(`${BASE_URL}/account/me`, () =>
-    HttpResponse.json({ error: { code: 'UNAUTHORIZED', message: 'Not signed in' } }, { status: 401 }),
+    HttpResponse.json(
+      { error: { code: 'UNAUTHORIZED', message: 'Not signed in' } },
+      { status: 401 },
+    ),
   );
 }
 

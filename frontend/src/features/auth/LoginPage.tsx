@@ -76,9 +76,7 @@ export function LoginPage() {
       <div className="mx-auto w-full max-w-md">
         <Card>
           <h1 className="text-2xl font-semibold text-slate-900">Sign in to Argus</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Enter your email and password to continue.
-          </p>
+          <p className="mt-1 text-sm text-slate-600">Enter your email and password to continue.</p>
 
           <form
             className="mt-6 flex flex-col gap-4"
