@@ -51,12 +51,12 @@ describe('AppBootstrap', () => {
     resetToastStoreForTest();
   });
 
-  it('renders its children', () => {
+  it('renders its children once bootstrap settles', async () => {
     server.use(http.get(`${BASE_URL}/account/me`, () => HttpResponse.json({ data: USER_FIXTURE })));
 
     renderWithRouter();
 
-    expect(screen.getByText('child content')).toBeInTheDocument();
+    expect(await screen.findByText('child content')).toBeInTheDocument();
   });
 
   it('populates the auth store from GET /account/me on mount', async () => {

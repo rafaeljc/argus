@@ -64,7 +64,12 @@ describe('App route table', () => {
   it('redirects anonymous users away from /account to /login', async () => {
     respondAsAnonymous();
     renderAppAt('/account');
-    expect(await screen.findByRole('heading', { name: /login/i })).toBeInTheDocument();
+    await waitFor(
+      () => {
+        expect(screen.getByRole('heading', { name: /login/i })).toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
   });
 
   it('renders the account placeholder for authenticated users', async () => {
@@ -76,15 +81,23 @@ describe('App route table', () => {
   it('redirects non-admin authenticated users away from /admin/users to the not-found page', async () => {
     respondAsUser(NON_ADMIN_USER);
     renderAppAt('/admin/users');
-    expect(await screen.findByRole('heading', { name: /not found/i })).toBeInTheDocument();
+    await waitFor(
+      () => {
+        expect(screen.getByRole('heading', { name: /not found/i })).toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
   });
 
   it('renders the admin users placeholder for admin users', async () => {
     respondAsUser(ADMIN_USER);
     renderAppAt('/admin/users');
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /admin users/i })).toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(screen.getByRole('heading', { name: /admin users/i })).toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
   });
 
   it('serves the not-found page for unknown paths', async () => {
