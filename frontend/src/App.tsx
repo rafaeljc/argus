@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { AppBootstrap } from './AppBootstrap';
 import { LoginPage } from './features/auth/LoginPage';
+import { SignupPage } from './features/auth/SignupPage';
 import {
   AccountPage,
   AccountSuspendedPage,
@@ -16,7 +17,6 @@ import {
   PasswordResetPage,
   PortfolioPage,
   PortfolioSnapshotsPage,
-  SignupPage,
   TransactionDetailPage,
   TransactionsPage,
   VerifyEmailPage,

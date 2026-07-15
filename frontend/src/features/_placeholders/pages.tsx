@@ -11,10 +11,6 @@ function Placeholder({ title }: PlaceholderProps) {
   );
 }
 
-export function SignupPage() {
-  return <Placeholder title="Signup" />;
-}
-
 export function VerifyEmailPage() {
   return <Placeholder title="Verify Email" />;
 }
