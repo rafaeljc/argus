@@ -55,10 +55,10 @@ describe('App route table', () => {
     resetApiErrorHandlers();
   });
 
-  it('renders the login placeholder at /login', async () => {
+  it('renders the login page at /login', async () => {
     respondAsAnonymous();
     renderAppAt('/login');
-    expect(await screen.findByRole('heading', { name: /login/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /sign in/i })).toBeInTheDocument();
   });
 
   it('redirects anonymous users away from /account to /login', async () => {
@@ -66,7 +66,7 @@ describe('App route table', () => {
     renderAppAt('/account');
     await waitFor(
       () => {
-        expect(screen.getByRole('heading', { name: /login/i })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /sign in/i })).toBeInTheDocument();
       },
       { timeout: 3000 },
     );
@@ -111,7 +111,7 @@ describe('App route table', () => {
   it('mounts the ToastProvider so notifications can be surfaced from anywhere', async () => {
     respondAsAnonymous();
     renderAppAt('/login');
-    await screen.findByRole('heading', { name: /login/i });
+    await screen.findByRole('heading', { name: /sign in/i });
     expect(screen.getByRole('region', { name: /notifications/i })).toBeInTheDocument();
   });
 });

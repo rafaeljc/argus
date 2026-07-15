@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { AppBootstrap } from './AppBootstrap';
+import { LoginPage } from './features/auth/LoginPage';
 import {
   AccountPage,
   AccountSuspendedPage,
@@ -11,7 +12,6 @@ import {
   AdminUsersPage,
   AlertFiringsPage,
   AlertsPage,
-  LoginPage,
   PasswordResetConfirmPage,
   PasswordResetPage,
   PortfolioPage,
