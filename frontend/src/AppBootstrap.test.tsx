@@ -85,7 +85,37 @@ describe('AppBootstrap', () => {
     expect(useAuthStore.getState().user).toBeNull();
   });
 
-  it('clears the auth store when a later request returns 401', async () => {
+  it('does not navigate away when the /account/me probe returns 401', async () => {
+    server.use(
+      http.get(`${BASE_URL}/account/me`, () =>
+        HttpResponse.json({ error: { code: 'UNAUTHORIZED', message: 'nope' } }, { status: 401 }),
+      ),
+    );
+
+    render(
+      <MemoryRouter initialEntries={['/signup']}>
+        <Routes>
+          <Route
+            path="*"
+            element={
+              <AppBootstrap>
+                <div>signup page</div>
+              </AppBootstrap>
+            }
+          />
+          <Route path="/login" element={<div>login destination</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('signup page')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(useAuthStore.getState().status).toBe('anonymous');
+    });
+    expect(screen.queryByText('login destination')).not.toBeInTheDocument();
+  });
+
+  it('clears the auth store and navigates to /login when a later request returns 401', async () => {
     server.use(
       http.get(`${BASE_URL}/account/me`, () => HttpResponse.json({ data: USER_FIXTURE })),
       http.get(`${BASE_URL}/probe`, () =>
@@ -93,24 +123,6 @@ describe('AppBootstrap', () => {
           { error: { code: 'UNAUTHORIZED', message: 'session gone' } },
           { status: 401 },
         ),
-      ),
-    );
-
-    renderWithRouter();
-    await waitFor(() => {
-      expect(useAuthStore.getState().status).toBe('authenticated');
-    });
-
-    await expect(apiClient.get('/probe')).rejects.toThrow();
-
-    expect(useAuthStore.getState().status).toBe('anonymous');
-    expect(useAuthStore.getState().user).toBeNull();
-  });
-
-  it('navigates to /login when a request returns 401', async () => {
-    server.use(
-      http.get(`${BASE_URL}/account/me`, () =>
-        HttpResponse.json({ error: { code: 'UNAUTHORIZED', message: 'nope' } }, { status: 401 }),
       ),
     );
 
@@ -130,6 +142,14 @@ describe('AppBootstrap', () => {
       </MemoryRouter>,
     );
 
+    await waitFor(() => {
+      expect(useAuthStore.getState().status).toBe('authenticated');
+    });
+
+    await expect(apiClient.get('/probe')).rejects.toThrow();
+
+    expect(useAuthStore.getState().status).toBe('anonymous');
+    expect(useAuthStore.getState().user).toBeNull();
     expect(await screen.findByText('login destination')).toBeInTheDocument();
   });
 
