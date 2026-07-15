@@ -10,6 +10,13 @@ declare module 'axios' {
      * redirect (e.g. `/login` on a bad-credentials 401) set this to true.
      */
     skipGlobalAuthHandling?: boolean;
+    /**
+     * Skip the CSRF token requirement for a single request. Set on
+     * pre-session endpoints that declare `security: []` in the OpenAPI
+     * contract and therefore neither issue nor require an `argus_csrf`
+     * cookie (e.g. `/auth/login`, `/auth/signup`).
+     */
+    skipCsrfHeader?: boolean;
   }
 }
 

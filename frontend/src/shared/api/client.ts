@@ -25,6 +25,10 @@ export function attachCsrfHeader(config: InternalAxiosRequestConfig): InternalAx
     return config;
   }
 
+  if (config.skipCsrfHeader === true) {
+    return config;
+  }
+
   const token = readCookie(CSRF_COOKIE_NAME);
   if (token === null || token === '') {
     throw new MissingCsrfTokenError();

@@ -96,6 +96,20 @@ describe('CSRF request interceptor', () => {
 
     expect(networkSpy).not.toHaveBeenCalled();
   });
+
+  it('skips CSRF entirely when skipCsrfHeader is set (pre-session endpoints)', async () => {
+    const capturedHeaders = vi.fn();
+    server.use(
+      http.all(`${BASE_URL}/probe`, ({ request }) => {
+        capturedHeaders(request.headers.get('X-CSRF-Token'));
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    await apiClient.request({ url: '/probe', method: 'post', skipCsrfHeader: true });
+
+    expect(capturedHeaders).toHaveBeenCalledWith(null);
+  });
 });
 
 describe('envelope-unwrap response interceptor', () => {
