@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { AppBootstrap } from './AppBootstrap';
 import { LoginPage } from './features/auth/LoginPage';
+import { LogoutPage } from './features/auth/LogoutPage';
 import { PasswordResetConfirmPage } from './features/auth/PasswordResetConfirmPage';
 import { PasswordResetPage } from './features/auth/PasswordResetPage';
 import { SignupPage } from './features/auth/SignupPage';
@@ -36,6 +37,7 @@ function App() {
           <Route path="/" element={<Navigate to="/account" replace />} />
 
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/logout" element={<LogoutPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/password-reset" element={<PasswordResetPage />} />
