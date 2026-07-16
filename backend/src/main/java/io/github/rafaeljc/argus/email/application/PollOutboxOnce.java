@@ -28,10 +28,13 @@ public class PollOutboxOnce {
     private final Clock clock;
 
     public PollOutboxOnce(
-            OutboxRepository repository, EmailGateway gateway, CircuitBreaker breaker, Clock clock) {
+            OutboxRepository repository,
+            EmailGateway gateway,
+            CircuitBreaker vendorEmailBreaker,
+            Clock clock) {
         this.repository = repository;
         this.gateway = gateway;
-        this.breaker = breaker;
+        this.breaker = vendorEmailBreaker;
         this.clock = clock;
     }
 

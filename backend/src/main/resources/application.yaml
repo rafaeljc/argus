@@ -33,7 +33,7 @@ management:
       show-details: when-authorized
       group:
         readiness:
-          include: readinessState,db,vendorEmail
+          include: readinessState,db,vendorEmail,vendorMarketdata
   info:
     env:
       enabled: true
@@ -60,6 +60,15 @@ resilience4j:
         minimumNumberOfCalls: 5
         failureRateThreshold: 50
         waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+      vendor-marketdata:
+        slidingWindowSize: 20
+        minimumNumberOfCalls: 10
+        failureRateThreshold: 50
+        slowCallRateThreshold: 50
+        slowCallDurationThreshold: 30s
+        waitDurationInOpenState: 60s
         permittedNumberOfCallsInHalfOpenState: 3
         automaticTransitionFromOpenToHalfOpenEnabled: true
 
