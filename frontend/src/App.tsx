@@ -2,6 +2,8 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { AppBootstrap } from './AppBootstrap';
 import { LoginPage } from './features/auth/LoginPage';
+import { PasswordResetConfirmPage } from './features/auth/PasswordResetConfirmPage';
+import { PasswordResetPage } from './features/auth/PasswordResetPage';
 import { SignupPage } from './features/auth/SignupPage';
 import { VerifyEmailPage } from './features/auth/VerifyEmailPage';
 import {
@@ -14,8 +16,6 @@ import {
   AdminUsersPage,
   AlertFiringsPage,
   AlertsPage,
-  PasswordResetConfirmPage,
-  PasswordResetPage,
   PortfolioPage,
   PortfolioSnapshotsPage,
   TransactionDetailPage,
