@@ -11,22 +11,22 @@ import { rateLimitMessage, toast } from '../../shared/hooks/useToastStore';
 import { logout } from './service';
 
 type LogoutStatus = 'signing-out' | 'unavailable';
-type LogoutPhase = 'idle' | 'running' | 'settled';
 
 export function LogoutPage() {
   const navigate = useNavigate();
   const clearAuth = useAuthStore((state) => state.clearAuth);
   const [status, setStatus] = useState<LogoutStatus>('signing-out');
-  const phaseRef = useRef<LogoutPhase>('idle');
+  const inFlightRef = useRef(false);
 
   const attemptLogout = useCallback(async () => {
-    if (phaseRef.current === 'running') return;
-    phaseRef.current = 'running';
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     setStatus('signing-out');
 
     if (useAuthStore.getState().status !== 'authenticated') {
       clearAuth();
       navigate('/login', { replace: true });
+      inFlightRef.current = false;
       return;
     }
 
@@ -47,12 +47,15 @@ export function LogoutPage() {
         toast.error(rateLimitMessage(error.retryAfterSeconds), { durationMs: null });
       }
       setStatus('unavailable');
-      phaseRef.current = 'settled';
+    } finally {
+      inFlightRef.current = false;
     }
   }, [clearAuth, navigate]);
 
+  const hasStartedRef = useRef(false);
   useEffect(() => {
-    if (phaseRef.current !== 'idle') return;
+    if (hasStartedRef.current) return;
+    hasStartedRef.current = true;
     void attemptLogout();
   }, [attemptLogout]);
 
