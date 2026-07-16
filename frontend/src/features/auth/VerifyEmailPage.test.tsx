@@ -86,7 +86,10 @@ describe('VerifyEmailPage', () => {
 
     expect(await screen.findByRole('heading', { name: /verify email/i })).toBeInTheDocument();
     expect(screen.getByText(/we.ve sent a verification link/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /back to sign in/i })).toHaveAttribute('href', '/login');
+    expect(screen.getByRole('link', { name: /back to sign in/i })).toHaveAttribute(
+      'href',
+      '/login',
+    );
     expect(requestSpy).not.toHaveBeenCalled();
   });
 
@@ -160,9 +163,7 @@ describe('VerifyEmailPage', () => {
     renderAppAt('/verify-email?token=good-token');
 
     expect(await screen.findByText(/wait 30 seconds/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/verification is temporarily unavailable/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/verification is temporarily unavailable/i)).toBeInTheDocument();
     expect(
       screen.queryByText(/this verification link is invalid or expired/i),
     ).not.toBeInTheDocument();
@@ -172,18 +173,13 @@ describe('VerifyEmailPage', () => {
     server.use(
       anonymousMe(),
       http.post(`${BASE_URL}/auth/verify-email`, () =>
-        HttpResponse.json(
-          { error: { code: 'INTERNAL_ERROR', message: 'Boom' } },
-          { status: 500 },
-        ),
+        HttpResponse.json({ error: { code: 'INTERNAL_ERROR', message: 'Boom' } }, { status: 500 }),
       ),
     );
 
     renderAppAt('/verify-email?token=good-token');
 
-    expect(
-      await screen.findByText(/verification is temporarily unavailable/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/verification is temporarily unavailable/i)).toBeInTheDocument();
     expect(
       screen.queryByText(/this verification link is invalid or expired/i),
     ).not.toBeInTheDocument();

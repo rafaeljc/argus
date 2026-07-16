@@ -1,11 +1,5 @@
 import { apiClient } from '../../shared/api/client';
-import type {
-  LoginBody,
-  SessionResult,
-  SignupBody,
-  SignupResult,
-  VerifyEmailBody,
-} from './types';
+import type { LoginBody, SessionResult, SignupBody, SignupResult, VerifyEmailBody } from './types';
 
 export async function login(body: LoginBody): Promise<SessionResult> {
   const response = await apiClient.post<SessionResult>('/auth/login', body, {
