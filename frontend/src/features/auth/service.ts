@@ -1,5 +1,11 @@
 import { apiClient } from '../../shared/api/client';
-import type { LoginBody, SessionResult, SignupBody, SignupResult } from './types';
+import type {
+  LoginBody,
+  SessionResult,
+  SignupBody,
+  SignupResult,
+  VerifyEmailBody,
+} from './types';
 
 export async function login(body: LoginBody): Promise<SessionResult> {
   const response = await apiClient.post<SessionResult>('/auth/login', body, {
@@ -15,4 +21,11 @@ export async function signup(body: SignupBody): Promise<SignupResult> {
     skipCsrfHeader: true,
   });
   return response.data;
+}
+
+export async function verifyEmail(body: VerifyEmailBody): Promise<void> {
+  await apiClient.post('/auth/verify-email', body, {
+    skipGlobalAuthHandling: true,
+    skipCsrfHeader: true,
+  });
 }
