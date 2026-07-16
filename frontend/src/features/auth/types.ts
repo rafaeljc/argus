@@ -17,3 +17,7 @@ export interface SignupResult {
   user_id: string;
   verification_sent: boolean;
 }
+
+export interface VerifyEmailBody {
+  token: string;
+}
