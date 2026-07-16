@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { http, HttpResponse, delay } from 'msw';
+import { http, HttpResponse } from 'msw';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -213,10 +213,14 @@ describe('LogoutPage', () => {
   });
 
   it('shows a spinner while the logout request is in flight', async () => {
+    let releaseLogout!: () => void;
+    const logoutGate = new Promise<void>((resolve) => {
+      releaseLogout = resolve;
+    });
     server.use(
       authenticatedMe(),
       http.post(`${BASE_URL}/auth/logout`, async () => {
-        await delay(50);
+        await logoutGate;
         return new HttpResponse(null, { status: 204 });
       }),
     );
@@ -226,6 +230,7 @@ describe('LogoutPage', () => {
     expect(await screen.findByText(/signing you out/i)).toBeInTheDocument();
     expect(screen.getByRole('status', { name: /loading/i })).toBeInTheDocument();
 
+    releaseLogout();
     await waitForAnonymous();
   });
 
@@ -246,10 +251,14 @@ describe('LogoutPage', () => {
   });
 
   it('has no a11y violations in the signing-out state', async () => {
+    let releaseLogout!: () => void;
+    const logoutGate = new Promise<void>((resolve) => {
+      releaseLogout = resolve;
+    });
     server.use(
       authenticatedMe(),
       http.post(`${BASE_URL}/auth/logout`, async () => {
-        await delay(200);
+        await logoutGate;
         return new HttpResponse(null, { status: 204 });
       }),
     );
@@ -258,6 +267,8 @@ describe('LogoutPage', () => {
     await screen.findByText(/signing you out/i);
 
     expect(await axe(container)).toHaveNoViolations();
+    releaseLogout();
+    await waitForAnonymous();
   });
 
   it('has no a11y violations in the unavailable state', async () => {
