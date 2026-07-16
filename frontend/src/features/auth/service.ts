@@ -45,3 +45,9 @@ export async function confirmPasswordReset(body: PasswordResetConfirmBody): Prom
     skipCsrfHeader: true,
   });
 }
+
+export async function logout(): Promise<void> {
+  await apiClient.post('/auth/logout', undefined, {
+    skipGlobalAuthHandling: true,
+  });
+}
