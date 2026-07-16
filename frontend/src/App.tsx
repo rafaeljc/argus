@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppBootstrap } from './AppBootstrap';
 import { LoginPage } from './features/auth/LoginPage';
 import { SignupPage } from './features/auth/SignupPage';
+import { VerifyEmailPage } from './features/auth/VerifyEmailPage';
 import {
   AccountPage,
   AccountSuspendedPage,
@@ -19,7 +20,6 @@ import {
   PortfolioSnapshotsPage,
   TransactionDetailPage,
   TransactionsPage,
-  VerifyEmailPage,
 } from './features/_placeholders/pages';
 import { AppLayout } from './shared/components/layout/AppLayout';
 import { NotFound } from './shared/components/NotFound';

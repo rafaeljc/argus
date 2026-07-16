@@ -11,10 +11,6 @@ function Placeholder({ title }: PlaceholderProps) {
   );
 }
 
-export function VerifyEmailPage() {
-  return <Placeholder title="Verify Email" />;
-}
-
 export function PasswordResetPage() {
   return <Placeholder title="Password Reset" />;
 }
