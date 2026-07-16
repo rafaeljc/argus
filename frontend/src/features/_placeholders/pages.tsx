@@ -11,14 +11,6 @@ function Placeholder({ title }: PlaceholderProps) {
   );
 }
 
-export function PasswordResetPage() {
-  return <Placeholder title="Password Reset" />;
-}
-
-export function PasswordResetConfirmPage() {
-  return <Placeholder title="Password Reset Confirm" />;
-}
-
 export function AccountPage() {
   return <Placeholder title="Account" />;
 }
