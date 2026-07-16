@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 
 import { AppBootstrap } from './AppBootstrap';
+import { AccountPage } from './features/account/AccountPage';
 import { LoginPage } from './features/auth/LoginPage';
 import { LogoutPage } from './features/auth/LogoutPage';
 import { PasswordResetConfirmPage } from './features/auth/PasswordResetConfirmPage';
@@ -8,7 +9,6 @@ import { PasswordResetPage } from './features/auth/PasswordResetPage';
 import { SignupPage } from './features/auth/SignupPage';
 import { VerifyEmailPage } from './features/auth/VerifyEmailPage';
 import {
-  AccountPage,
   AccountSuspendedPage,
   AdminAuditLogPage,
   AdminEodPipelinePage,
