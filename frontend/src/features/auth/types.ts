@@ -21,3 +21,12 @@ export interface SignupResult {
 export interface VerifyEmailBody {
   token: string;
 }
+
+export interface PasswordResetRequestBody {
+  email: string;
+}
+
+export interface PasswordResetConfirmBody {
+  token: string;
+  new_password: string;
+}
