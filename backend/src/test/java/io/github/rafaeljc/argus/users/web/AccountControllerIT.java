@@ -17,6 +17,7 @@ import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.TestRestTemplate;
@@ -165,6 +166,32 @@ class AccountControllerIT {
     }
 
     @Test
+    void deleteMe_thenReusingOriginalSessionCookie_clearsCookiesAndRejectsFollowUpRequest()
+            throws Exception {
+        User seeded = seedVerified("heidi@example.com");
+        String sessionToken = seedSession(seeded);
+
+        ResponseEntity<String> deleteResponse =
+                exchangeWithToken(sessionToken, HttpMethod.DELETE, passwordBody(PASSWORD));
+        assertThat(deleteResponse.getStatusCode().value()).isEqualTo(204);
+
+        List<String> setCookieHeaders = deleteResponse.getHeaders().get(HttpHeaders.SET_COOKIE);
+        assertThat(setCookieHeaders).isNotNull();
+        assertThat(setCookieHeaders)
+                .anySatisfy(header -> assertThat(header)
+                        .startsWith(SessionCookieFactory.COOKIE_NAME + "=;")
+                        .contains("Expires=Thu, 01 Jan 1970"))
+                .anySatisfy(header -> assertThat(header)
+                        .startsWith(CsrfCookieFactory.COOKIE_NAME + "=;")
+                        .contains("Expires=Thu, 01 Jan 1970"));
+
+        ResponseEntity<String> reuse = exchangeWithToken(sessionToken, HttpMethod.GET, null);
+        assertThat(reuse.getStatusCode().value()).isEqualTo(401);
+        assertThat(json.readTree(reuse.getBody()).get("error").get("code").asString())
+                .isEqualTo("UNAUTHORIZED");
+    }
+
+    @Test
     void deleteMe_suspendedLiveSession_returns403AccountSuspended() throws Exception {
         User seeded = seedVerified("gina@example.com");
         userRepository.save(new User(seeded.id(), seeded.email(), seeded.passwordHash(),
@@ -190,7 +217,10 @@ class AccountControllerIT {
     }
 
     private ResponseEntity<String> exchange(User authenticatedAs, HttpMethod method, String jsonBody) {
-        String sessionToken = seedSession(authenticatedAs);
+        return exchangeWithToken(seedSession(authenticatedAs), method, jsonBody);
+    }
+
+    private ResponseEntity<String> exchangeWithToken(String sessionToken, HttpMethod method, String jsonBody) {
         HttpHeaders headers = new HttpHeaders();
         headers.add(HttpHeaders.COOKIE,
                 SessionCookieFactory.COOKIE_NAME + "=" + sessionToken

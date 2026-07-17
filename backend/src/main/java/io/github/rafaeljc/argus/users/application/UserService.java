@@ -6,6 +6,7 @@ import io.github.rafaeljc.argus.common.domain.Clock;
 import io.github.rafaeljc.argus.common.domain.DomainException;
 import io.github.rafaeljc.argus.common.domain.ResourceNotFoundException;
 import io.github.rafaeljc.argus.common.domain.UserId;
+import io.github.rafaeljc.argus.users.application.event.UserSoftDeleted;
 import io.github.rafaeljc.argus.users.application.port.PasswordEncoder;
 import io.github.rafaeljc.argus.users.application.port.UserRepository;
 import io.github.rafaeljc.argus.users.domain.AccountSuspendedException;
@@ -97,6 +98,9 @@ public class UserService {
     public User softDelete(UserId id, String rawPassword) {
         try {
             User deleted = performSoftDelete(id, rawPassword);
+            // Business event first so peer-module reactions (auth invalidating sessions) commit
+            // in the same transaction as the flip. Audit event stays on its own channel.
+            events.publishEvent(new UserSoftDeleted(deleted.id()));
             events.publishEvent(new AuthAuditEvent.AccountDeleted(deleted.id(), deleted.email()));
             return deleted;
         } catch (DomainException ex) {
