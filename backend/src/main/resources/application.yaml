@@ -76,6 +76,9 @@ argus:
   email:
     poll:
       interval-ms: 30000
+  marketdata:
+    backfill:
+      interval-ms: 60000
   auth:
     session:
       sweep:
