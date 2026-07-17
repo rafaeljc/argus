@@ -11,10 +11,6 @@ function Placeholder({ title }: PlaceholderProps) {
   );
 }
 
-export function AccountSuspendedPage() {
-  return <Placeholder title="Account Suspended" />;
-}
-
 export function TransactionsPage() {
   return <Placeholder title="Transactions" />;
 }
