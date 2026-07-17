@@ -1,35 +1,26 @@
 package io.github.rafaeljc.argus.auth.web;
 
 import io.github.rafaeljc.argus.auth.domain.Session;
+import io.github.rafaeljc.argus.common.web.SessionCookies;
 import jakarta.servlet.http.Cookie;
 import org.springframework.stereotype.Component;
 
 @Component
 public class SessionCookieFactory {
 
-    public static final String COOKIE_NAME = "argus_session";
-
-    private static final String SAME_SITE = "Lax";
-    private static final String PATH = "/";
+    public static final String COOKIE_NAME = SessionCookies.SESSION_COOKIE_NAME;
 
     public Cookie forToken(String rawToken) {
-        Cookie cookie = baseCookie(rawToken);
+        Cookie cookie = new Cookie(COOKIE_NAME, rawToken);
+        cookie.setHttpOnly(true);
+        cookie.setSecure(true);
+        cookie.setPath(SessionCookies.COOKIE_PATH);
+        cookie.setAttribute("SameSite", SessionCookies.SAME_SITE);
         cookie.setMaxAge((int) Session.ROLLING_WINDOW.toSeconds());
         return cookie;
     }
 
     public Cookie cleared() {
-        Cookie cookie = baseCookie("");
-        cookie.setMaxAge(0);
-        return cookie;
-    }
-
-    private static Cookie baseCookie(String value) {
-        Cookie cookie = new Cookie(COOKIE_NAME, value);
-        cookie.setHttpOnly(true);
-        cookie.setSecure(true);
-        cookie.setPath(PATH);
-        cookie.setAttribute("SameSite", SAME_SITE);
-        return cookie;
+        return SessionCookies.clearedSession();
     }
 }
