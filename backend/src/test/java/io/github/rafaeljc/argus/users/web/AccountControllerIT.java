@@ -32,7 +32,7 @@ import org.springframework.http.ResponseEntity;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-@Import({PostgresContainer.class, TestCurrentUserIdConfig.class})
+@Import(PostgresContainer.class)
 @AutoConfigureTestRestTemplate
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class AccountControllerIT {
@@ -192,7 +192,6 @@ class AccountControllerIT {
     private ResponseEntity<String> exchange(User authenticatedAs, HttpMethod method, String jsonBody) {
         String sessionToken = seedSession(authenticatedAs);
         HttpHeaders headers = new HttpHeaders();
-        headers.add(TestCurrentUserIdConfig.HEADER, authenticatedAs.id().value().toString());
         headers.add(HttpHeaders.COOKIE,
                 SessionCookieFactory.COOKIE_NAME + "=" + sessionToken
                         + "; " + CsrfCookieFactory.COOKIE_NAME + "=" + CSRF_VALUE);

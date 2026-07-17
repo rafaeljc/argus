@@ -11,7 +11,6 @@ import io.github.rafaeljc.argus.common.domain.SessionId;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
 import io.github.rafaeljc.argus.users.application.UserService;
 import io.github.rafaeljc.argus.users.domain.User;
-import io.github.rafaeljc.argus.users.web.TestCurrentUserIdConfig;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
@@ -29,7 +28,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 
-@Import({PostgresContainer.class, TestCurrentUserIdConfig.class})
+@Import(PostgresContainer.class)
 @AutoConfigureTestRestTemplate
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class RateLimitIT {
@@ -57,8 +56,8 @@ class RateLimitIT {
         User user = userService.createUnverified("ratelimit-it@example.com", "correct horse battery staple");
         String sessionToken = seedSession(user);
 
-        ResponseEntity<String> first = get(user, sessionToken);
-        ResponseEntity<String> second = get(user, sessionToken);
+        ResponseEntity<String> first = get(sessionToken);
+        ResponseEntity<String> second = get(sessionToken);
 
         assertThat(first.getStatusCode().value()).isEqualTo(200);
         assertThat(second.getStatusCode().value()).isEqualTo(200);
@@ -80,9 +79,8 @@ class RateLimitIT {
         assertThat(secondRemaining).isLessThan(300L);
     }
 
-    private ResponseEntity<String> get(User authenticatedAs, String sessionToken) {
+    private ResponseEntity<String> get(String sessionToken) {
         HttpHeaders headers = new HttpHeaders();
-        headers.add(TestCurrentUserIdConfig.HEADER, authenticatedAs.id().value().toString());
         headers.add(HttpHeaders.COOKIE,
                 SessionCookieFactory.COOKIE_NAME + "=" + sessionToken
                         + "; " + CsrfCookieFactory.COOKIE_NAME + "=" + CSRF_VALUE);
