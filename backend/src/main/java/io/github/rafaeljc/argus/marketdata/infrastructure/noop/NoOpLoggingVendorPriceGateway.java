@@ -10,16 +10,12 @@ import java.util.List;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-// Profile-gated to local + test so a missing production adapter fails wiring instead of
-// silently swallowing vendor calls. Symbol-universe fetches return empty (safe no-op — the
-// upstream sweep just has nothing to reconcile). Price-history fetches throw because the
-// backfill worker treats an empty result as "vendor says no data for this window", which
-// would mask the fact that no vendor is wired at all.
+// Symbol-universe fetches return empty (safe no-op — the upstream sweep just has nothing to
+// reconcile). Price-history fetches throw because the backfill worker treats an empty result
+// as "vendor says no data for this window", which would mask the fact that no vendor is wired.
 @Component
-@Profile({"local", "test"})
 public class NoOpLoggingVendorPriceGateway implements VendorPriceGateway {
 
     private static final Logger log = LoggerFactory.getLogger(NoOpLoggingVendorPriceGateway.class);
