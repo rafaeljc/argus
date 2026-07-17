@@ -168,7 +168,7 @@ describe('useForm', () => {
     expect(result.current.formError).toBe('Extra.');
   });
 
-  it('surfaces ApiError without details as formError and a toast', async () => {
+  it('surfaces ApiError without details as inline formError only (no toast)', async () => {
     const onSubmit = vi.fn().mockRejectedValue(
       new ApiError({
         status: 409,
@@ -184,9 +184,7 @@ describe('useForm', () => {
 
     expect(result.current.formError).toBe('Rule already exists.');
     expect(result.current.fieldErrors).toEqual({});
-    expect(useToastStore.getState().toasts).toHaveLength(1);
-    expect(useToastStore.getState().toasts[0]?.message).toBe('Rule already exists.');
-    expect(useToastStore.getState().toasts[0]?.variant).toBe('error');
+    expect(useToastStore.getState().toasts).toHaveLength(0);
   });
 
   it('swallows RateLimitedError so the global handler owns it (no local surface)', async () => {

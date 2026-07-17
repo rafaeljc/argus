@@ -119,7 +119,6 @@ export function useForm<TValues extends object>({
             return;
           }
           setFormError(error.message);
-          toast.error(error.message);
           return;
         }
 
