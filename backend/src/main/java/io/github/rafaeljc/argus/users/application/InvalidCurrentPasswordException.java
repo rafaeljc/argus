@@ -8,7 +8,7 @@ public final class InvalidCurrentPasswordException extends DomainException {
     private final UserId userId;
 
     public InvalidCurrentPasswordException(UserId userId) {
-        super("current password mismatch: " + userId.value());
+        super("Current password is incorrect.");
         this.userId = userId;
     }
 
