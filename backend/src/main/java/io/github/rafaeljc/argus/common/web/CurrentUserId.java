@@ -1,4 +1,4 @@
-package io.github.rafaeljc.argus.users.web;
+package io.github.rafaeljc.argus.common.web;
 
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
