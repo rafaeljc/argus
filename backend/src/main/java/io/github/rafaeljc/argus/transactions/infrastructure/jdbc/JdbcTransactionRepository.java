@@ -58,6 +58,14 @@ class JdbcTransactionRepository implements TransactionRepository {
             ORDER BY trade_date, created_at
             """;
 
+    private static final String FIND_ALL_AFTER_SQL =
+            """
+            SELECT id, user_id, ticker, operation, quantity, trade_date, created_at, updated_at
+            FROM transactions
+            WHERE user_id = :userId AND ticker = :ticker AND trade_date > :after
+            ORDER BY trade_date, created_at
+            """;
+
     private static final String HOLDINGS_AS_OF_SQL =
             """
             SELECT COALESCE(SUM(CASE WHEN operation = 'BUY' THEN quantity ELSE -quantity END), 0) AS net
@@ -112,6 +120,15 @@ class JdbcTransactionRepository implements TransactionRepository {
                 .addValue("ticker", ticker.value())
                 .addValue("after", after);
         return jdbc.query(FIND_LATER_SELLS_SQL, params, JdbcTransactionRepository::mapRow);
+    }
+
+    @Override
+    public List<Transaction> findAllAfter(UserId userId, Ticker ticker, LocalDate after) {
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("userId", userId.value())
+                .addValue("ticker", ticker.value())
+                .addValue("after", after);
+        return jdbc.query(FIND_ALL_AFTER_SQL, params, JdbcTransactionRepository::mapRow);
     }
 
     @Override

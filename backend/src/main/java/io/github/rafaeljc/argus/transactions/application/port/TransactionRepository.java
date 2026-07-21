@@ -23,5 +23,7 @@ public interface TransactionRepository {
 
     List<Transaction> findLaterSells(UserId userId, Ticker ticker, LocalDate after);
 
+    List<Transaction> findAllAfter(UserId userId, Ticker ticker, LocalDate after);
+
     BigDecimal holdingsAsOf(UserId userId, Ticker ticker, LocalDate asOf);
 }
