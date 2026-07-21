@@ -8,6 +8,8 @@ import io.github.rafaeljc.argus.common.domain.DomainException;
 import io.github.rafaeljc.argus.common.domain.FieldError;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.MessageSourceResolvable;
+import org.springframework.core.MethodParameter;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.HttpInputMessage;
@@ -16,9 +18,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.BindingResult;
+import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 class ApiErrorHandlerTest {
 
@@ -127,6 +132,60 @@ class ApiErrorHandlerTest {
         ResponseEntity<ErrorEnvelope> response = handler.handleBeanValidation(ex);
 
         assertThat(response.getBody().error().details().get(0).code()).isEqualTo("invalid");
+    }
+
+    @Test
+    void handleParamValidation_outOfRangeParam_returns422WithSnakeCaseFieldAndLowercaseCode() {
+        MethodParameter parameter = mock(MethodParameter.class);
+        when(parameter.getParameterName()).thenReturn("perPage");
+        MessageSourceResolvable error = mock(MessageSourceResolvable.class);
+        when(error.getCodes()).thenReturn(new String[] {"Max.list.perPage", "Max.perPage", "Max.int", "Max"});
+        when(error.getDefaultMessage()).thenReturn("must be less than or equal to 200");
+        ParameterValidationResult result = mock(ParameterValidationResult.class);
+        when(result.getMethodParameter()).thenReturn(parameter);
+        when(result.getResolvableErrors()).thenReturn(List.of(error));
+        HandlerMethodValidationException ex = mock(HandlerMethodValidationException.class);
+        when(ex.getParameterValidationResults()).thenReturn(List.of(result));
+
+        ResponseEntity<ErrorEnvelope> response = handler.handleParamValidation(ex);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(422);
+        ApiError responseError = response.getBody().error();
+        assertThat(responseError.code()).isEqualTo("VALIDATION_ERROR");
+        assertThat(responseError.details()).hasSize(1);
+        FieldError detail = responseError.details().get(0);
+        assertThat(detail.field()).isEqualTo("per_page");
+        assertThat(detail.code()).isEqualTo("max");
+        assertThat(detail.message()).isEqualTo("must be less than or equal to 200");
+    }
+
+    @Test
+    void handleParamValidation_missingDefaultMessage_fallsBackToInvalid() {
+        MethodParameter parameter = mock(MethodParameter.class);
+        when(parameter.getParameterName()).thenReturn("page");
+        MessageSourceResolvable error = mock(MessageSourceResolvable.class);
+        when(error.getCodes()).thenReturn(new String[] {"Min"});
+        when(error.getDefaultMessage()).thenReturn(null);
+        ParameterValidationResult result = mock(ParameterValidationResult.class);
+        when(result.getMethodParameter()).thenReturn(parameter);
+        when(result.getResolvableErrors()).thenReturn(List.of(error));
+        HandlerMethodValidationException ex = mock(HandlerMethodValidationException.class);
+        when(ex.getParameterValidationResults()).thenReturn(List.of(result));
+
+        ResponseEntity<ErrorEnvelope> response = handler.handleParamValidation(ex);
+
+        assertThat(response.getBody().error().details().get(0).message()).isEqualTo("invalid");
+    }
+
+    @Test
+    void handleTypeMismatch_returns400MalformedRequest() {
+        MethodArgumentTypeMismatchException ex = mock(MethodArgumentTypeMismatchException.class);
+
+        ResponseEntity<ErrorEnvelope> response = handler.handleTypeMismatch(ex);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+        assertThat(response.getBody().error().code()).isEqualTo("MALFORMED_REQUEST");
+        assertThat(response.getBody().error().details()).isEmpty();
     }
 
     @Test
