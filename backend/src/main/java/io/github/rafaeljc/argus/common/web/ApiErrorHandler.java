@@ -8,15 +8,19 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.context.MessageSourceResolvable;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class ApiErrorHandler {
@@ -59,6 +63,22 @@ public class ApiErrorHandler {
     public ResponseEntity<ErrorEnvelope> handleMalformed(HttpMessageNotReadableException ex) {
         LOG.info("malformed request traceId={}", traceId());
         return response(400, CODE_MALFORMED_REQUEST, "Malformed request body", List.of());
+    }
+
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ErrorEnvelope> handleParamValidation(HandlerMethodValidationException ex) {
+        List<FieldError> details = ex.getParameterValidationResults().stream()
+                .flatMap(result -> result.getResolvableErrors().stream()
+                        .map(error -> toFieldError(result, error)))
+                .toList();
+        LOG.info("param validation error traceId={} count={}", traceId(), details.size());
+        return response(422, CODE_VALIDATION_ERROR, "Request validation failed", details);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorEnvelope> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        LOG.info("type mismatch traceId={}", traceId());
+        return response(400, CODE_MALFORMED_REQUEST, "Malformed request", List.of());
     }
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
@@ -108,6 +128,14 @@ public class ApiErrorHandler {
                 toSnakeCase(binding.getField()),
                 normalizeCode(binding.getCode()),
                 binding.getDefaultMessage() == null ? FALLBACK_DETAIL : binding.getDefaultMessage());
+    }
+
+    private static FieldError toFieldError(ParameterValidationResult result, MessageSourceResolvable error) {
+        String field = toSnakeCase(result.getMethodParameter().getParameterName());
+        String[] codes = error.getCodes();
+        String code = normalizeCode(codes == null || codes.length == 0 ? null : codes[codes.length - 1]);
+        String message = error.getDefaultMessage() == null ? FALLBACK_DETAIL : error.getDefaultMessage();
+        return new FieldError(field, code, message);
     }
 
     private static String normalizeCode(String code) {
