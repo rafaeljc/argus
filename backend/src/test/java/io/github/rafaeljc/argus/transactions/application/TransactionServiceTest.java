@@ -14,6 +14,7 @@ import io.github.rafaeljc.argus.transactions.domain.Transaction;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,15 +29,22 @@ class TransactionServiceTest {
     private static final Quantity QUANTITY = new Quantity(new BigDecimal("10"));
     private static final LocalDate TRADE_DATE = LocalDate.parse("2026-06-15");
     private static final Instant NOW = Instant.parse("2026-07-01T12:00:00Z");
+    private static final TransactionId TRANSACTION_ID = new TransactionId(UuidCreator.getTimeOrderedEpoch());
 
     @Mock
     private RecordTransaction recordTransaction;
+
+    @Mock
+    private ListTransactions listTransactions;
+
+    @Mock
+    private GetTransaction getTransaction;
 
     private TransactionService service;
 
     @BeforeEach
     void setUp() {
-        service = new TransactionService(recordTransaction);
+        service = new TransactionService(recordTransaction, listTransactions, getTransaction);
     }
 
     @Test
@@ -51,5 +59,30 @@ class TransactionServiceTest {
 
         assertThat(result).isEqualTo(expected);
         verify(recordTransaction).record(USER_ID, TICKER, Operation.BUY, QUANTITY, TRADE_DATE);
+    }
+
+    @Test
+    void list_delegatesToListTransactionsAndReturnsItsResult() {
+        Transaction transaction = new Transaction(
+                TRANSACTION_ID, USER_ID, TICKER, Operation.BUY, QUANTITY, TRADE_DATE, NOW, NOW);
+        PageResult<Transaction> expected = new PageResult<>(List.of(transaction), 1, 1, 50);
+        when(listTransactions.list(USER_ID, 1, 50)).thenReturn(expected);
+
+        PageResult<Transaction> result = service.list(USER_ID, 1, 50);
+
+        assertThat(result).isEqualTo(expected);
+        verify(listTransactions).list(USER_ID, 1, 50);
+    }
+
+    @Test
+    void get_delegatesToGetTransactionAndReturnsItsResult() {
+        Transaction expected = new Transaction(
+                TRANSACTION_ID, USER_ID, TICKER, Operation.BUY, QUANTITY, TRADE_DATE, NOW, NOW);
+        when(getTransaction.get(USER_ID, TRANSACTION_ID)).thenReturn(expected);
+
+        Transaction result = service.get(USER_ID, TRANSACTION_ID);
+
+        assertThat(result).isEqualTo(expected);
+        verify(getTransaction).get(USER_ID, TRANSACTION_ID);
     }
 }
