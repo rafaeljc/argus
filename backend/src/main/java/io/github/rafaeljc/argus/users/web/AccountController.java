@@ -1,6 +1,7 @@
 package io.github.rafaeljc.argus.users.web;
 
 import io.github.rafaeljc.argus.common.domain.UserId;
+import io.github.rafaeljc.argus.common.web.CurrentUserId;
 import io.github.rafaeljc.argus.common.web.SessionCookies;
 import io.github.rafaeljc.argus.common.web.SuccessEnvelope;
 import io.github.rafaeljc.argus.users.application.UserService;

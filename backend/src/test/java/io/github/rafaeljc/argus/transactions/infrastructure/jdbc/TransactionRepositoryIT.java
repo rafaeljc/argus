@@ -186,6 +186,30 @@ class TransactionRepositoryIT {
     }
 
     @Test
+    void findAllAfter_returnsBuyAndSellRowsOrderedByTradeDateThenCreatedAt() {
+        UserId userId = newUser();
+        UserId otherUser = newUser();
+        repository.save(newTransaction(userId, AAPL, Operation.BUY, "20", LocalDate.parse("2026-01-01")));
+        Transaction laterBuy = repository.save(
+                newTransaction(userId, AAPL, Operation.BUY, "5", LocalDate.parse("2026-02-01")));
+        Transaction laterSell = repository.save(
+                newTransaction(userId, AAPL, Operation.SELL, "8", LocalDate.parse("2026-03-01")));
+        repository.save(newTransaction(otherUser, AAPL, Operation.SELL, "1", LocalDate.parse("2026-04-01")));
+
+        List<Transaction> after = repository.findAllAfter(userId, AAPL, LocalDate.parse("2026-01-01"));
+
+        assertThat(after).extracting(Transaction::id).containsExactly(laterBuy.id(), laterSell.id());
+    }
+
+    @Test
+    void findAllAfter_noneAfterDate_returnsEmpty() {
+        UserId userId = newUser();
+        repository.save(newTransaction(userId, AAPL, Operation.BUY, "10", LocalDate.parse("2026-03-10")));
+
+        assertThat(repository.findAllAfter(userId, AAPL, LocalDate.parse("2026-03-10"))).isEmpty();
+    }
+
+    @Test
     void listByUserId_ordersByTradeDateDescThenCreatedAtDesc() {
         UserId userId = newUser();
         Transaction oldest = repository.save(

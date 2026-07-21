@@ -1,4 +1,4 @@
-package io.github.rafaeljc.argus.marketdata.infrastructure.jpa;
+package io.github.rafaeljc.argus.marketdata.infrastructure.jdbc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -24,10 +24,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Import(PostgresContainer.class)
 @SpringBootTest
-class JpaBackfillJobRepositoryIT {
+class JdbcBackfillJobRepositoryIT {
 
     private static final Ticker AAPL = new Ticker("AAPL");
     private static final LocalDate START = LocalDate.of(2021, 1, 1);
@@ -42,6 +44,9 @@ class JpaBackfillJobRepositoryIT {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     private UserId userId;
 
@@ -147,6 +152,42 @@ class JpaBackfillJobRepositoryIT {
 
         assertThatThrownBy(() -> jobs.save(duplicate))
                 .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void enqueueIfNoActiveJob_noActiveJobForTicker_insertsAndReturnsTrue() {
+        boolean inserted = jobs.enqueueIfNoActiveJob(pendingJob(newJobId()));
+
+        assertThat(inserted).isTrue();
+        assertThat(jobs.findActiveByTicker(AAPL)).isPresent();
+    }
+
+    @Test
+    void enqueueIfNoActiveJob_activeJobAlreadyExists_returnsFalseAndDoesNotInsert() {
+        BackfillJob existing = jobs.save(pendingJob(newJobId()));
+
+        boolean inserted = jobs.enqueueIfNoActiveJob(pendingJob(newJobId()));
+
+        assertThat(inserted).isFalse();
+        assertThat(jobs.findActiveByTicker(AAPL)).contains(existing);
+    }
+
+    @Test
+    void enqueueIfNoActiveJob_racingCallWithinOneOpenTransaction_secondCallReturnsFalseAndTransactionCommits() {
+        TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+        JobId firstId = newJobId();
+        JobId secondId = newJobId();
+
+        transactionTemplate.executeWithoutResult(status -> {
+            boolean firstInserted = jobs.enqueueIfNoActiveJob(pendingJob(firstId));
+            boolean secondInserted = jobs.enqueueIfNoActiveJob(pendingJob(secondId));
+
+            assertThat(firstInserted).isTrue();
+            assertThat(secondInserted).isFalse();
+        });
+
+        assertThat(jobs.findById(firstId)).isPresent();
+        assertThat(jobs.findById(secondId)).isEmpty();
     }
 
     private BackfillJob pendingJob(JobId id) {
