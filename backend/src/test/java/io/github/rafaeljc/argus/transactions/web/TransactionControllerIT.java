@@ -17,6 +17,7 @@ import io.github.rafaeljc.argus.marketdata.domain.Symbol;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
 import io.github.rafaeljc.argus.transactions.application.TransactionService;
 import io.github.rafaeljc.argus.transactions.domain.Operation;
+import io.github.rafaeljc.argus.transactions.domain.Transaction;
 import io.github.rafaeljc.argus.users.application.UserService;
 import io.github.rafaeljc.argus.users.domain.User;
 import java.math.BigDecimal;
@@ -27,6 +28,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.HexFormat;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -207,6 +209,158 @@ class TransactionControllerIT {
         assertThat(jobCount).isEqualTo(1);
     }
 
+    @Test
+    void getTransactions_authenticated_returnsOwnedPageWithEnvelope() throws Exception {
+        User user = seedVerified("judy@example.com");
+        transactionService.record(user.id(), AAPL, Operation.BUY, new Quantity(new BigDecimal("10")),
+                today().minusDays(2));
+        transactionService.record(user.id(), AAPL, Operation.BUY, new Quantity(new BigDecimal("5")),
+                today().minusDays(1));
+
+        ResponseEntity<String> response = get(user, "");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        JsonNode body = json.readTree(response.getBody());
+        assertThat(body.get("data")).hasSize(2);
+        JsonNode meta = body.get("meta");
+        assertThat(meta.get("total").asInt()).isEqualTo(2);
+        assertThat(meta.get("page").asInt()).isEqualTo(1);
+        assertThat(meta.get("per_page").asInt()).isEqualTo(50);
+        assertThat(meta.get("total_pages").asInt()).isEqualTo(1);
+        JsonNode links = body.get("links");
+        assertThat(links.get("self").asString()).contains("page=1").contains("per_page=50");
+        assertThat(links.get("last").asString()).contains("page=1");
+        assertThat(links.get("next").isNull()).isTrue();
+        assertThat(links.get("prev").isNull()).isTrue();
+    }
+
+    @Test
+    void getTransactions_empty_returnsEmptyDataWithZeroMeta() throws Exception {
+        User user = seedVerified("kevin@example.com");
+
+        ResponseEntity<String> response = get(user, "");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        JsonNode body = json.readTree(response.getBody());
+        assertThat(body.get("data")).isEmpty();
+        assertThat(body.get("meta").get("total").asInt()).isZero();
+        assertThat(body.get("meta").get("total_pages").asInt()).isZero();
+        assertThat(body.get("links").get("next").isNull()).isTrue();
+        assertThat(body.get("links").get("prev").isNull()).isTrue();
+    }
+
+    @Test
+    void getTransactions_perPageOne_secondPage_setsNextPrevLast() throws Exception {
+        User user = seedVerified("laura@example.com");
+        transactionService.record(user.id(), AAPL, Operation.BUY, new Quantity(new BigDecimal("1")),
+                today().minusDays(3));
+        transactionService.record(user.id(), AAPL, Operation.BUY, new Quantity(new BigDecimal("1")),
+                today().minusDays(2));
+        transactionService.record(user.id(), AAPL, Operation.BUY, new Quantity(new BigDecimal("1")),
+                today().minusDays(1));
+
+        ResponseEntity<String> response = get(user, "?page=2&per_page=1");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        JsonNode body = json.readTree(response.getBody());
+        assertThat(body.get("data")).hasSize(1);
+        JsonNode meta = body.get("meta");
+        assertThat(meta.get("total").asInt()).isEqualTo(3);
+        assertThat(meta.get("page").asInt()).isEqualTo(2);
+        assertThat(meta.get("total_pages").asInt()).isEqualTo(3);
+        JsonNode links = body.get("links");
+        assertThat(links.get("next").asString()).contains("page=3");
+        assertThat(links.get("prev").asString()).contains("page=1");
+        assertThat(links.get("last").asString()).contains("page=3");
+    }
+
+    @Test
+    void getTransactions_onlyReturnsCallersTransactions() throws Exception {
+        User owner = seedVerified("mike@example.com");
+        User other = seedVerified("nina@example.com");
+        transactionService.record(owner.id(), AAPL, Operation.BUY, new Quantity(new BigDecimal("10")),
+                today().minusDays(1));
+        transactionService.record(other.id(), AAPL, Operation.BUY, new Quantity(new BigDecimal("20")),
+                today().minusDays(1));
+
+        ResponseEntity<String> response = get(owner, "");
+
+        JsonNode data = json.readTree(response.getBody()).get("data");
+        assertThat(data).hasSize(1);
+        assertThat(data.get(0).get("quantity").asString()).isEqualTo("10.000000");
+    }
+
+    @Test
+    void getTransactions_perPageAboveMax_returns422() throws Exception {
+        User user = seedVerified("oscar@example.com");
+
+        ResponseEntity<String> response = get(user, "?per_page=201");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(422);
+        JsonNode error = json.readTree(response.getBody()).get("error");
+        assertThat(error.get("code").asString()).isEqualTo("VALIDATION_ERROR");
+        assertThat(error.get("details").get(0).get("field").asString()).isEqualTo("per_page");
+    }
+
+    @Test
+    void getTransactions_pageAboveMax_returns422() throws Exception {
+        User user = seedVerified("oliver@example.com");
+
+        ResponseEntity<String> response = get(user, "?page=100001");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(422);
+        JsonNode error = json.readTree(response.getBody()).get("error");
+        assertThat(error.get("code").asString()).isEqualTo("VALIDATION_ERROR");
+        assertThat(error.get("details").get(0).get("field").asString()).isEqualTo("page");
+    }
+
+    @Test
+    void getTransactions_perPageNonNumeric_returns400() throws Exception {
+        User user = seedVerified("peggy@example.com");
+
+        ResponseEntity<String> response = get(user, "?per_page=abc");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+        assertThat(errorCode(response)).isEqualTo("MALFORMED_REQUEST");
+    }
+
+    @Test
+    void getTransaction_owned_returns200WithEnvelope() throws Exception {
+        User user = seedVerified("quentin@example.com");
+        Transaction saved = transactionService.record(user.id(), AAPL, Operation.BUY,
+                new Quantity(new BigDecimal("10")), today().minusDays(1));
+
+        ResponseEntity<String> response = get(user, "/" + saved.id().value());
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        JsonNode data = json.readTree(response.getBody()).get("data");
+        assertThat(data.get("id").asString()).isEqualTo(saved.id().value().toString());
+        assertThat(data.get("ticker").asString()).isEqualTo("AAPL");
+    }
+
+    @Test
+    void getTransaction_otherUsersTransaction_returns404() throws Exception {
+        User owner = seedVerified("rachel@example.com");
+        User other = seedVerified("steve@example.com");
+        Transaction saved = transactionService.record(owner.id(), AAPL, Operation.BUY,
+                new Quantity(new BigDecimal("10")), today().minusDays(1));
+
+        ResponseEntity<String> response = get(other, "/" + saved.id().value());
+
+        assertThat(response.getStatusCode().value()).isEqualTo(404);
+        assertThat(errorCode(response)).isEqualTo("NOT_FOUND");
+    }
+
+    @Test
+    void getTransaction_unknownId_returns404() throws Exception {
+        User user = seedVerified("tina@example.com");
+
+        ResponseEntity<String> response = get(user, "/" + UUID.randomUUID());
+
+        assertThat(response.getStatusCode().value()).isEqualTo(404);
+        assertThat(errorCode(response)).isEqualTo("NOT_FOUND");
+    }
+
     private static LocalDate today() {
         return LocalDate.now(ZONE);
     }
@@ -237,6 +391,17 @@ class TransactionControllerIT {
                 "http://localhost:" + port + ENDPOINT,
                 HttpMethod.POST,
                 new HttpEntity<>(jsonBody, headers),
+                String.class);
+    }
+
+    private ResponseEntity<String> get(User authenticatedAs, String pathAndQuery) {
+        HttpHeaders headers = new HttpHeaders();
+        String sessionToken = seedSession(authenticatedAs);
+        headers.add(HttpHeaders.COOKIE, SessionCookieFactory.COOKIE_NAME + "=" + sessionToken);
+        return http.exchange(
+                "http://localhost:" + port + ENDPOINT + pathAndQuery,
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
                 String.class);
     }
 
