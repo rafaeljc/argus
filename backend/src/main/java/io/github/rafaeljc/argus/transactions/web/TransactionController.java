@@ -15,7 +15,9 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -75,6 +77,24 @@ class TransactionController {
             @CurrentUserId UserId userId, @PathVariable UUID id) {
         Transaction transaction = transactionService.get(userId, new TransactionId(id));
         return ResponseEntity.ok(new SuccessEnvelope<>(TransactionResponse.from(transaction)));
+    }
+
+    @PatchMapping("/{id}")
+    ResponseEntity<SuccessEnvelope<TransactionResponse>> edit(
+            @CurrentUserId UserId userId, @PathVariable UUID id, @Valid @RequestBody EditTransactionRequest body) {
+        Transaction updated = transactionService.edit(
+                userId,
+                new TransactionId(id),
+                body.operation(),
+                body.quantity() != null ? new Quantity(body.quantity()) : null,
+                body.tradeDate());
+        return ResponseEntity.ok(new SuccessEnvelope<>(TransactionResponse.from(updated)));
+    }
+
+    @DeleteMapping("/{id}")
+    ResponseEntity<Void> delete(@CurrentUserId UserId userId, @PathVariable UUID id) {
+        transactionService.delete(userId, new TransactionId(id));
+        return ResponseEntity.noContent().build();
     }
 
     private static String pageUri(int page, int perPage) {
