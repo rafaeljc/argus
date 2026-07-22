@@ -1,6 +1,7 @@
 package io.github.rafaeljc.argus.transactions.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.github.f4b6a3.uuid.UuidCreator;
 import io.github.rafaeljc.argus.auth.application.port.SessionRepository;
@@ -8,6 +9,7 @@ import io.github.rafaeljc.argus.auth.domain.Session;
 import io.github.rafaeljc.argus.auth.web.CsrfCookieFactory;
 import io.github.rafaeljc.argus.auth.web.SessionCookieFactory;
 import io.github.rafaeljc.argus.common.domain.Quantity;
+import io.github.rafaeljc.argus.common.domain.ResourceNotFoundException;
 import io.github.rafaeljc.argus.common.domain.SessionId;
 import io.github.rafaeljc.argus.common.domain.Ticker;
 import io.github.rafaeljc.argus.marketdata.application.port.BackfillJobRepository;
@@ -361,6 +363,150 @@ class TransactionControllerIT {
         assertThat(errorCode(response)).isEqualTo("NOT_FOUND");
     }
 
+    @Test
+    void patchTransaction_quantityEdit_returns200WithUpdatedQuantity() throws Exception {
+        User user = seedVerified("uma@example.com");
+        Transaction saved = transactionService.record(user.id(), AAPL, Operation.BUY,
+                new Quantity(new BigDecimal("10")), today().minusDays(1));
+
+        ResponseEntity<String> response = patch(user, saved.id().value(), "{\"quantity\":\"7\"}");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        JsonNode data = json.readTree(response.getBody()).get("data");
+        assertThat(data.get("quantity").asString()).isEqualTo("7.000000");
+        assertThat(data.get("operation").asString()).isEqualTo("BUY");
+        assertThat(data.get("trade_date").asString()).isEqualTo(today().minusDays(1).toString());
+    }
+
+    @Test
+    void patchTransaction_tradeDateEdit_returns200WithUpdatedTradeDate() throws Exception {
+        User user = seedVerified("victor@example.com");
+        LocalDate originalDate = today().minusDays(5);
+        Transaction saved = transactionService.record(user.id(), AAPL, Operation.BUY,
+                new Quantity(new BigDecimal("10")), originalDate);
+        LocalDate newDate = today().minusDays(2);
+
+        ResponseEntity<String> response = patch(user, saved.id().value(), "{\"trade_date\":\"" + newDate + "\"}");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        JsonNode data = json.readTree(response.getBody()).get("data");
+        assertThat(data.get("trade_date").asString()).isEqualTo(newDate.toString());
+    }
+
+    @Test
+    void patchTransaction_wouldInvalidateLaterSell_returns422ValidationErrorWithSellDetails() throws Exception {
+        User user = seedVerified("wendy@example.com");
+        Transaction buy = transactionService.record(user.id(), AAPL, Operation.BUY,
+                new Quantity(new BigDecimal("10")), today().minusDays(10));
+        Transaction sell = transactionService.record(user.id(), AAPL, Operation.SELL,
+                new Quantity(new BigDecimal("8")), today().minusDays(1));
+
+        ResponseEntity<String> response = patch(user, buy.id().value(), "{\"quantity\":\"5\"}");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(422);
+        JsonNode error = json.readTree(response.getBody()).get("error");
+        assertThat(error.get("code").asString()).isEqualTo("VALIDATION_ERROR");
+        JsonNode detail = error.get("details").get(0);
+        assertThat(detail.get("field").asString()).isEqualTo("trade_date");
+        assertThat(detail.get("code").asString()).isEqualTo("would_invalidate_sell");
+        assertThat(detail.get("message").asString()).contains(sell.id().value().toString());
+    }
+
+    @Test
+    void patchTransaction_selfOversell_returns422InsufficientHoldings() throws Exception {
+        User user = seedVerified("xavier@example.com");
+        transactionService.record(user.id(), AAPL, Operation.BUY,
+                new Quantity(new BigDecimal("10")), today().minusDays(5));
+        Transaction sell = transactionService.record(user.id(), AAPL, Operation.SELL,
+                new Quantity(new BigDecimal("5")), today().minusDays(1));
+
+        ResponseEntity<String> response = patch(user, sell.id().value(), "{\"quantity\":\"50\"}");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(422);
+        assertThat(errorCode(response)).isEqualTo("INSUFFICIENT_HOLDINGS");
+    }
+
+    @Test
+    void patchTransaction_futureDate_returns422TradeDateFuture() throws Exception {
+        User user = seedVerified("yolanda@example.com");
+        Transaction saved = transactionService.record(user.id(), AAPL, Operation.BUY,
+                new Quantity(new BigDecimal("10")), today().minusDays(1));
+
+        ResponseEntity<String> response = patch(
+                user, saved.id().value(), "{\"trade_date\":\"" + today().plusDays(1) + "\"}");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(422);
+        assertThat(errorCode(response)).isEqualTo("TRADE_DATE_FUTURE");
+    }
+
+    @Test
+    void patchTransaction_notOwned_returns404() throws Exception {
+        User owner = seedVerified("zack@example.com");
+        User other = seedVerified("amy@example.com");
+        Transaction saved = transactionService.record(owner.id(), AAPL, Operation.BUY,
+                new Quantity(new BigDecimal("10")), today().minusDays(1));
+
+        ResponseEntity<String> response = patch(other, saved.id().value(), "{\"quantity\":\"5\"}");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(404);
+        assertThat(errorCode(response)).isEqualTo("NOT_FOUND");
+    }
+
+    @Test
+    void deleteTransaction_noLaterSellDependency_returns204() {
+        User user = seedVerified("bruce@example.com");
+        Transaction saved = transactionService.record(user.id(), AAPL, Operation.BUY,
+                new Quantity(new BigDecimal("10")), today().minusDays(1));
+
+        ResponseEntity<String> response = delete(user, saved.id().value());
+
+        assertThat(response.getStatusCode().value()).isEqualTo(204);
+        assertThatThrownBy(() -> transactionService.get(user.id(), saved.id()))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void deleteTransaction_removesBuyWithDependentLaterSell_returns422() throws Exception {
+        User user = seedVerified("carla@example.com");
+        Transaction buy = transactionService.record(user.id(), AAPL, Operation.BUY,
+                new Quantity(new BigDecimal("10")), today().minusDays(10));
+        Transaction sell = transactionService.record(user.id(), AAPL, Operation.SELL,
+                new Quantity(new BigDecimal("8")), today().minusDays(1));
+
+        ResponseEntity<String> response = delete(user, buy.id().value());
+
+        assertThat(response.getStatusCode().value()).isEqualTo(422);
+        JsonNode error = json.readTree(response.getBody()).get("error");
+        assertThat(error.get("code").asString()).isEqualTo("VALIDATION_ERROR");
+        assertThat(error.get("details").get(0).get("message").asString()).contains(sell.id().value().toString());
+    }
+
+    @Test
+    void deleteTransaction_notOwned_returns404() {
+        User owner = seedVerified("dan@example.com");
+        User other = seedVerified("eve@example.com");
+        Transaction saved = transactionService.record(owner.id(), AAPL, Operation.BUY,
+                new Quantity(new BigDecimal("10")), today().minusDays(1));
+
+        ResponseEntity<String> response = delete(other, saved.id().value());
+
+        assertThat(response.getStatusCode().value()).isEqualTo(404);
+        assertThat(errorCode(response)).isEqualTo("NOT_FOUND");
+    }
+
+    @Test
+    void deleteTransaction_alreadyDeleted_returns404() {
+        User user = seedVerified("felix@example.com");
+        Transaction saved = transactionService.record(user.id(), AAPL, Operation.BUY,
+                new Quantity(new BigDecimal("10")), today().minusDays(1));
+        delete(user, saved.id().value());
+
+        ResponseEntity<String> response = delete(user, saved.id().value());
+
+        assertThat(response.getStatusCode().value()).isEqualTo(404);
+        assertThat(errorCode(response)).isEqualTo("NOT_FOUND");
+    }
+
     private static LocalDate today() {
         return LocalDate.now(ZONE);
     }
@@ -401,6 +547,35 @@ class TransactionControllerIT {
         return http.exchange(
                 "http://localhost:" + port + ENDPOINT + pathAndQuery,
                 HttpMethod.GET,
+                new HttpEntity<>(headers),
+                String.class);
+    }
+
+    private ResponseEntity<String> patch(User authenticatedAs, UUID id, String jsonBody) {
+        HttpHeaders headers = new HttpHeaders();
+        String sessionToken = seedSession(authenticatedAs);
+        headers.add(HttpHeaders.COOKIE,
+                SessionCookieFactory.COOKIE_NAME + "=" + sessionToken
+                        + "; " + CsrfCookieFactory.COOKIE_NAME + "=" + CSRF_VALUE);
+        headers.add("X-CSRF-Token", CSRF_VALUE);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return http.exchange(
+                "http://localhost:" + port + ENDPOINT + "/" + id,
+                HttpMethod.PATCH,
+                new HttpEntity<>(jsonBody, headers),
+                String.class);
+    }
+
+    private ResponseEntity<String> delete(User authenticatedAs, UUID id) {
+        HttpHeaders headers = new HttpHeaders();
+        String sessionToken = seedSession(authenticatedAs);
+        headers.add(HttpHeaders.COOKIE,
+                SessionCookieFactory.COOKIE_NAME + "=" + sessionToken
+                        + "; " + CsrfCookieFactory.COOKIE_NAME + "=" + CSRF_VALUE);
+        headers.add("X-CSRF-Token", CSRF_VALUE);
+        return http.exchange(
+                "http://localhost:" + port + ENDPOINT + "/" + id,
+                HttpMethod.DELETE,
                 new HttpEntity<>(headers),
                 String.class);
     }

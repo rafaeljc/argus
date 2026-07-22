@@ -872,7 +872,6 @@ components:
     TransactionPatch:
       type: object
       properties:
-        ticker: { type: string, pattern: "^[A-Z.]{1,10}$" }
         operation: { type: string, enum: [BUY, SELL] }
         quantity: { type: string }
         trade_date: { type: string, format: date }

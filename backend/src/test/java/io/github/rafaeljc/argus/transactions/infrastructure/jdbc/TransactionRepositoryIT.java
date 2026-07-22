@@ -163,30 +163,7 @@ class TransactionRepositoryIT {
     }
 
     @Test
-    void findLaterSells_returnsOnlySellsStrictlyAfterDate_scopedToUserAndTicker() {
-        UserId userId = newUser();
-        UserId otherUser = newUser();
-        repository.save(newTransaction(userId, AAPL, Operation.BUY, "20", LocalDate.parse("2026-01-01")));
-        Transaction laterSell = repository.save(
-                newTransaction(userId, AAPL, Operation.SELL, "3", LocalDate.parse("2026-04-02")));
-        repository.save(newTransaction(userId, AAPL, Operation.SELL, "2", LocalDate.parse("2026-03-10")));
-        repository.save(newTransaction(otherUser, AAPL, Operation.SELL, "1", LocalDate.parse("2026-04-05")));
-
-        List<Transaction> later = repository.findLaterSells(userId, AAPL, LocalDate.parse("2026-03-10"));
-
-        assertThat(later).extracting(Transaction::id).containsExactly(laterSell.id());
-    }
-
-    @Test
-    void findLaterSells_noneAfterDate_returnsEmpty() {
-        UserId userId = newUser();
-        repository.save(newTransaction(userId, AAPL, Operation.SELL, "2", LocalDate.parse("2026-03-10")));
-
-        assertThat(repository.findLaterSells(userId, AAPL, LocalDate.parse("2026-03-10"))).isEmpty();
-    }
-
-    @Test
-    void findAllAfter_returnsBuyAndSellRowsOrderedByTradeDateThenCreatedAt() {
+    void findAllAfterOrderedByTradeDateThenCreatedAt_returnsBuyAndSellRowsOrderedByTradeDateThenCreatedAt() {
         UserId userId = newUser();
         UserId otherUser = newUser();
         repository.save(newTransaction(userId, AAPL, Operation.BUY, "20", LocalDate.parse("2026-01-01")));
@@ -196,17 +173,19 @@ class TransactionRepositoryIT {
                 newTransaction(userId, AAPL, Operation.SELL, "8", LocalDate.parse("2026-03-01")));
         repository.save(newTransaction(otherUser, AAPL, Operation.SELL, "1", LocalDate.parse("2026-04-01")));
 
-        List<Transaction> after = repository.findAllAfter(userId, AAPL, LocalDate.parse("2026-01-01"));
+        List<Transaction> after = repository.findAllAfterOrderedByTradeDateThenCreatedAt(
+                userId, AAPL, LocalDate.parse("2026-01-01"));
 
         assertThat(after).extracting(Transaction::id).containsExactly(laterBuy.id(), laterSell.id());
     }
 
     @Test
-    void findAllAfter_noneAfterDate_returnsEmpty() {
+    void findAllAfterOrderedByTradeDateThenCreatedAt_noneAfterDate_returnsEmpty() {
         UserId userId = newUser();
         repository.save(newTransaction(userId, AAPL, Operation.BUY, "10", LocalDate.parse("2026-03-10")));
 
-        assertThat(repository.findAllAfter(userId, AAPL, LocalDate.parse("2026-03-10"))).isEmpty();
+        assertThat(repository.findAllAfterOrderedByTradeDateThenCreatedAt(userId, AAPL, LocalDate.parse("2026-03-10")))
+                .isEmpty();
     }
 
     @Test
@@ -267,6 +246,70 @@ class TransactionRepositoryIT {
         UserId userId = newUser();
 
         assertThat(repository.countByUserId(userId)).isZero();
+    }
+
+    @Test
+    void update_changesQuantityOnly_keepsOperationTradeDateTickerAndCreatedAt() {
+        UserId userId = newUser();
+        Transaction saved = repository.save(
+                newTransaction(userId, AAPL, Operation.BUY, "10", LocalDate.parse("2026-06-01")));
+        Instant newUpdatedAt = Instant.parse("2026-06-22T13:00:00Z");
+        Transaction proposed = new Transaction(
+                saved.id(), userId, saved.ticker(), saved.operation(),
+                new Quantity(new BigDecimal("7")), saved.tradeDate(), saved.createdAt(), newUpdatedAt);
+
+        repository.update(proposed);
+
+        Transaction reloaded = repository.findByIdAndUserId(saved.id(), userId).orElseThrow();
+        assertThat(reloaded.quantity()).isEqualTo(new Quantity(new BigDecimal("7")));
+        assertThat(reloaded.operation()).isEqualTo(saved.operation());
+        assertThat(reloaded.tradeDate()).isEqualTo(saved.tradeDate());
+        assertThat(reloaded.ticker()).isEqualTo(saved.ticker());
+        assertThat(reloaded.createdAt()).isEqualTo(saved.createdAt());
+        assertThat(reloaded.updatedAt()).isEqualTo(newUpdatedAt);
+    }
+
+    @Test
+    void update_changesTradeDateOnly_keepsOperationQuantityTickerAndCreatedAt() {
+        UserId userId = newUser();
+        Transaction saved = repository.save(
+                newTransaction(userId, AAPL, Operation.BUY, "10", LocalDate.parse("2026-06-01")));
+        Instant newUpdatedAt = Instant.parse("2026-06-22T13:00:00Z");
+        LocalDate newTradeDate = LocalDate.parse("2026-06-05");
+        Transaction proposed = new Transaction(
+                saved.id(), userId, saved.ticker(), saved.operation(),
+                saved.quantity(), newTradeDate, saved.createdAt(), newUpdatedAt);
+
+        repository.update(proposed);
+
+        Transaction reloaded = repository.findByIdAndUserId(saved.id(), userId).orElseThrow();
+        assertThat(reloaded.tradeDate()).isEqualTo(newTradeDate);
+        assertThat(reloaded.operation()).isEqualTo(saved.operation());
+        assertThat(reloaded.quantity()).isEqualTo(saved.quantity());
+        assertThat(reloaded.ticker()).isEqualTo(saved.ticker());
+        assertThat(reloaded.createdAt()).isEqualTo(saved.createdAt());
+        assertThat(reloaded.updatedAt()).isEqualTo(newUpdatedAt);
+    }
+
+    @Test
+    void update_changesOperationOnly_keepsQuantityTradeDateTickerAndCreatedAt() {
+        UserId userId = newUser();
+        Transaction saved = repository.save(
+                newTransaction(userId, AAPL, Operation.BUY, "10", LocalDate.parse("2026-06-01")));
+        Instant newUpdatedAt = Instant.parse("2026-06-22T13:00:00Z");
+        Transaction proposed = new Transaction(
+                saved.id(), userId, saved.ticker(), Operation.SELL,
+                saved.quantity(), saved.tradeDate(), saved.createdAt(), newUpdatedAt);
+
+        repository.update(proposed);
+
+        Transaction reloaded = repository.findByIdAndUserId(saved.id(), userId).orElseThrow();
+        assertThat(reloaded.operation()).isEqualTo(Operation.SELL);
+        assertThat(reloaded.quantity()).isEqualTo(saved.quantity());
+        assertThat(reloaded.tradeDate()).isEqualTo(saved.tradeDate());
+        assertThat(reloaded.ticker()).isEqualTo(saved.ticker());
+        assertThat(reloaded.createdAt()).isEqualTo(saved.createdAt());
+        assertThat(reloaded.updatedAt()).isEqualTo(newUpdatedAt);
     }
 
     private UserId newUser() {
