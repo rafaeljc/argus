@@ -100,7 +100,7 @@ class CsrfFilterIT {
         // Promote past the state gate so this IT isolates CSRF behavior.
         userRepository.save(activeUser(userId, userService.lookup(userId)));
 
-        Instant now = Instant.parse("2026-06-22T12:00:00Z");
+        Instant now = Instant.now();
         sessionRepository.save(new Session(
                 new SessionId(UuidCreator.getTimeOrderedEpoch()),
                 userId,

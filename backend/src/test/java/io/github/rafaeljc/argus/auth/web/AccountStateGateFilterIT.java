@@ -108,7 +108,7 @@ class AccountStateGateFilterIT {
     }
 
     private void seedSessionFor(UserId userId) {
-        Instant now = Instant.parse("2026-06-22T12:00:00Z");
+        Instant now = Instant.now();
         sessionRepository.save(new Session(
                 new SessionId(UuidCreator.getTimeOrderedEpoch()),
                 userId,
