@@ -36,6 +36,13 @@ class JdbcTransactionRepository implements TransactionRepository {
             WHERE id = :id AND user_id = :userId
             """;
 
+    private static final String UPDATE_SQL =
+            """
+            UPDATE transactions
+            SET operation = :operation, quantity = :quantity, trade_date = :tradeDate, updated_at = :updatedAt
+            WHERE id = :id AND user_id = :userId
+            """;
+
     private static final String DELETE_BY_ID_AND_USER_ID_SQL =
             "DELETE FROM transactions WHERE id = :id AND user_id = :userId";
 
@@ -50,15 +57,7 @@ class JdbcTransactionRepository implements TransactionRepository {
 
     private static final String COUNT_BY_USER_ID_SQL = "SELECT count(*) FROM transactions WHERE user_id = :userId";
 
-    private static final String FIND_LATER_SELLS_SQL =
-            """
-            SELECT id, user_id, ticker, operation, quantity, trade_date, created_at, updated_at
-            FROM transactions
-            WHERE user_id = :userId AND ticker = :ticker AND operation = 'SELL' AND trade_date > :after
-            ORDER BY trade_date, created_at
-            """;
-
-    private static final String FIND_ALL_AFTER_SQL =
+    private static final String FIND_ALL_AFTER_ORDERED_BY_TRADE_DATE_THEN_CREATED_AT_SQL =
             """
             SELECT id, user_id, ticker, operation, quantity, trade_date, created_at, updated_at
             FROM transactions
@@ -82,6 +81,12 @@ class JdbcTransactionRepository implements TransactionRepository {
     @Override
     public Transaction save(Transaction transaction) {
         jdbc.update(INSERT_SQL, paramsFor(transaction));
+        return transaction;
+    }
+
+    @Override
+    public Transaction update(Transaction transaction) {
+        jdbc.update(UPDATE_SQL, paramsFor(transaction));
         return transaction;
     }
 
@@ -114,21 +119,14 @@ class JdbcTransactionRepository implements TransactionRepository {
     }
 
     @Override
-    public List<Transaction> findLaterSells(UserId userId, Ticker ticker, LocalDate after) {
+    public List<Transaction> findAllAfterOrderedByTradeDateThenCreatedAt(
+            UserId userId, Ticker ticker, LocalDate after) {
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("userId", userId.value())
                 .addValue("ticker", ticker.value())
                 .addValue("after", after);
-        return jdbc.query(FIND_LATER_SELLS_SQL, params, JdbcTransactionRepository::mapRow);
-    }
-
-    @Override
-    public List<Transaction> findAllAfter(UserId userId, Ticker ticker, LocalDate after) {
-        MapSqlParameterSource params = new MapSqlParameterSource()
-                .addValue("userId", userId.value())
-                .addValue("ticker", ticker.value())
-                .addValue("after", after);
-        return jdbc.query(FIND_ALL_AFTER_SQL, params, JdbcTransactionRepository::mapRow);
+        return jdbc.query(
+                FIND_ALL_AFTER_ORDERED_BY_TRADE_DATE_THEN_CREATED_AT_SQL, params, JdbcTransactionRepository::mapRow);
     }
 
     @Override

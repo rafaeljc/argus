@@ -13,6 +13,8 @@ public interface TransactionRepository {
 
     Transaction save(Transaction transaction);
 
+    Transaction update(Transaction transaction);
+
     Optional<Transaction> findByIdAndUserId(TransactionId id, UserId userId);
 
     boolean deleteByIdAndUserId(TransactionId id, UserId userId);
@@ -21,9 +23,7 @@ public interface TransactionRepository {
 
     int countByUserId(UserId userId);
 
-    List<Transaction> findLaterSells(UserId userId, Ticker ticker, LocalDate after);
-
-    List<Transaction> findAllAfter(UserId userId, Ticker ticker, LocalDate after);
+    List<Transaction> findAllAfterOrderedByTradeDateThenCreatedAt(UserId userId, Ticker ticker, LocalDate after);
 
     BigDecimal holdingsAsOf(UserId userId, Ticker ticker, LocalDate asOf);
 }
