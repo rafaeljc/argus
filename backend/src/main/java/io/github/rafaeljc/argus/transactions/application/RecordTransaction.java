@@ -33,6 +33,7 @@ public class RecordTransaction {
     private final SymbolLookup symbolLookup;
     private final HoldingRebuild holdingRebuild;
     private final EnqueueBackfillJob enqueueBackfillJob;
+    private final ForwardValidator forwardValidator;
     private final Clock clock;
 
     public RecordTransaction(
@@ -41,12 +42,14 @@ public class RecordTransaction {
             SymbolLookup symbolLookup,
             HoldingRebuild holdingRebuild,
             EnqueueBackfillJob enqueueBackfillJob,
+            ForwardValidator forwardValidator,
             Clock clock) {
         this.repository = repository;
         this.lock = lock;
         this.symbolLookup = symbolLookup;
         this.holdingRebuild = holdingRebuild;
         this.enqueueBackfillJob = enqueueBackfillJob;
+        this.forwardValidator = forwardValidator;
         this.clock = clock;
     }
 
@@ -64,17 +67,14 @@ public class RecordTransaction {
         if (tradeDate.isAfter(today)) {
             throw new TradeDateFutureException(tradeDate);
         }
-        if (operation == Operation.SELL) {
-            BigDecimal held = repository.holdingsAsOf(userId, ticker, tradeDate);
-            if (held.compareTo(quantity.value()) < 0) {
-                throw new InsufficientHoldingsException(ticker, held, quantity);
-            }
-            rejectIfInvalidatesLaterSells(userId, ticker, quantity, tradeDate, held);
-        }
 
         Transaction saved = repository.save(new Transaction(
                 new TransactionId(UuidCreator.getTimeOrderedEpoch()),
                 userId, ticker, operation, quantity, tradeDate, clock.now(), clock.now()));
+
+        if (operation == Operation.SELL) {
+            rejectIfOversold(userId, ticker, tradeDate, saved);
+        }
 
         BigDecimal ledgerNetQuantity = repository.holdingsAsOf(userId, ticker, today);
         holdingRebuild.apply(userId, ticker, ledgerNetQuantity);
@@ -84,22 +84,16 @@ public class RecordTransaction {
         return saved;
     }
 
-    private void rejectIfInvalidatesLaterSells(
-            UserId userId, Ticker ticker, Quantity newQuantity, LocalDate tradeDate, BigDecimal heldAsOfTradeDate) {
-        List<Transaction> laterTransactions = repository.findAllAfter(userId, ticker, tradeDate);
-        BigDecimal running = heldAsOfTradeDate.subtract(newQuantity.value());
-        for (Transaction laterTx : laterTransactions) {
-            if (laterTx.operation() == Operation.BUY) {
-                running = running.add(laterTx.quantity().value());
-                continue;
+    private void rejectIfOversold(UserId userId, Ticker ticker, LocalDate tradeDate, Transaction saved) {
+        forwardValidator.firstOversoldSell(userId, ticker, tradeDate).ifPresent(oversold -> {
+            if (oversold.sell().id().equals(saved.id())) {
+                throw new InsufficientHoldingsException(ticker, oversold.heldBefore(), saved.quantity());
             }
-            running = running.subtract(laterTx.quantity().value());
-            if (running.signum() < 0) {
-                throw new TransactionMutationRejectedException(List.of(new FieldError(
-                        "trade_date",
-                        "would_invalidate_sell",
-                        "sell " + laterTx.id().value() + " on " + laterTx.tradeDate() + " would be oversold")));
-            }
-        }
+            throw new TransactionMutationRejectedException(List.of(new FieldError(
+                    "trade_date",
+                    "would_invalidate_sell",
+                    "sell " + oversold.sell().id().value() + " on " + oversold.sell().tradeDate()
+                            + " would be oversold")));
+        });
     }
 }

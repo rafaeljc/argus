@@ -29,7 +29,7 @@ import io.github.rafaeljc.argus.transactions.domain.Transaction;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -63,6 +63,9 @@ class RecordTransactionTest {
     @Mock
     private EnqueueBackfillJob enqueueBackfillJob;
 
+    @Mock
+    private ForwardValidator forwardValidator;
+
     private FixedClock clock;
     private RecordTransaction recordTransaction;
 
@@ -70,7 +73,7 @@ class RecordTransactionTest {
     void setUp() {
         clock = new FixedClock(FIXED_NOW);
         recordTransaction = new RecordTransaction(
-                repository, lock, symbolLookup, holdingRebuild, enqueueBackfillJob, clock);
+                repository, lock, symbolLookup, holdingRebuild, enqueueBackfillJob, forwardValidator, clock);
     }
 
     @Test
@@ -99,14 +102,15 @@ class RecordTransactionTest {
         order.verify(holdingRebuild).apply(USER_ID, TICKER, new BigDecimal("10"));
         order.verify(enqueueBackfillJob).apply(
                 eq(USER_ID), eq(TICKER), eq(TRADE_DATE.minusYears(5)), eq(TODAY));
+        verifyNoInteractions(forwardValidator);
     }
 
     @Test
-    void record_validSellWithPriorBuy_savesAndRebuilds() {
+    void record_validSell_forwardValidatorAllows_savesAndRebuilds() {
         when(symbolLookup.exists(TICKER)).thenReturn(true);
-        when(repository.holdingsAsOf(USER_ID, TICKER, TRADE_DATE)).thenReturn(new BigDecimal("20"));
-        when(repository.holdingsAsOf(USER_ID, TICKER, TODAY)).thenReturn(new BigDecimal("10"));
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(forwardValidator.firstOversoldSell(USER_ID, TICKER, TRADE_DATE)).thenReturn(Optional.empty());
+        when(repository.holdingsAsOf(USER_ID, TICKER, TODAY)).thenReturn(new BigDecimal("10"));
 
         Transaction saved = recordTransaction.record(USER_ID, TICKER, Operation.SELL, QUANTITY, TRADE_DATE);
 
@@ -118,7 +122,8 @@ class RecordTransactionTest {
     @Test
     void record_sellSkipsDelistedCheck() {
         when(symbolLookup.exists(TICKER)).thenReturn(true);
-        when(repository.holdingsAsOf(USER_ID, TICKER, TRADE_DATE)).thenReturn(new BigDecimal("20"));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(forwardValidator.firstOversoldSell(USER_ID, TICKER, TRADE_DATE)).thenReturn(Optional.empty());
         when(repository.holdingsAsOf(USER_ID, TICKER, TODAY)).thenReturn(new BigDecimal("10"));
 
         recordTransaction.record(USER_ID, TICKER, Operation.SELL, QUANTITY, TRADE_DATE);
@@ -127,16 +132,39 @@ class RecordTransactionTest {
     }
 
     @Test
-    void record_sellOversellAsOfTradeDate_throwsInsufficientHoldingsAndDoesNotSave() {
+    void record_sellOversoldAtOwnTradeDate_throwsInsufficientHoldingsAfterSaving() {
+        Transaction saved = fixedTransaction(Operation.SELL);
         when(symbolLookup.exists(TICKER)).thenReturn(true);
-        when(repository.holdingsAsOf(USER_ID, TICKER, TRADE_DATE)).thenReturn(new BigDecimal("5"));
+        when(repository.save(any())).thenReturn(saved);
+        when(forwardValidator.firstOversoldSell(USER_ID, TICKER, TRADE_DATE))
+                .thenReturn(Optional.of(new ForwardValidator.Oversold(saved, new BigDecimal("5"))));
 
         assertThatThrownBy(() -> recordTransaction.record(USER_ID, TICKER, Operation.SELL, QUANTITY, TRADE_DATE))
                 .isInstanceOf(InsufficientHoldingsException.class)
                 .extracting("ticker", "held", "attempted")
                 .containsExactly(TICKER, new BigDecimal("5"), QUANTITY);
 
-        verify(repository, never()).save(any());
+        verify(repository).save(any());
+        verifyNoInteractions(holdingRebuild, enqueueBackfillJob);
+    }
+
+    @Test
+    void record_sellWouldInvalidateLaterSell_throwsTransactionMutationRejectedAfterSaving() {
+        Transaction saved = fixedTransaction(Operation.SELL);
+        Transaction laterSell = laterTransaction(Operation.SELL, "15", TRADE_DATE.plusDays(5));
+        when(symbolLookup.exists(TICKER)).thenReturn(true);
+        when(repository.save(any())).thenReturn(saved);
+        when(forwardValidator.firstOversoldSell(USER_ID, TICKER, TRADE_DATE))
+                .thenReturn(Optional.of(new ForwardValidator.Oversold(laterSell, new BigDecimal("5"))));
+
+        assertThatThrownBy(() -> recordTransaction.record(USER_ID, TICKER, Operation.SELL, QUANTITY, TRADE_DATE))
+                .isInstanceOfSatisfying(TransactionMutationRejectedException.class, ex -> {
+                    assertThat(ex.details()).hasSize(1);
+                    assertThat(ex.details().get(0).field()).isEqualTo("trade_date");
+                    assertThat(ex.details().get(0).code()).isEqualTo("would_invalidate_sell");
+                });
+
+        verify(repository).save(any());
         verifyNoInteractions(holdingRebuild, enqueueBackfillJob);
     }
 
@@ -150,7 +178,7 @@ class RecordTransactionTest {
                 .isEqualTo(TICKER);
 
         verify(repository, never()).save(any());
-        verifyNoInteractions(holdingRebuild, enqueueBackfillJob);
+        verifyNoInteractions(holdingRebuild, enqueueBackfillJob, forwardValidator);
     }
 
     @Test
@@ -164,7 +192,7 @@ class RecordTransactionTest {
                 .isEqualTo(TICKER);
 
         verify(repository, never()).save(any());
-        verifyNoInteractions(holdingRebuild, enqueueBackfillJob);
+        verifyNoInteractions(holdingRebuild, enqueueBackfillJob, forwardValidator);
     }
 
     @Test
@@ -179,7 +207,7 @@ class RecordTransactionTest {
                 .isEqualTo(futureDate);
 
         verify(repository, never()).save(any());
-        verifyNoInteractions(holdingRebuild, enqueueBackfillJob);
+        verifyNoInteractions(holdingRebuild, enqueueBackfillJob, forwardValidator);
     }
 
     @Test
@@ -195,72 +223,34 @@ class RecordTransactionTest {
     }
 
     @Test
-    void record_backdatedSellWouldInvalidateLaterSell_throwsTransactionMutationRejectedAndDoesNotSave() {
-        when(symbolLookup.exists(TICKER)).thenReturn(true);
-        when(repository.holdingsAsOf(USER_ID, TICKER, TRADE_DATE)).thenReturn(new BigDecimal("20"));
-        LocalDate laterDate = TRADE_DATE.plusDays(5);
-        Transaction laterSell = laterTransaction(Operation.SELL, "15", laterDate);
-        when(repository.findAllAfter(USER_ID, TICKER, TRADE_DATE)).thenReturn(List.of(laterSell));
-
-        assertThatThrownBy(() -> recordTransaction.record(USER_ID, TICKER, Operation.SELL, QUANTITY, TRADE_DATE))
-                .isInstanceOfSatisfying(TransactionMutationRejectedException.class, ex -> {
-                    assertThat(ex.details()).hasSize(1);
-                    assertThat(ex.details().get(0).field()).isEqualTo("trade_date");
-                    assertThat(ex.details().get(0).code()).isEqualTo("would_invalidate_sell");
-                });
-
-        verify(repository, never()).save(any());
-        verifyNoInteractions(holdingRebuild, enqueueBackfillJob);
-    }
-
-    @Test
-    void record_backdatedSellLeavesLaterSellStillValid_saves() {
-        when(symbolLookup.exists(TICKER)).thenReturn(true);
-        when(repository.holdingsAsOf(USER_ID, TICKER, TRADE_DATE)).thenReturn(new BigDecimal("20"));
-        LocalDate laterDate = TRADE_DATE.plusDays(5);
-        Transaction laterSell = laterTransaction(Operation.SELL, "10", laterDate);
-        when(repository.findAllAfter(USER_ID, TICKER, TRADE_DATE)).thenReturn(List.of(laterSell));
-        when(repository.holdingsAsOf(USER_ID, TICKER, TODAY)).thenReturn(BigDecimal.ZERO);
-        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        Transaction saved = recordTransaction.record(USER_ID, TICKER, Operation.SELL, QUANTITY, TRADE_DATE);
-
-        assertThat(saved.operation()).isEqualTo(Operation.SELL);
-        verify(repository).save(any());
-    }
-
-    @Test
-    void record_backdatedSellWithInterveningLaterBuy_accountsForItAndSaves() {
-        // held(tradeDate)=5, new sell=5 -> running starts at 0. A naive implementation that
-        // only replays later SELLs (ignoring later BUYs) would see running go to 0-8=-8 at the
-        // later sell and wrongly reject; correctly replaying the intervening +10 BUY first
-        // leaves running at 10-8=2, which must not throw.
-        Quantity sellQuantity = new Quantity(new BigDecimal("5"));
-        when(symbolLookup.exists(TICKER)).thenReturn(true);
-        when(repository.holdingsAsOf(USER_ID, TICKER, TRADE_DATE)).thenReturn(new BigDecimal("5"));
-        LocalDate laterBuyDate = TRADE_DATE.plusDays(2);
-        LocalDate laterSellDate = TRADE_DATE.plusDays(5);
-        Transaction laterBuy = laterTransaction(Operation.BUY, "10", laterBuyDate);
-        Transaction laterSell = laterTransaction(Operation.SELL, "8", laterSellDate);
-        when(repository.findAllAfter(USER_ID, TICKER, TRADE_DATE)).thenReturn(List.of(laterBuy, laterSell));
-        when(repository.holdingsAsOf(USER_ID, TICKER, TODAY)).thenReturn(BigDecimal.ZERO);
-        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        Transaction saved = recordTransaction.record(USER_ID, TICKER, Operation.SELL, sellQuantity, TRADE_DATE);
-
-        assertThat(saved.operation()).isEqualTo(Operation.SELL);
-        verify(repository).save(any());
-    }
-
-    @Test
-    void record_buyNeverChecksLaterSells() {
+    void record_buyNeverChecksForwardValidation() {
         when(symbolLookup.exists(TICKER)).thenReturn(true);
         when(symbolLookup.isDelisted(TICKER)).thenReturn(false);
         when(repository.holdingsAsOf(USER_ID, TICKER, TODAY)).thenReturn(QUANTITY.value());
 
         recordTransaction.record(USER_ID, TICKER, Operation.BUY, QUANTITY, TRADE_DATE);
 
-        verify(repository, never()).findAllAfter(any(), any(), any());
+        verifyNoInteractions(forwardValidator);
+    }
+
+    @Test
+    void record_sell_savesBeforeConsultingForwardValidator() {
+        when(symbolLookup.exists(TICKER)).thenReturn(true);
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(forwardValidator.firstOversoldSell(USER_ID, TICKER, TRADE_DATE)).thenReturn(Optional.empty());
+        when(repository.holdingsAsOf(USER_ID, TICKER, TODAY)).thenReturn(BigDecimal.ZERO);
+
+        recordTransaction.record(USER_ID, TICKER, Operation.SELL, QUANTITY, TRADE_DATE);
+
+        InOrder order = Mockito.inOrder(repository, forwardValidator);
+        order.verify(repository).save(any());
+        order.verify(forwardValidator).firstOversoldSell(USER_ID, TICKER, TRADE_DATE);
+    }
+
+    private static Transaction fixedTransaction(Operation operation) {
+        return new Transaction(
+                new TransactionId(UuidCreator.getTimeOrderedEpoch()), USER_ID, TICKER, operation,
+                QUANTITY, TRADE_DATE, FIXED_NOW, FIXED_NOW);
     }
 
     private static Transaction laterTransaction(Operation operation, String quantity, LocalDate tradeDate) {
