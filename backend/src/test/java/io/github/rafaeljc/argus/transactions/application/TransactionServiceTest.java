@@ -40,11 +40,18 @@ class TransactionServiceTest {
     @Mock
     private GetTransaction getTransaction;
 
+    @Mock
+    private EditTransaction editTransaction;
+
+    @Mock
+    private DeleteTransaction deleteTransaction;
+
     private TransactionService service;
 
     @BeforeEach
     void setUp() {
-        service = new TransactionService(recordTransaction, listTransactions, getTransaction);
+        service = new TransactionService(
+                recordTransaction, listTransactions, getTransaction, editTransaction, deleteTransaction);
     }
 
     @Test
@@ -84,5 +91,25 @@ class TransactionServiceTest {
 
         assertThat(result).isEqualTo(expected);
         verify(getTransaction).get(USER_ID, TRANSACTION_ID);
+    }
+
+    @Test
+    void edit_delegatesToEditTransactionAndReturnsItsResult() {
+        Transaction expected = new Transaction(
+                TRANSACTION_ID, USER_ID, TICKER, Operation.SELL, QUANTITY, TRADE_DATE, NOW, NOW);
+        when(editTransaction.edit(USER_ID, TRANSACTION_ID, Operation.SELL, QUANTITY, TRADE_DATE))
+                .thenReturn(expected);
+
+        Transaction result = service.edit(USER_ID, TRANSACTION_ID, Operation.SELL, QUANTITY, TRADE_DATE);
+
+        assertThat(result).isEqualTo(expected);
+        verify(editTransaction).edit(USER_ID, TRANSACTION_ID, Operation.SELL, QUANTITY, TRADE_DATE);
+    }
+
+    @Test
+    void delete_delegatesToDeleteTransaction() {
+        service.delete(USER_ID, TRANSACTION_ID);
+
+        verify(deleteTransaction).delete(USER_ID, TRANSACTION_ID);
     }
 }
