@@ -34,6 +34,9 @@ class JdbcHoldingRepository implements HoldingRepository {
     private static final String FIND_SQL =
             "SELECT user_id, ticker, quantity, updated_at FROM holdings WHERE user_id = :userId AND ticker = :ticker";
 
+    private static final String FIND_BY_USER_SQL =
+            "SELECT user_id, ticker, quantity, updated_at FROM holdings WHERE user_id = :userId";
+
     private final NamedParameterJdbcTemplate jdbc;
 
     JdbcHoldingRepository(NamedParameterJdbcTemplate jdbc) {
@@ -54,6 +57,12 @@ class JdbcHoldingRepository implements HoldingRepository {
     public Optional<Holding> find(UserId userId, Ticker ticker) {
         List<Holding> rows = jdbc.query(FIND_SQL, idParams(userId, ticker), JdbcHoldingRepository::mapRow);
         return rows.stream().findFirst();
+    }
+
+    @Override
+    public List<Holding> findByUser(UserId userId) {
+        MapSqlParameterSource params = new MapSqlParameterSource().addValue("userId", userId.value());
+        return jdbc.query(FIND_BY_USER_SQL, params, JdbcHoldingRepository::mapRow);
     }
 
     private static MapSqlParameterSource idParams(UserId userId, Ticker ticker) {
