@@ -6,6 +6,8 @@ import com.github.f4b6a3.uuid.UuidCreator;
 import io.github.rafaeljc.argus.auth.application.port.SessionRepository;
 import io.github.rafaeljc.argus.auth.domain.Session;
 import io.github.rafaeljc.argus.auth.web.SessionCookieFactory;
+import io.github.rafaeljc.argus.common.domain.Clock;
+import io.github.rafaeljc.argus.common.domain.Money;
 import io.github.rafaeljc.argus.common.domain.Quantity;
 import io.github.rafaeljc.argus.common.domain.SessionId;
 import io.github.rafaeljc.argus.common.domain.Ticker;
@@ -15,6 +17,8 @@ import io.github.rafaeljc.argus.marketdata.domain.Exchange;
 import io.github.rafaeljc.argus.marketdata.domain.PriceHistory;
 import io.github.rafaeljc.argus.marketdata.domain.Symbol;
 import io.github.rafaeljc.argus.portfolio.application.port.HoldingRepository;
+import io.github.rafaeljc.argus.portfolio.application.port.PortfolioSnapshotRepository;
+import io.github.rafaeljc.argus.portfolio.domain.PortfolioSnapshot;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
 import io.github.rafaeljc.argus.users.application.UserService;
 import io.github.rafaeljc.argus.users.domain.User;
@@ -76,6 +80,12 @@ class PortfolioControllerIT {
 
     @Autowired
     private HoldingRepository holdingRepository;
+
+    @Autowired
+    private PortfolioSnapshotRepository snapshotRepository;
+
+    @Autowired
+    private Clock clock;
 
     @Test
     void getPortfolio_pricedHoldings_returnsEnvelopeWithTotalAndPositions() throws Exception {
@@ -154,6 +164,89 @@ class PortfolioControllerIT {
                 String.class);
 
         assertThat(response.getStatusCode().value()).isEqualTo(401);
+    }
+
+    @Test
+    void listSnapshots_defaultRange_excludesSnapshotOlderThanOneYear() throws Exception {
+        User user = seedVerified("erin@example.com");
+        LocalDate anchor = clock.today().minusDays(1);
+        seedSnapshot(user, anchor, "100.00");
+        seedSnapshot(user, anchor.minusYears(1).minusDays(1), "80.00");
+
+        ResponseEntity<String> response = getSnapshots(user, null);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        JsonNode data = json.readTree(response.getBody()).get("data");
+        assertThat(data).hasSize(1);
+        assertThat(data.get(0).get("snapshot_date").asString()).isEqualTo(anchor.toString());
+    }
+
+    @Test
+    void listSnapshots_multipleSnapshotsInRange_returnsAscendingByDate() throws Exception {
+        User user = seedVerified("frank@example.com");
+        LocalDate anchor = clock.today().minusDays(1);
+        seedSnapshot(user, anchor, "100.00");
+        seedSnapshot(user, anchor.minusMonths(6), "90.00");
+
+        ResponseEntity<String> response = getSnapshots(user, "1y");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        JsonNode data = json.readTree(response.getBody()).get("data");
+        assertThat(data.get(0).get("snapshot_date").asString()).isEqualTo(anchor.minusMonths(6).toString());
+        assertThat(data.get(0).get("total_value").asString()).isEqualTo("90.00");
+        assertThat(data.get(1).get("snapshot_date").asString()).isEqualTo(anchor.toString());
+    }
+
+    @Test
+    void listSnapshots_snapshotDatedToday_excludedFromResult() throws Exception {
+        User user = seedVerified("grace@example.com");
+        seedSnapshot(user, clock.today(), "999.00");
+
+        ResponseEntity<String> response = getSnapshots(user, "5y");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(json.readTree(response.getBody()).get("data")).isEmpty();
+    }
+
+    @Test
+    void listSnapshots_unknownRange_returns422ValidationError() {
+        User user = seedVerified("heidi@example.com");
+
+        ResponseEntity<String> response = getSnapshots(user, "2y");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(422);
+    }
+
+    @Test
+    void listSnapshots_noSnapshots_returnsEmptyData() throws Exception {
+        User user = seedVerified("ivan@example.com");
+
+        ResponseEntity<String> response = getSnapshots(user, "1y");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(json.readTree(response.getBody()).get("data")).isEmpty();
+    }
+
+    @Test
+    void listSnapshots_unauthenticated_returns401() {
+        ResponseEntity<String> response = http.exchange(
+                "http://localhost:" + port + ENDPOINT + "/snapshots", HttpMethod.GET,
+                new HttpEntity<>(new HttpHeaders()), String.class);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(401);
+    }
+
+    private void seedSnapshot(User user, LocalDate date, String totalValue) {
+        snapshotRepository.insertIfAbsent(
+                new PortfolioSnapshot(user.id(), date, new Money(new BigDecimal(totalValue))));
+    }
+
+    private ResponseEntity<String> getSnapshots(User authenticatedAs, String range) {
+        HttpHeaders headers = new HttpHeaders();
+        String sessionToken = seedSession(authenticatedAs);
+        headers.add(HttpHeaders.COOKIE, SessionCookieFactory.COOKIE_NAME + "=" + sessionToken);
+        String url = "http://localhost:" + port + ENDPOINT + "/snapshots" + (range == null ? "" : "?range=" + range);
+        return http.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), String.class);
     }
 
     private void seedSymbol(Ticker ticker, boolean delisted) {
