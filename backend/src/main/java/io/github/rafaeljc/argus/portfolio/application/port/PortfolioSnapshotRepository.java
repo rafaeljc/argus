@@ -12,5 +12,5 @@ public interface PortfolioSnapshotRepository {
 
     Optional<PortfolioSnapshot> findByUserAndDate(UserId userId, LocalDate snapshotDate);
 
-    List<PortfolioSnapshot> listByUserAndRange(UserId userId, LocalDate from, LocalDate to, int page, int perPage);
+    List<PortfolioSnapshot> listByUserAndRange(UserId userId, LocalDate from, LocalDate to);
 }

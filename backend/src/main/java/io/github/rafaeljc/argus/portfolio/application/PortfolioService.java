@@ -16,16 +16,19 @@ public class PortfolioService {
     private final GetSnapshot getSnapshot;
     private final GetActiveHoldings getActiveHoldings;
     private final GetPortfolio getPortfolio;
+    private final ListSnapshots listSnapshots;
 
     public PortfolioService(
             SnapshotWriter snapshotWriter,
             GetSnapshot getSnapshot,
             GetActiveHoldings getActiveHoldings,
-            GetPortfolio getPortfolio) {
+            GetPortfolio getPortfolio,
+            ListSnapshots listSnapshots) {
         this.snapshotWriter = snapshotWriter;
         this.getSnapshot = getSnapshot;
         this.getActiveHoldings = getActiveHoldings;
         this.getPortfolio = getPortfolio;
+        this.listSnapshots = listSnapshots;
     }
 
     @Transactional
@@ -46,5 +49,10 @@ public class PortfolioService {
     @Transactional(readOnly = true)
     public PortfolioView getPortfolio(UserId userId) {
         return getPortfolio.forUser(userId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PortfolioSnapshot> listPortfolioSnapshots(UserId userId, SnapshotRange range) {
+        return listSnapshots.list(userId, range);
     }
 }

@@ -364,21 +364,24 @@ paths:
   /portfolio/snapshots:
     get:
       tags: [portfolio]
-      summary: List historical daily portfolio values
+      summary: List historical daily portfolio values for charting
       security:
         - sessionCookie: []
       parameters:
-        - { in: query, name: from, schema: { type: string, format: date } }
-        - { in: query, name: to, schema: { type: string, format: date } }
-        - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
-        - { in: query, name: per_page, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - in: query
+          name: range
+          schema: { type: string, enum: [1m, 3m, 6m, 1y, 3y, 5y], default: 1y }
       responses:
         "200":
-          description: Snapshots collection
+          description: Snapshots collection, ascending by snapshot_date
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/EnvelopeSnapshotCollection"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
 
   # ─── alerts (module:alerts) ──────────────────────────────────────────
   /alert-rules:
