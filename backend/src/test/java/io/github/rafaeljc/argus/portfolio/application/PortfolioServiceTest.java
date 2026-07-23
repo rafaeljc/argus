@@ -42,11 +42,14 @@ class PortfolioServiceTest {
     @Mock
     private GetPortfolio getPortfolio;
 
+    @Mock
+    private ListSnapshots listSnapshots;
+
     private PortfolioService service;
 
     @BeforeEach
     void setUp() {
-        service = new PortfolioService(snapshotWriter, getSnapshot, getActiveHoldings, getPortfolio);
+        service = new PortfolioService(snapshotWriter, getSnapshot, getActiveHoldings, getPortfolio, listSnapshots);
     }
 
     @Test
@@ -88,5 +91,16 @@ class PortfolioServiceTest {
 
         assertThat(result).isEqualTo(expected);
         verify(getPortfolio).forUser(USER_ID);
+    }
+
+    @Test
+    void listPortfolioSnapshots_delegatesToListSnapshotsAndReturnsItsResult() {
+        PortfolioSnapshot snapshot = new PortfolioSnapshot(USER_ID, SNAPSHOT_DATE, new Money(new BigDecimal("100.00")));
+        when(listSnapshots.list(USER_ID, SnapshotRange.Y1)).thenReturn(List.of(snapshot));
+
+        List<PortfolioSnapshot> result = service.listPortfolioSnapshots(USER_ID, SnapshotRange.Y1);
+
+        assertThat(result).containsExactly(snapshot);
+        verify(listSnapshots).list(USER_ID, SnapshotRange.Y1);
     }
 }
