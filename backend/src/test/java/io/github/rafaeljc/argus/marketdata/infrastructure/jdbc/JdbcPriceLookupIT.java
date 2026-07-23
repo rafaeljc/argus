@@ -148,6 +148,43 @@ class JdbcPriceLookupIT {
         assertThat(lookup.closesOn(Set.of(AAPL), D2)).isEmpty();
     }
 
+    @Test
+    void latestCloses_emptyInput_returnsEmptyMap() {
+        assertThat(lookup.latestCloses(Set.of())).isEmpty();
+    }
+
+    @Test
+    void latestCloses_multipleTradeDatesPerTicker_returnsMostRecentEach() {
+        seed(AAPL);
+        seed(MSFT);
+        prices.upsertBatch(List.of(
+                priceOn(AAPL, D1, "148.00"),
+                priceOn(AAPL, D3, "152.50"),
+                priceOn(AAPL, D2, "150.00"),
+                priceOn(MSFT, D2, "420.75")));
+
+        Map<Ticker, PriceLookup.Close> result = lookup.latestCloses(Set.of(AAPL, MSFT, UNKNOWN));
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(AAPL).tradeDate()).isEqualTo(D3);
+        assertThat(result.get(AAPL).price()).isEqualByComparingTo("152.50");
+        assertThat(result.get(MSFT).tradeDate()).isEqualTo(D2);
+        assertThat(result.get(MSFT).price()).isEqualByComparingTo("420.75");
+        assertThat(result).doesNotContainKey(UNKNOWN);
+    }
+
+    @Test
+    void latestCloses_tickerWithNoRows_isAbsentFromResult() {
+        seed(AAPL);
+        seed(MSFT);
+        prices.upsertBatch(List.of(priceOn(AAPL, D2, "150.00")));
+
+        Map<Ticker, PriceLookup.Close> result = lookup.latestCloses(Set.of(AAPL, MSFT));
+
+        assertThat(result).hasSize(1);
+        assertThat(result).doesNotContainKey(MSFT);
+    }
+
     private void seed(Ticker ticker) {
         symbols.save(new Symbol(ticker, Exchange.NASDAQ, ticker.value() + " Inc.", false, NOW, NOW, NOW));
     }
