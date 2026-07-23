@@ -65,15 +65,15 @@ class JdbcPortfolioSnapshotRepositoryIT {
     }
 
     @Test
-    void listByUserAndRange_ordersByDateDescending() {
+    void listByUserAndRange_ordersByDateAscending() {
         UserId userId = newUser();
         repository.insertIfAbsent(new PortfolioSnapshot(userId, D1, new Money(new BigDecimal("100.00"))));
         repository.insertIfAbsent(new PortfolioSnapshot(userId, D3, new Money(new BigDecimal("300.00"))));
         repository.insertIfAbsent(new PortfolioSnapshot(userId, D2, new Money(new BigDecimal("200.00"))));
 
-        List<PortfolioSnapshot> page = repository.listByUserAndRange(userId, null, null, 1, 50);
+        List<PortfolioSnapshot> result = repository.listByUserAndRange(userId, null, null);
 
-        assertThat(page).extracting(PortfolioSnapshot::snapshotDate).containsExactly(D3, D2, D1);
+        assertThat(result).extracting(PortfolioSnapshot::snapshotDate).containsExactly(D1, D2, D3);
     }
 
     @Test
@@ -83,23 +83,19 @@ class JdbcPortfolioSnapshotRepositoryIT {
         repository.insertIfAbsent(new PortfolioSnapshot(userId, D2, new Money(new BigDecimal("200.00"))));
         repository.insertIfAbsent(new PortfolioSnapshot(userId, D3, new Money(new BigDecimal("300.00"))));
 
-        List<PortfolioSnapshot> ranged = repository.listByUserAndRange(userId, D2, D2, 1, 50);
+        List<PortfolioSnapshot> ranged = repository.listByUserAndRange(userId, D2, D2);
 
         assertThat(ranged).extracting(PortfolioSnapshot::snapshotDate).containsExactly(D2);
     }
 
     @Test
-    void listByUserAndRange_pagination_slicesCorrectly() {
+    void listByUserAndRange_noRowsInRange_returnsEmpty() {
         UserId userId = newUser();
         repository.insertIfAbsent(new PortfolioSnapshot(userId, D1, new Money(new BigDecimal("100.00"))));
-        repository.insertIfAbsent(new PortfolioSnapshot(userId, D2, new Money(new BigDecimal("200.00"))));
-        repository.insertIfAbsent(new PortfolioSnapshot(userId, D3, new Money(new BigDecimal("300.00"))));
 
-        List<PortfolioSnapshot> pageOne = repository.listByUserAndRange(userId, null, null, 1, 2);
-        List<PortfolioSnapshot> pageTwo = repository.listByUserAndRange(userId, null, null, 2, 2);
+        List<PortfolioSnapshot> ranged = repository.listByUserAndRange(userId, D2, D3);
 
-        assertThat(pageOne).extracting(PortfolioSnapshot::snapshotDate).containsExactly(D3, D2);
-        assertThat(pageTwo).extracting(PortfolioSnapshot::snapshotDate).containsExactly(D1);
+        assertThat(ranged).isEmpty();
     }
 
     @Test
@@ -109,9 +105,9 @@ class JdbcPortfolioSnapshotRepositoryIT {
         repository.insertIfAbsent(new PortfolioSnapshot(owner, D1, new Money(new BigDecimal("100.00"))));
         repository.insertIfAbsent(new PortfolioSnapshot(otherUser, D1, new Money(new BigDecimal("500.00"))));
 
-        List<PortfolioSnapshot> page = repository.listByUserAndRange(owner, null, null, 1, 50);
+        List<PortfolioSnapshot> result = repository.listByUserAndRange(owner, null, null);
 
-        assertThat(page).extracting(PortfolioSnapshot::userId).containsExactly(owner);
+        assertThat(result).extracting(PortfolioSnapshot::userId).containsExactly(owner);
     }
 
     private UserId newUser() {

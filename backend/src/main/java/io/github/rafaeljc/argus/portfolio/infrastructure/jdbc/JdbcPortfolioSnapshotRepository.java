@@ -39,8 +39,7 @@ class JdbcPortfolioSnapshotRepository implements PortfolioSnapshotRepository {
              WHERE user_id = :userId
                AND (CAST(:from AS DATE) IS NULL OR snapshot_date >= CAST(:from AS DATE))
                AND (CAST(:to AS DATE) IS NULL OR snapshot_date <= CAST(:to AS DATE))
-             ORDER BY snapshot_date DESC
-             LIMIT :limit OFFSET :offset
+             ORDER BY snapshot_date ASC
             """;
 
     private final NamedParameterJdbcTemplate jdbc;
@@ -69,14 +68,11 @@ class JdbcPortfolioSnapshotRepository implements PortfolioSnapshotRepository {
     }
 
     @Override
-    public List<PortfolioSnapshot> listByUserAndRange(
-            UserId userId, LocalDate from, LocalDate to, int page, int perPage) {
+    public List<PortfolioSnapshot> listByUserAndRange(UserId userId, LocalDate from, LocalDate to) {
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("userId", userId.value())
                 .addValue("from", from)
-                .addValue("to", to)
-                .addValue("limit", perPage)
-                .addValue("offset", (page - 1) * perPage);
+                .addValue("to", to);
         return jdbc.query(LIST_BY_USER_AND_RANGE_SQL, params, JdbcPortfolioSnapshotRepository::mapRow);
     }
 
