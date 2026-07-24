@@ -11,10 +11,6 @@ function Placeholder({ title }: PlaceholderProps) {
   );
 }
 
-export function TransactionsPage() {
-  return <Placeholder title="Transactions" />;
-}
-
 export function TransactionDetailPage() {
   return <Placeholder title="Transaction Detail" />;
 }

@@ -20,8 +20,8 @@ import {
   PortfolioPage,
   PortfolioSnapshotsPage,
   TransactionDetailPage,
-  TransactionsPage,
 } from './features/_placeholders/pages';
+import { TransactionsPage } from './features/transactions/TransactionsPage';
 import { AppLayout } from './shared/components/layout/AppLayout';
 import { NotFound } from './shared/components/NotFound';
 import { ToastProvider } from './shared/components/ui/ToastProvider';
