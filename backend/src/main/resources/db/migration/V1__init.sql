@@ -171,9 +171,10 @@ CREATE TABLE alert_rules (
 
 -- Enforces BRD §2.6 "no exact-duplicate active rule" and serves the pre-insert duplicate check.
 CREATE UNIQUE INDEX alert_rules_user_signature_uidx ON alert_rules (user_id, direction, threshold, window_days);
--- Used by the nightly evaluation fan-out ("every active rule grouped by user") and by the user's
--- "list active rules" endpoint.
-CREATE        INDEX alert_rules_user_id_idx         ON alert_rules (user_id);
+-- Used by the nightly evaluation fan-out ("every active rule grouped by user", via the leftmost
+-- user_id prefix) and by the user's "list active rules" endpoint, ordered by created_at DESC;
+-- avoids an in-memory sort and is index-only-scan friendly for the common page size.
+CREATE        INDEX alert_rules_user_created_at_desc_idx ON alert_rules (user_id, created_at DESC);
 
 CREATE TABLE alert_firings (
     id                     UUID            PRIMARY KEY,
