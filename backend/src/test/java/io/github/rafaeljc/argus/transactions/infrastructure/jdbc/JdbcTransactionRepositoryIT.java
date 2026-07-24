@@ -28,7 +28,7 @@ import org.springframework.context.annotation.Import;
 
 @Import(PostgresContainer.class)
 @SpringBootTest
-class TransactionRepositoryIT {
+class JdbcTransactionRepositoryIT {
 
     private static final Ticker AAPL = new Ticker("AAPL");
     private static final Instant SYMBOL_NOW = Instant.parse("2026-06-01T00:00:00Z");
