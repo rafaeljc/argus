@@ -11,6 +11,11 @@ export async function getTransactions(
   return response.data;
 }
 
+export async function getTransaction(id: string): Promise<Transaction> {
+  const response = await apiClient.get<Transaction>(`/transactions/${id}`);
+  return response.data;
+}
+
 export async function createTransaction(input: TransactionInput): Promise<Transaction> {
   const response = await apiClient.post<Transaction>('/transactions', input);
   return response.data;

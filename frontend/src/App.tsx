@@ -19,8 +19,8 @@ import {
   AlertsPage,
   PortfolioPage,
   PortfolioSnapshotsPage,
-  TransactionDetailPage,
 } from './features/_placeholders/pages';
+import { TransactionDetailPage } from './features/transactions/TransactionDetailPage';
 import { TransactionsPage } from './features/transactions/TransactionsPage';
 import { AppLayout } from './shared/components/layout/AppLayout';
 import { NotFound } from './shared/components/NotFound';
