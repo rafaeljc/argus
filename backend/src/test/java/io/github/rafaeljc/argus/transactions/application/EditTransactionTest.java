@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.github.f4b6a3.uuid.UuidCreator;
+import io.github.rafaeljc.argus.common.application.TransactionalMutationLock;
 import io.github.rafaeljc.argus.common.domain.FixedClock;
 import io.github.rafaeljc.argus.common.domain.Quantity;
 import io.github.rafaeljc.argus.common.domain.ResourceNotFoundException;
@@ -19,7 +20,6 @@ import io.github.rafaeljc.argus.marketdata.application.EnqueueBackfillJob;
 import io.github.rafaeljc.argus.marketdata.application.port.SymbolLookup;
 import io.github.rafaeljc.argus.marketdata.domain.TickerDelistedException;
 import io.github.rafaeljc.argus.portfolio.application.HoldingRebuild;
-import io.github.rafaeljc.argus.transactions.application.port.TransactionMutationLock;
 import io.github.rafaeljc.argus.transactions.application.port.TransactionRepository;
 import io.github.rafaeljc.argus.transactions.domain.InsufficientHoldingsException;
 import io.github.rafaeljc.argus.transactions.domain.Operation;
@@ -53,7 +53,7 @@ class EditTransactionTest {
     private TransactionRepository repository;
 
     @Mock
-    private TransactionMutationLock lock;
+    private TransactionalMutationLock lock;
 
     @Mock
     private SymbolLookup symbolLookup;
@@ -245,7 +245,7 @@ class EditTransactionTest {
                 .isInstanceOf(ResourceNotFoundException.class);
 
         InOrder order = Mockito.inOrder(lock, repository);
-        order.verify(lock).acquireForUser(USER_ID);
+        order.verify(lock).acquireResourceForUser("transaction", USER_ID);
         order.verify(repository).findByIdAndUserId(ID, USER_ID);
     }
 

@@ -1,12 +1,12 @@
-package io.github.rafaeljc.argus.transactions.infrastructure.jdbc;
+package io.github.rafaeljc.argus.common.infrastructure;
 
 import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.github.f4b6a3.uuid.UuidCreator;
+import io.github.rafaeljc.argus.common.application.TransactionalMutationLock;
 import io.github.rafaeljc.argus.common.domain.UserId;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
-import io.github.rafaeljc.argus.transactions.application.port.TransactionMutationLock;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -16,38 +16,41 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Import(PostgresContainer.class)
 @SpringBootTest
-class JdbcTransactionMutationLockIT {
+class PostgresTransactionalMutationLockIT {
+
+    private static final String RESOURCE = "test-resource";
 
     @Autowired
-    private TransactionMutationLock lock;
+    private TransactionalMutationLock lock;
 
     @Autowired
     private PlatformTransactionManager transactionManager;
 
     @Test
-    void acquireForUser_withinTransaction_doesNotThrow() {
+    void acquireResourceForUser_withinTransaction_doesNotThrow() {
         UserId userId = new UserId(UuidCreator.getTimeOrderedEpoch());
         TransactionTemplate template = new TransactionTemplate(transactionManager);
 
-        assertThatNoException()
-                .isThrownBy(() -> template.executeWithoutResult(status -> lock.acquireForUser(userId)));
+        assertThatNoException().isThrownBy(
+                () -> template.executeWithoutResult(status -> lock.acquireResourceForUser(RESOURCE, userId)));
     }
 
     @Test
-    void acquireForUser_calledTwiceForSameUserInSameTransaction_doesNotDeadlock() {
+    void acquireResourceForUser_calledTwiceForSameResourceAndUserInSameTransaction_doesNotDeadlock() {
         UserId userId = new UserId(UuidCreator.getTimeOrderedEpoch());
         TransactionTemplate template = new TransactionTemplate(transactionManager);
 
         assertThatNoException().isThrownBy(() -> template.executeWithoutResult(status -> {
-            lock.acquireForUser(userId);
-            lock.acquireForUser(userId);
+            lock.acquireResourceForUser(RESOURCE, userId);
+            lock.acquireResourceForUser(RESOURCE, userId);
         }));
     }
 
     @Test
-    void acquireForUser_outsideActiveTransaction_throwsIllegalState() {
+    void acquireResourceForUser_outsideActiveTransaction_throwsIllegalState() {
         UserId userId = new UserId(UuidCreator.getTimeOrderedEpoch());
 
-        assertThatThrownBy(() -> lock.acquireForUser(userId)).hasRootCauseInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> lock.acquireResourceForUser(RESOURCE, userId))
+                .hasRootCauseInstanceOf(IllegalStateException.class);
     }
 }

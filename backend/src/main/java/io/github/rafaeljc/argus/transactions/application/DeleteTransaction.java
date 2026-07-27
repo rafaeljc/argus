@@ -1,12 +1,12 @@
 package io.github.rafaeljc.argus.transactions.application;
 
+import io.github.rafaeljc.argus.common.application.TransactionalMutationLock;
 import io.github.rafaeljc.argus.common.domain.Clock;
 import io.github.rafaeljc.argus.common.domain.FieldError;
 import io.github.rafaeljc.argus.common.domain.ResourceNotFoundException;
 import io.github.rafaeljc.argus.common.domain.TransactionId;
 import io.github.rafaeljc.argus.common.domain.UserId;
 import io.github.rafaeljc.argus.portfolio.application.HoldingRebuild;
-import io.github.rafaeljc.argus.transactions.application.port.TransactionMutationLock;
 import io.github.rafaeljc.argus.transactions.application.port.TransactionRepository;
 import io.github.rafaeljc.argus.transactions.domain.Transaction;
 import java.util.List;
@@ -16,14 +16,14 @@ import org.springframework.stereotype.Service;
 public class DeleteTransaction {
 
     private final TransactionRepository repository;
-    private final TransactionMutationLock lock;
+    private final TransactionalMutationLock lock;
     private final HoldingRebuild holdingRebuild;
     private final ForwardValidator forwardValidator;
     private final Clock clock;
 
     public DeleteTransaction(
             TransactionRepository repository,
-            TransactionMutationLock lock,
+            TransactionalMutationLock lock,
             HoldingRebuild holdingRebuild,
             ForwardValidator forwardValidator,
             Clock clock) {
@@ -35,7 +35,7 @@ public class DeleteTransaction {
     }
 
     public void delete(UserId userId, TransactionId id) {
-        lock.acquireForUser(userId);
+        lock.acquireResourceForUser("transaction", userId);
 
         Transaction current = repository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("transaction not found: " + id.value()));
