@@ -8,6 +8,7 @@ import { Pagination } from '../../shared/components/ui/Pagination';
 import { SelectField, type SelectOption } from '../../shared/components/ui/SelectField';
 import { Skeleton } from '../../shared/components/ui/Skeleton';
 import type { Paginated } from '../../shared/types/envelopes';
+import { CreateTransactionModal } from './CreateTransactionModal';
 import { getTransactions } from './service';
 import type { Transaction, TransactionOperation } from './types';
 
@@ -49,6 +50,7 @@ export function TransactionsPage() {
   const [status, setStatus] = useState<LoadStatus>('loading');
   const [result, setResult] = useState<Paginated<Transaction> | null>(null);
   const [retryToken, setRetryToken] = useState(0);
+  const [isCreateOpen, setCreateOpen] = useState(false);
   const requestIdRef = useRef(0);
 
   useEffect(() => {
@@ -89,18 +91,30 @@ export function TransactionsPage() {
     setRetryToken((token) => token + 1);
   }
 
+  function handleCreated(): void {
+    const next = new URLSearchParams(searchParams);
+    next.set('page', '1');
+    setSearchParams(next);
+    setRetryToken((token) => token + 1);
+  }
+
   return (
     <PageContainer>
       <div className="flex flex-col gap-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold text-slate-900">Transactions</h1>
-          <div className="w-32">
-            <SelectField
-              label="Rows per page"
-              options={PAGE_SIZE_SELECT_OPTIONS}
-              value={String(perPage)}
-              onChange={handlePageSizeChange}
-            />
+          <div className="flex items-end gap-4">
+            <div className="w-32">
+              <SelectField
+                label="Rows per page"
+                options={PAGE_SIZE_SELECT_OPTIONS}
+                value={String(perPage)}
+                onChange={handlePageSizeChange}
+              />
+            </div>
+            <Button type="button" onClick={() => setCreateOpen(true)}>
+              Add transaction
+            </Button>
           </div>
         </div>
 
@@ -137,6 +151,12 @@ export function TransactionsPage() {
           </>
         )}
       </div>
+
+      <CreateTransactionModal
+        open={isCreateOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={handleCreated}
+      />
     </PageContainer>
   );
 }
