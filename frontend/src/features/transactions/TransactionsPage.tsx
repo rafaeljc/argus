@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { PageContainer } from '../../shared/components/layout/PageContainer';
 import { Button } from '../../shared/components/ui/Button';
@@ -9,8 +9,9 @@ import { SelectField, type SelectOption } from '../../shared/components/ui/Selec
 import { Skeleton } from '../../shared/components/ui/Skeleton';
 import type { Paginated } from '../../shared/types/envelopes';
 import { CreateTransactionModal } from './CreateTransactionModal';
+import { OperationBadge } from './OperationBadge';
 import { getTransactions } from './service';
-import type { Transaction, TransactionOperation } from './types';
+import type { Transaction } from './types';
 
 const PAGE_SIZE_STORAGE_KEY = 'argus.pageSize.transactions';
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
@@ -193,6 +194,9 @@ function TransactionsTable({ transactions }: TransactionsTableProps) {
             <th scope="col" className="px-4 py-3">
               Quantity
             </th>
+            <th scope="col" className="px-4 py-3 text-right">
+              <span className="sr-only">Actions</span>
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-200">
@@ -204,29 +208,19 @@ function TransactionsTable({ transactions }: TransactionsTableProps) {
                 <OperationBadge operation={transaction.operation} />
               </td>
               <td className="px-4 py-3">{transaction.quantity}</td>
+              <td className="px-4 py-3 text-right">
+                <Link
+                  to={`/transactions/${transaction.id}`}
+                  aria-label={`View ${transaction.ticker} transaction from ${transaction.trade_date}`}
+                  className="font-medium text-brand hover:underline"
+                >
+                  View
+                </Link>
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
     </div>
-  );
-}
-
-const OPERATION_TONE: Record<TransactionOperation, string> = {
-  BUY: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-  SELL: 'bg-amber-50 text-amber-700 ring-amber-200',
-};
-
-interface OperationBadgeProps {
-  operation: TransactionOperation;
-}
-
-function OperationBadge({ operation }: OperationBadgeProps) {
-  return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${OPERATION_TONE[operation]}`}
-    >
-      {operation === 'BUY' ? 'Buy' : 'Sell'}
-    </span>
   );
 }
