@@ -1,6 +1,7 @@
 package io.github.rafaeljc.argus.transactions.application;
 
 import com.github.f4b6a3.uuid.UuidCreator;
+import io.github.rafaeljc.argus.common.application.TransactionalMutationLock;
 import io.github.rafaeljc.argus.common.domain.Clock;
 import io.github.rafaeljc.argus.common.domain.FieldError;
 import io.github.rafaeljc.argus.common.domain.Quantity;
@@ -12,7 +13,6 @@ import io.github.rafaeljc.argus.marketdata.application.port.SymbolLookup;
 import io.github.rafaeljc.argus.marketdata.domain.TickerDelistedException;
 import io.github.rafaeljc.argus.marketdata.domain.TickerNotFoundException;
 import io.github.rafaeljc.argus.portfolio.application.HoldingRebuild;
-import io.github.rafaeljc.argus.transactions.application.port.TransactionMutationLock;
 import io.github.rafaeljc.argus.transactions.application.port.TransactionRepository;
 import io.github.rafaeljc.argus.transactions.domain.InsufficientHoldingsException;
 import io.github.rafaeljc.argus.transactions.domain.Operation;
@@ -29,7 +29,7 @@ public class RecordTransaction {
     private static final int BACKFILL_LOOKBACK_YEARS = 5;
 
     private final TransactionRepository repository;
-    private final TransactionMutationLock lock;
+    private final TransactionalMutationLock lock;
     private final SymbolLookup symbolLookup;
     private final HoldingRebuild holdingRebuild;
     private final EnqueueBackfillJob enqueueBackfillJob;
@@ -38,7 +38,7 @@ public class RecordTransaction {
 
     public RecordTransaction(
             TransactionRepository repository,
-            TransactionMutationLock lock,
+            TransactionalMutationLock lock,
             SymbolLookup symbolLookup,
             HoldingRebuild holdingRebuild,
             EnqueueBackfillJob enqueueBackfillJob,
@@ -55,7 +55,7 @@ public class RecordTransaction {
 
     public Transaction record(
             UserId userId, Ticker ticker, Operation operation, Quantity quantity, LocalDate tradeDate) {
-        lock.acquireForUser(userId);
+        lock.acquireResourceForUser("transaction", userId);
 
         if (!symbolLookup.exists(ticker)) {
             throw new TickerNotFoundException(ticker);

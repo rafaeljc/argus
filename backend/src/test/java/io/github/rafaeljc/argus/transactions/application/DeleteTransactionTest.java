@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.github.f4b6a3.uuid.UuidCreator;
+import io.github.rafaeljc.argus.common.application.TransactionalMutationLock;
 import io.github.rafaeljc.argus.common.domain.FixedClock;
 import io.github.rafaeljc.argus.common.domain.Quantity;
 import io.github.rafaeljc.argus.common.domain.ResourceNotFoundException;
@@ -15,7 +16,6 @@ import io.github.rafaeljc.argus.common.domain.Ticker;
 import io.github.rafaeljc.argus.common.domain.TransactionId;
 import io.github.rafaeljc.argus.common.domain.UserId;
 import io.github.rafaeljc.argus.portfolio.application.HoldingRebuild;
-import io.github.rafaeljc.argus.transactions.application.port.TransactionMutationLock;
 import io.github.rafaeljc.argus.transactions.application.port.TransactionRepository;
 import io.github.rafaeljc.argus.transactions.domain.Operation;
 import io.github.rafaeljc.argus.transactions.domain.Transaction;
@@ -46,7 +46,7 @@ class DeleteTransactionTest {
     private TransactionRepository repository;
 
     @Mock
-    private TransactionMutationLock lock;
+    private TransactionalMutationLock lock;
 
     @Mock
     private HoldingRebuild holdingRebuild;
@@ -114,7 +114,7 @@ class DeleteTransactionTest {
                 .isInstanceOf(ResourceNotFoundException.class);
 
         InOrder order = Mockito.inOrder(lock, repository);
-        order.verify(lock).acquireForUser(USER_ID);
+        order.verify(lock).acquireResourceForUser("transaction", USER_ID);
         order.verify(repository).findByIdAndUserId(ID, USER_ID);
     }
 

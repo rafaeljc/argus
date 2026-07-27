@@ -1,5 +1,6 @@
 package io.github.rafaeljc.argus.transactions.application;
 
+import io.github.rafaeljc.argus.common.application.TransactionalMutationLock;
 import io.github.rafaeljc.argus.common.domain.Clock;
 import io.github.rafaeljc.argus.common.domain.FieldError;
 import io.github.rafaeljc.argus.common.domain.Quantity;
@@ -11,7 +12,6 @@ import io.github.rafaeljc.argus.marketdata.application.EnqueueBackfillJob;
 import io.github.rafaeljc.argus.marketdata.application.port.SymbolLookup;
 import io.github.rafaeljc.argus.marketdata.domain.TickerDelistedException;
 import io.github.rafaeljc.argus.portfolio.application.HoldingRebuild;
-import io.github.rafaeljc.argus.transactions.application.port.TransactionMutationLock;
 import io.github.rafaeljc.argus.transactions.application.port.TransactionRepository;
 import io.github.rafaeljc.argus.transactions.domain.InsufficientHoldingsException;
 import io.github.rafaeljc.argus.transactions.domain.Operation;
@@ -27,7 +27,7 @@ public class EditTransaction {
     private static final int BACKFILL_LOOKBACK_YEARS = 5;
 
     private final TransactionRepository repository;
-    private final TransactionMutationLock lock;
+    private final TransactionalMutationLock lock;
     private final SymbolLookup symbolLookup;
     private final HoldingRebuild holdingRebuild;
     private final EnqueueBackfillJob enqueueBackfillJob;
@@ -36,7 +36,7 @@ public class EditTransaction {
 
     public EditTransaction(
             TransactionRepository repository,
-            TransactionMutationLock lock,
+            TransactionalMutationLock lock,
             SymbolLookup symbolLookup,
             HoldingRebuild holdingRebuild,
             EnqueueBackfillJob enqueueBackfillJob,
@@ -53,7 +53,7 @@ public class EditTransaction {
 
     public Transaction edit(
             UserId userId, TransactionId id, Operation operation, Quantity quantity, LocalDate tradeDate) {
-        lock.acquireForUser(userId);
+        lock.acquireResourceForUser("transaction", userId);
 
         Transaction current = repository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("transaction not found: " + id.value()));

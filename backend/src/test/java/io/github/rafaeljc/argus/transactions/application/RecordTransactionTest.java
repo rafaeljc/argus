@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.github.f4b6a3.uuid.UuidCreator;
+import io.github.rafaeljc.argus.common.application.TransactionalMutationLock;
 import io.github.rafaeljc.argus.common.domain.FixedClock;
 import io.github.rafaeljc.argus.common.domain.Quantity;
 import io.github.rafaeljc.argus.common.domain.Ticker;
@@ -20,7 +21,6 @@ import io.github.rafaeljc.argus.marketdata.application.port.SymbolLookup;
 import io.github.rafaeljc.argus.marketdata.domain.TickerDelistedException;
 import io.github.rafaeljc.argus.marketdata.domain.TickerNotFoundException;
 import io.github.rafaeljc.argus.portfolio.application.HoldingRebuild;
-import io.github.rafaeljc.argus.transactions.application.port.TransactionMutationLock;
 import io.github.rafaeljc.argus.transactions.application.port.TransactionRepository;
 import io.github.rafaeljc.argus.transactions.domain.InsufficientHoldingsException;
 import io.github.rafaeljc.argus.transactions.domain.Operation;
@@ -52,7 +52,7 @@ class RecordTransactionTest {
     private TransactionRepository repository;
 
     @Mock
-    private TransactionMutationLock lock;
+    private TransactionalMutationLock lock;
 
     @Mock
     private SymbolLookup symbolLookup;
@@ -94,7 +94,7 @@ class RecordTransactionTest {
         assertThat(saved.updatedAt()).isEqualTo(FIXED_NOW);
 
         InOrder order = Mockito.inOrder(lock, symbolLookup, repository, holdingRebuild, enqueueBackfillJob);
-        order.verify(lock).acquireForUser(USER_ID);
+        order.verify(lock).acquireResourceForUser("transaction", USER_ID);
         order.verify(symbolLookup).exists(TICKER);
         order.verify(symbolLookup).isDelisted(TICKER);
         order.verify(repository).save(any());
@@ -218,7 +218,7 @@ class RecordTransactionTest {
                 .isInstanceOf(TickerNotFoundException.class);
 
         InOrder order = Mockito.inOrder(lock, symbolLookup);
-        order.verify(lock).acquireForUser(USER_ID);
+        order.verify(lock).acquireResourceForUser("transaction", USER_ID);
         order.verify(symbolLookup).exists(TICKER);
     }
 
