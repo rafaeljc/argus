@@ -14,3 +14,10 @@ export interface TransactionListParams {
   page: number;
   perPage: number;
 }
+
+export interface TransactionInput {
+  ticker: string;
+  operation: TransactionOperation;
+  quantity: string;
+  trade_date: string;
+}
