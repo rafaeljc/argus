@@ -140,6 +140,52 @@ function renderAppAt(path: string) {
   );
 }
 
+function transactionsSequence(pages: Transaction[][]) {
+  let call = 0;
+  return http.get(`${BASE_URL}/transactions`, () => {
+    const data = pages[Math.min(call, pages.length - 1)] ?? [];
+    call += 1;
+    const meta: PaginationMeta = { total: data.length, page: 1, per_page: 50, total_pages: 1 };
+    const links: PaginationLinks = {
+      self: '/transactions?page=1&per_page=50',
+      next: null,
+      prev: null,
+      last: '/transactions?page=1&per_page=50',
+    };
+    return HttpResponse.json(buildEnvelope(data, meta, links));
+  });
+}
+
+function transactionCreated(
+  created: Transaction,
+  requestSpy?: (info: { csrf: string | null; body: unknown }) => void,
+) {
+  return http.post(`${BASE_URL}/transactions`, async ({ request }) => {
+    requestSpy?.({ csrf: request.headers.get('X-CSRF-Token'), body: await request.json() });
+    return HttpResponse.json({ data: created }, { status: 201 });
+  });
+}
+
+function transactionCreateFailed(details: Array<{ field: string; code: string; message: string }>) {
+  return http.post(`${BASE_URL}/transactions`, () =>
+    HttpResponse.json(
+      { error: { code: 'VALIDATION_ERROR', message: 'Validation failed', details } },
+      { status: 422 },
+    ),
+  );
+}
+
+async function openCreateModal(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.click(screen.getByRole('button', { name: /add transaction/i }));
+  await screen.findByRole('dialog', { name: /add transaction/i });
+}
+
+async function fillValidTransactionForm(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.type(screen.getByLabelText(/ticker/i), 'AAPL');
+  await user.type(screen.getByLabelText(/quantity/i), '10.5');
+  await user.type(screen.getByLabelText(/trade date/i), '2026-03-15');
+}
+
 describe('TransactionsPage', () => {
   beforeEach(() => {
     resetAuthStoreForTest();
@@ -278,5 +324,301 @@ describe('TransactionsPage', () => {
     await screen.findByRole('table');
 
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  describe('create-transaction modal', () => {
+    it('opens the create-transaction modal with the expected fields', async () => {
+      server.use(userMe(VERIFIED_USER), transactionsOk([]));
+      const user = userEvent.setup();
+      renderAppAt('/transactions');
+      await screen.findByRole('heading', { name: /^transactions$/i });
+
+      await openCreateModal(user);
+
+      const dialog = screen.getByRole('dialog', { name: /add transaction/i });
+      expect(within(dialog).getByLabelText(/ticker/i)).toBeInTheDocument();
+      expect(within(dialog).getByRole('radiogroup', { name: /operation/i })).toBeInTheDocument();
+      expect(within(dialog).getByRole('radio', { name: /^buy$/i })).toBeChecked();
+      expect(within(dialog).getByRole('radio', { name: /^sell$/i })).not.toBeChecked();
+      expect(within(dialog).getByLabelText(/quantity/i)).toBeInTheDocument();
+      expect(within(dialog).getByLabelText(/trade date/i)).toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: /save transaction/i })).toBeInTheDocument();
+    });
+
+    it('closes the modal without calling the API when Cancel is clicked', async () => {
+      const createSpy = vi.fn();
+      server.use(
+        userMe(VERIFIED_USER),
+        transactionsOk([]),
+        http.post(`${BASE_URL}/transactions`, () => {
+          createSpy();
+          return HttpResponse.json({ data: buildTransaction() }, { status: 201 });
+        }),
+      );
+      const user = userEvent.setup();
+      renderAppAt('/transactions');
+      await screen.findByRole('heading', { name: /^transactions$/i });
+      await openCreateModal(user);
+
+      await user.click(screen.getByRole('button', { name: /^cancel$/i }));
+
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog', { name: /add transaction/i })).not.toBeInTheDocument(),
+      );
+      expect(createSpy).not.toHaveBeenCalled();
+    });
+
+    it('uppercases the ticker on blur', async () => {
+      server.use(userMe(VERIFIED_USER), transactionsOk([]));
+      const user = userEvent.setup();
+      renderAppAt('/transactions');
+      await screen.findByRole('heading', { name: /^transactions$/i });
+      await openCreateModal(user);
+
+      const ticker = screen.getByLabelText<HTMLInputElement>(/ticker/i);
+      await user.type(ticker, 'aapl');
+      await user.tab();
+
+      expect(ticker.value).toBe('AAPL');
+    });
+
+    it('POSTs /transactions with the CSRF header and form body on submit', async () => {
+      const requestSpy = vi.fn();
+      server.use(
+        userMe(VERIFIED_USER),
+        transactionsSequence([[], [buildTransaction()]]),
+        transactionCreated(buildTransaction(), requestSpy),
+      );
+      const user = userEvent.setup();
+      renderAppAt('/transactions');
+      await screen.findByRole('heading', { name: /^transactions$/i });
+      await openCreateModal(user);
+      await fillValidTransactionForm(user);
+
+      await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+      await waitFor(() =>
+        expect(requestSpy).toHaveBeenCalledWith({
+          csrf: 'csrf-token',
+          body: { ticker: 'AAPL', operation: 'BUY', quantity: '10.5', trade_date: '2026-03-15' },
+        }),
+      );
+    });
+
+    it('shows a success toast, closes the modal, and refetches the list on 201', async () => {
+      server.use(
+        userMe(VERIFIED_USER),
+        transactionsSequence([[], [buildTransaction({ ticker: 'AAPL' })]]),
+        transactionCreated(buildTransaction({ ticker: 'AAPL' })),
+      );
+      const user = userEvent.setup();
+      renderAppAt('/transactions');
+      await screen.findByRole('heading', { name: /^transactions$/i });
+      await openCreateModal(user);
+      await fillValidTransactionForm(user);
+
+      await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+      expect(await screen.findByText(/transaction added/i)).toBeInTheDocument();
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog', { name: /add transaction/i })).not.toBeInTheDocument(),
+      );
+      expect(await screen.findByText('AAPL')).toBeInTheDocument();
+    });
+
+    it('renders 422 INSUFFICIENT_HOLDINGS inline against the quantity field', async () => {
+      server.use(
+        userMe(VERIFIED_USER),
+        transactionsOk([]),
+        transactionCreateFailed([
+          {
+            field: 'quantity',
+            code: 'INSUFFICIENT_HOLDINGS',
+            message: 'Quantity 100 exceeds holdings 50.',
+          },
+        ]),
+      );
+      const user = userEvent.setup();
+      renderAppAt('/transactions');
+      await screen.findByRole('heading', { name: /^transactions$/i });
+      await openCreateModal(user);
+      await user.type(screen.getByLabelText(/ticker/i), 'AAPL');
+      await user.click(screen.getByRole('radio', { name: /^sell$/i }));
+      await user.type(screen.getByLabelText(/quantity/i), '100');
+      await user.type(screen.getByLabelText(/trade date/i), '2026-03-15');
+
+      await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+      const quantityInput = await screen.findByLabelText(/quantity/i);
+      await waitFor(() => expect(quantityInput).toHaveAttribute('aria-invalid', 'true'));
+      expect(screen.getByText(/exceeds holdings/i)).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: /add transaction/i })).toBeInTheDocument();
+    });
+
+    it('renders 422 TRADE_DATE_FUTURE inline against the trade date field', async () => {
+      server.use(
+        userMe(VERIFIED_USER),
+        transactionsOk([]),
+        transactionCreateFailed([
+          {
+            field: 'trade_date',
+            code: 'TRADE_DATE_FUTURE',
+            message: 'Trade date cannot be in the future.',
+          },
+        ]),
+      );
+      const user = userEvent.setup();
+      renderAppAt('/transactions');
+      await screen.findByRole('heading', { name: /^transactions$/i });
+      await openCreateModal(user);
+      await fillValidTransactionForm(user);
+
+      await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+      const dateInput = await screen.findByLabelText(/trade date/i);
+      await waitFor(() => expect(dateInput).toHaveAttribute('aria-invalid', 'true'));
+      expect(screen.getByText(/cannot be in the future/i)).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: /add transaction/i })).toBeInTheDocument();
+    });
+
+    it('blocks submission client-side for an invalid ticker without calling the API', async () => {
+      const createSpy = vi.fn();
+      server.use(
+        userMe(VERIFIED_USER),
+        transactionsOk([]),
+        http.post(`${BASE_URL}/transactions`, () => {
+          createSpy();
+          return HttpResponse.json({ data: buildTransaction() }, { status: 201 });
+        }),
+      );
+      const user = userEvent.setup();
+      renderAppAt('/transactions');
+      await screen.findByRole('heading', { name: /^transactions$/i });
+      await openCreateModal(user);
+      await user.type(screen.getByLabelText(/ticker/i), 'AAPL1');
+      await user.type(screen.getByLabelText(/quantity/i), '10');
+      await user.type(screen.getByLabelText(/trade date/i), '2026-03-15');
+
+      await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+      expect(await screen.findByText(/ticker must be/i)).toBeInTheDocument();
+      expect(createSpy).not.toHaveBeenCalled();
+    });
+
+    it('blocks submission client-side for a non-positive quantity without calling the API', async () => {
+      const createSpy = vi.fn();
+      server.use(
+        userMe(VERIFIED_USER),
+        transactionsOk([]),
+        http.post(`${BASE_URL}/transactions`, () => {
+          createSpy();
+          return HttpResponse.json({ data: buildTransaction() }, { status: 201 });
+        }),
+      );
+      const user = userEvent.setup();
+      renderAppAt('/transactions');
+      await screen.findByRole('heading', { name: /^transactions$/i });
+      await openCreateModal(user);
+      await user.type(screen.getByLabelText(/ticker/i), 'AAPL');
+      await user.type(screen.getByLabelText(/quantity/i), '-5');
+      await user.type(screen.getByLabelText(/trade date/i), '2026-03-15');
+
+      await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+      expect(await screen.findByText(/quantity must be/i)).toBeInTheDocument();
+      expect(createSpy).not.toHaveBeenCalled();
+    });
+
+    it('blocks submission client-side for a missing trade date without calling the API', async () => {
+      const createSpy = vi.fn();
+      server.use(
+        userMe(VERIFIED_USER),
+        transactionsOk([]),
+        http.post(`${BASE_URL}/transactions`, () => {
+          createSpy();
+          return HttpResponse.json({ data: buildTransaction() }, { status: 201 });
+        }),
+      );
+      const user = userEvent.setup();
+      renderAppAt('/transactions');
+      await screen.findByRole('heading', { name: /^transactions$/i });
+      await openCreateModal(user);
+      await user.type(screen.getByLabelText(/ticker/i), 'AAPL');
+      await user.type(screen.getByLabelText(/quantity/i), '10');
+
+      await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+      expect(await screen.findByText(/trade date is required/i)).toBeInTheDocument();
+      expect(createSpy).not.toHaveBeenCalled();
+    });
+
+    it('blocks submission client-side for a future trade date without calling the API', async () => {
+      const createSpy = vi.fn();
+      server.use(
+        userMe(VERIFIED_USER),
+        transactionsOk([]),
+        http.post(`${BASE_URL}/transactions`, () => {
+          createSpy();
+          return HttpResponse.json({ data: buildTransaction() }, { status: 201 });
+        }),
+      );
+      const user = userEvent.setup();
+      renderAppAt('/transactions');
+      await screen.findByRole('heading', { name: /^transactions$/i });
+      await openCreateModal(user);
+      await user.type(screen.getByLabelText(/ticker/i), 'AAPL');
+      await user.type(screen.getByLabelText(/quantity/i), '10');
+      await user.type(screen.getByLabelText(/trade date/i), '2099-01-01');
+
+      await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+      expect(await screen.findByText(/trade date cannot be in the future/i)).toBeInTheDocument();
+      expect(createSpy).not.toHaveBeenCalled();
+    });
+
+    it('has no a11y violations when open', async () => {
+      server.use(userMe(VERIFIED_USER), transactionsOk([]));
+      const user = userEvent.setup();
+      const { container } = renderAppAt('/transactions');
+      await screen.findByRole('heading', { name: /^transactions$/i });
+
+      await openCreateModal(user);
+
+      expect(await axe(container)).toHaveNoViolations();
+    });
+
+    it('treats the America/New_York trading day as "today", matching the backend\'s Clock', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      // 2026-03-16T02:00:00Z has already rolled over to the 16th in UTC, but it's still
+      // 2026-03-15T22:00 in America/New_York (UTC-4 under DST) — the backend's Clock.today().
+      vi.setSystemTime(new Date('2026-03-16T02:00:00Z'));
+
+      try {
+        const createSpy = vi.fn();
+        server.use(
+          userMe(VERIFIED_USER),
+          transactionsOk([]),
+          http.post(`${BASE_URL}/transactions`, () => {
+            createSpy();
+            return HttpResponse.json({ data: buildTransaction() }, { status: 201 });
+          }),
+        );
+        const user = userEvent.setup();
+        renderAppAt('/transactions');
+        await screen.findByRole('heading', { name: /^transactions$/i });
+        await openCreateModal(user);
+        await user.type(screen.getByLabelText(/ticker/i), 'AAPL');
+        await user.type(screen.getByLabelText(/quantity/i), '10');
+        // Already tomorrow in America/New_York, even though UTC's calendar date is 2026-03-16.
+        await user.type(screen.getByLabelText(/trade date/i), '2026-03-16');
+
+        await user.click(screen.getByRole('button', { name: /save transaction/i }));
+
+        expect(await screen.findByText(/trade date cannot be in the future/i)).toBeInTheDocument();
+        expect(createSpy).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });
