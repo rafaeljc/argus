@@ -229,6 +229,28 @@ describe('TransactionsPage', () => {
     expect(within(table).getByText(/sell/i)).toBeInTheDocument();
   });
 
+  it('links each row to its transaction detail page via a View action', async () => {
+    server.use(
+      userMe(VERIFIED_USER),
+      transactionsOk([buildTransaction({ id: 'tx-1', ticker: 'AAPL', trade_date: '2026-03-15' })]),
+      http.get(`${BASE_URL}/transactions/:id`, () =>
+        HttpResponse.json({ data: buildTransaction({ id: 'tx-1', ticker: 'AAPL' }) }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderAppAt('/transactions');
+
+    const link = await screen.findByRole('link', {
+      name: /view aapl transaction from 2026-03-15/i,
+    });
+    expect(link).toHaveAttribute('href', '/transactions/tx-1');
+
+    await user.click(link);
+
+    expect(await screen.findByRole('heading', { name: /aapl/i })).toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
   it('shows a skeleton while loading, then renders rows once resolved', async () => {
     server.use(
       userMe(VERIFIED_USER),
