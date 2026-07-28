@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { PageContainer } from '../../shared/components/layout/PageContainer';
 import { Button } from '../../shared/components/ui/Button';
@@ -7,6 +7,8 @@ import { Card } from '../../shared/components/ui/Card';
 import { EmptyState } from '../../shared/components/ui/EmptyState';
 import { Spinner } from '../../shared/components/ui/Spinner';
 import { ApiError } from '../../shared/api/errors';
+import { DeleteTransactionModal } from './DeleteTransactionModal';
+import { EditTransactionModal } from './EditTransactionModal';
 import { OperationBadge } from './OperationBadge';
 import { getTransaction } from './service';
 import type { Transaction } from './types';
@@ -83,7 +85,9 @@ export function TransactionDetailPage() {
           />
         )}
 
-        {status === 'ready' && transaction && <TransactionDetail transaction={transaction} />}
+        {status === 'ready' && transaction && (
+          <TransactionDetail transaction={transaction} onUpdated={setTransaction} />
+        )}
       </div>
     </PageContainer>
   );
@@ -91,14 +95,30 @@ export function TransactionDetailPage() {
 
 interface TransactionDetailProps {
   transaction: Transaction;
+  onUpdated: (transaction: Transaction) => void;
 }
 
-function TransactionDetail({ transaction }: TransactionDetailProps) {
+function TransactionDetail({ transaction, onUpdated }: TransactionDetailProps) {
+  const navigate = useNavigate();
+  const [isEditOpen, setEditOpen] = useState(false);
+  const [isDeleteOpen, setDeleteOpen] = useState(false);
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold text-slate-900">{transaction.ticker}</h1>
-        <OperationBadge operation={transaction.operation} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-semibold text-slate-900">{transaction.ticker}</h1>
+          <OperationBadge operation={transaction.operation} />
+        </div>
+
+        <div className="flex gap-2">
+          <Button type="button" variant="secondary" onClick={() => setEditOpen(true)}>
+            Edit
+          </Button>
+          <Button type="button" variant="danger" onClick={() => setDeleteOpen(true)}>
+            Delete transaction
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -112,6 +132,20 @@ function TransactionDetail({ transaction }: TransactionDetailProps) {
           </DetailRow>
         </dl>
       </Card>
+
+      <EditTransactionModal
+        open={isEditOpen}
+        transaction={transaction}
+        onClose={() => setEditOpen(false)}
+        onUpdated={onUpdated}
+      />
+
+      <DeleteTransactionModal
+        open={isDeleteOpen}
+        transaction={transaction}
+        onClose={() => setDeleteOpen(false)}
+        onDeleted={() => navigate(TRANSACTIONS_PATH)}
+      />
     </div>
   );
 }

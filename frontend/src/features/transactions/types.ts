@@ -21,3 +21,7 @@ export interface TransactionInput {
   quantity: string;
   trade_date: string;
 }
+
+export type TransactionPatch = Partial<
+  Pick<TransactionInput, 'operation' | 'quantity' | 'trade_date'>
+>;

@@ -180,6 +180,41 @@ async function openCreateModal(user: ReturnType<typeof userEvent.setup>): Promis
   await screen.findByRole('dialog', { name: /add transaction/i });
 }
 
+function transactionPatched(
+  updated: Transaction,
+  requestSpy?: (info: { csrf: string | null; body: unknown }) => void,
+) {
+  return http.patch(`${BASE_URL}/transactions/:id`, async ({ request }) => {
+    requestSpy?.({ csrf: request.headers.get('X-CSRF-Token'), body: await request.json() });
+    return HttpResponse.json({ data: updated });
+  });
+}
+
+function transactionDeleted(requestSpy?: (info: { csrf: string | null }) => void) {
+  return http.delete(`${BASE_URL}/transactions/:id`, ({ request }) => {
+    requestSpy?.({ csrf: request.headers.get('X-CSRF-Token') });
+    return new HttpResponse(null, { status: 204 });
+  });
+}
+
+async function openEditModalForRow(
+  user: ReturnType<typeof userEvent.setup>,
+  ticker: string,
+): Promise<void> {
+  const row = screen.getByRole('row', { name: new RegExp(ticker, 'i') });
+  await user.click(within(row).getByRole('button', { name: /^edit /i }));
+  await screen.findByRole('dialog', { name: /edit transaction/i });
+}
+
+async function openDeleteModalForRow(
+  user: ReturnType<typeof userEvent.setup>,
+  ticker: string,
+): Promise<void> {
+  const row = screen.getByRole('row', { name: new RegExp(ticker, 'i') });
+  await user.click(within(row).getByRole('button', { name: /^delete /i }));
+  await screen.findByRole('dialog', { name: /delete transaction/i });
+}
+
 async function fillValidTransactionForm(user: ReturnType<typeof userEvent.setup>): Promise<void> {
   await user.type(screen.getByLabelText(/ticker/i), 'AAPL');
   await user.type(screen.getByLabelText(/quantity/i), '10.5');
@@ -641,6 +676,66 @@ describe('TransactionsPage', () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+  });
+
+  describe('row edit and delete actions', () => {
+    it('renders Edit and Delete actions per row', async () => {
+      server.use(userMe(VERIFIED_USER), transactionsOk([buildTransaction({ ticker: 'AAPL' })]));
+      renderAppAt('/transactions');
+      await screen.findByRole('heading', { name: /^transactions$/i });
+
+      const row = await screen.findByRole('row', { name: /aapl/i });
+      expect(within(row).getByRole('button', { name: /^edit .*aapl/i })).toBeInTheDocument();
+      expect(within(row).getByRole('button', { name: /^delete .*aapl/i })).toBeInTheDocument();
+    });
+
+    it('opens the edit modal pre-populated for the clicked row and refetches on success', async () => {
+      server.use(
+        userMe(VERIFIED_USER),
+        transactionsSequence([
+          [buildTransaction({ ticker: 'AAPL', quantity: '10.500000' })],
+          [buildTransaction({ ticker: 'AAPL', quantity: '11.250000' })],
+        ]),
+        transactionPatched(buildTransaction({ ticker: 'AAPL', quantity: '11.250000' })),
+      );
+      const user = userEvent.setup();
+      renderAppAt('/transactions');
+      await screen.findByRole('heading', { name: /^transactions$/i });
+      await openEditModalForRow(user, 'AAPL');
+
+      expect(screen.getByLabelText<HTMLInputElement>(/quantity/i).value).toBe('10.500000');
+      const quantity = screen.getByLabelText(/quantity/i);
+      await user.clear(quantity);
+      await user.type(quantity, '11.25');
+      await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog', { name: /edit transaction/i })).not.toBeInTheDocument(),
+      );
+      expect(await screen.findByText('11.250000')).toBeInTheDocument();
+    });
+
+    it('opens the delete modal for the clicked row and refetches the list on success', async () => {
+      server.use(
+        userMe(VERIFIED_USER),
+        transactionsSequence([[buildTransaction({ ticker: 'AAPL' })], []]),
+        transactionDeleted(),
+      );
+      const user = userEvent.setup();
+      renderAppAt('/transactions');
+      await screen.findByRole('heading', { name: /^transactions$/i });
+      await openDeleteModalForRow(user, 'AAPL');
+
+      await user.click(screen.getByRole('button', { name: /confirm delete/i }));
+
+      expect(await screen.findByText(/transaction deleted/i)).toBeInTheDocument();
+      await waitFor(() =>
+        expect(
+          screen.queryByRole('dialog', { name: /delete transaction/i }),
+        ).not.toBeInTheDocument(),
+      );
+      expect(await screen.findByText(/no transactions yet/i)).toBeInTheDocument();
     });
   });
 });

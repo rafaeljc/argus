@@ -9,6 +9,8 @@ import { SelectField, type SelectOption } from '../../shared/components/ui/Selec
 import { Skeleton } from '../../shared/components/ui/Skeleton';
 import type { Paginated } from '../../shared/types/envelopes';
 import { CreateTransactionModal } from './CreateTransactionModal';
+import { DeleteTransactionModal } from './DeleteTransactionModal';
+import { EditTransactionModal } from './EditTransactionModal';
 import { OperationBadge } from './OperationBadge';
 import { getTransactions } from './service';
 import type { Transaction } from './types';
@@ -52,6 +54,8 @@ export function TransactionsPage() {
   const [result, setResult] = useState<Paginated<Transaction> | null>(null);
   const [retryToken, setRetryToken] = useState(0);
   const [isCreateOpen, setCreateOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
   const requestIdRef = useRef(0);
 
   useEffect(() => {
@@ -99,6 +103,10 @@ export function TransactionsPage() {
     setRetryToken((token) => token + 1);
   }
 
+  function handleRowChanged(): void {
+    setRetryToken((token) => token + 1);
+  }
+
   return (
     <PageContainer>
       <div className="flex flex-col gap-6">
@@ -142,7 +150,11 @@ export function TransactionsPage() {
 
         {status !== 'error' && result && result.data.length > 0 && (
           <>
-            <TransactionsTable transactions={result.data} />
+            <TransactionsTable
+              transactions={result.data}
+              onEdit={setEditingTransaction}
+              onDelete={setDeletingTransaction}
+            />
             <Pagination
               meta={result.meta}
               links={result.links}
@@ -158,6 +170,29 @@ export function TransactionsPage() {
         onClose={() => setCreateOpen(false)}
         onCreated={handleCreated}
       />
+
+      {editingTransaction && (
+        <EditTransactionModal
+          key={editingTransaction.id}
+          open
+          transaction={editingTransaction}
+          onClose={() => setEditingTransaction(null)}
+          onUpdated={handleRowChanged}
+        />
+      )}
+
+      {deletingTransaction && (
+        <DeleteTransactionModal
+          key={deletingTransaction.id}
+          open
+          transaction={deletingTransaction}
+          onClose={() => setDeletingTransaction(null)}
+          onDeleted={() => {
+            setDeletingTransaction(null);
+            handleRowChanged();
+          }}
+        />
+      )}
     </PageContainer>
   );
 }
@@ -174,9 +209,11 @@ function TransactionsSkeleton() {
 
 interface TransactionsTableProps {
   transactions: Transaction[];
+  onEdit: (transaction: Transaction) => void;
+  onDelete: (transaction: Transaction) => void;
 }
 
-function TransactionsTable({ transactions }: TransactionsTableProps) {
+function TransactionsTable({ transactions, onEdit, onDelete }: TransactionsTableProps) {
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200">
       <table className="w-full min-w-max text-left text-sm">
@@ -209,13 +246,33 @@ function TransactionsTable({ transactions }: TransactionsTableProps) {
               </td>
               <td className="px-4 py-3">{transaction.quantity}</td>
               <td className="px-4 py-3 text-right">
-                <Link
-                  to={`/transactions/${transaction.id}`}
-                  aria-label={`View ${transaction.ticker} transaction from ${transaction.trade_date}`}
-                  className="font-medium text-brand hover:underline"
-                >
-                  View
-                </Link>
+                <div className="flex items-center justify-end gap-3">
+                  <Link
+                    to={`/transactions/${transaction.id}`}
+                    aria-label={`View ${transaction.ticker} transaction from ${transaction.trade_date}`}
+                    className="font-medium text-brand hover:underline"
+                  >
+                    View
+                  </Link>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Edit ${transaction.ticker} transaction from ${transaction.trade_date}`}
+                    onClick={() => onEdit(transaction)}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Delete ${transaction.ticker} transaction from ${transaction.trade_date}`}
+                    onClick={() => onDelete(transaction)}
+                  >
+                    Delete
+                  </Button>
+                </div>
               </td>
             </tr>
           ))}

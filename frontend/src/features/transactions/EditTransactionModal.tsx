@@ -6,31 +6,35 @@ import { SegmentedField } from '../../shared/components/ui/SegmentedField';
 import { TextField } from '../../shared/components/ui/TextField';
 import { useForm } from '../../shared/hooks/useForm';
 import { toast } from '../../shared/hooks/useToastStore';
-import { createTransaction } from './service';
-import { todayIso, validateQuantity, validateTicker, validateTradeDate } from './transactionForm';
-import type { TransactionInput } from './types';
-
-const INITIAL_VALUES: TransactionInput = {
-  ticker: '',
-  operation: 'BUY',
-  quantity: '',
-  trade_date: '',
-};
+import { updateTransaction } from './service';
+import { todayIso, validateQuantity, validateTradeDate } from './transactionForm';
+import type { Transaction, TransactionPatch } from './types';
 
 const OPERATION_OPTIONS = [
   { value: 'BUY', label: 'Buy' },
   { value: 'SELL', label: 'Sell' },
 ] as const;
 
-const SUCCESS_MESSAGE = 'Transaction added.';
+const SUCCESS_MESSAGE = 'Transaction updated.';
 
-type ValidationErrors = Partial<Record<keyof TransactionInput, string>>;
+interface EditableValues {
+  operation: Transaction['operation'];
+  quantity: string;
+  trade_date: string;
+}
 
-function validate(values: TransactionInput): ValidationErrors {
+type ValidationErrors = Partial<Record<keyof EditableValues, string>>;
+
+function toValues(transaction: Transaction): EditableValues {
+  return {
+    operation: transaction.operation,
+    quantity: transaction.quantity,
+    trade_date: transaction.trade_date,
+  };
+}
+
+function validate(values: EditableValues): ValidationErrors {
   const errors: ValidationErrors = {};
-
-  const tickerError = validateTicker(values.ticker);
-  if (tickerError) errors.ticker = tickerError;
 
   const quantityError = validateQuantity(values.quantity);
   if (quantityError) errors.quantity = quantityError;
@@ -41,27 +45,50 @@ function validate(values: TransactionInput): ValidationErrors {
   return errors;
 }
 
-export interface CreateTransactionModalProps {
-  open: boolean;
-  onClose: () => void;
-  onCreated: () => void;
+function buildPatch(initial: EditableValues, current: EditableValues): TransactionPatch {
+  const patch: TransactionPatch = {};
+  if (current.operation !== initial.operation) patch.operation = current.operation;
+  if (current.quantity !== initial.quantity) patch.quantity = current.quantity;
+  if (current.trade_date !== initial.trade_date) patch.trade_date = current.trade_date;
+  return patch;
 }
 
-export function CreateTransactionModal({ open, onClose, onCreated }: CreateTransactionModalProps) {
-  const form = useForm<TransactionInput>({
-    initialValues: INITIAL_VALUES,
+function isDirty(initial: EditableValues, current: EditableValues): boolean {
+  return (
+    current.operation !== initial.operation ||
+    current.quantity !== initial.quantity ||
+    current.trade_date !== initial.trade_date
+  );
+}
+
+export interface EditTransactionModalProps {
+  open: boolean;
+  transaction: Transaction;
+  onClose: () => void;
+  onUpdated: (transaction: Transaction) => void;
+}
+
+export function EditTransactionModal({
+  open,
+  transaction,
+  onClose,
+  onUpdated,
+}: EditTransactionModalProps) {
+  const initialValues = toValues(transaction);
+
+  const form = useForm<EditableValues>({
+    initialValues,
     onSubmit: async (values) => {
-      const normalized: TransactionInput = { ...values, ticker: values.ticker.toUpperCase() };
-      const errors = validate(normalized);
+      const errors = validate(values);
       if (Object.keys(errors).length > 0) {
         form.setFieldErrors(errors);
         return;
       }
 
-      await createTransaction(normalized);
+      const patch = buildPatch(initialValues, values);
+      const updated = await updateTransaction(transaction.id, patch);
       toast.success(SUCCESS_MESSAGE);
-      form.reset();
-      onCreated();
+      onUpdated(updated);
       onClose();
     },
   });
@@ -73,7 +100,7 @@ export function CreateTransactionModal({ open, onClose, onCreated }: CreateTrans
   };
 
   return (
-    <Modal open={open} onClose={handleClose} title="Add transaction">
+    <Modal open={open} onClose={handleClose} title="Edit transaction">
       <form
         className="flex flex-col gap-4"
         onSubmit={(event) => {
@@ -90,14 +117,7 @@ export function CreateTransactionModal({ open, onClose, onCreated }: CreateTrans
           </p>
         )}
 
-        <TextField
-          label="Ticker"
-          required
-          value={form.values.ticker}
-          onChange={form.handleChange('ticker')}
-          onBlur={(event) => form.setValue('ticker', event.target.value.toUpperCase())}
-          error={form.fieldErrors.ticker ?? ''}
-        />
+        <TextField label="Ticker" value={transaction.ticker} disabled />
 
         <SegmentedField
           label="Operation"
@@ -129,8 +149,12 @@ export function CreateTransactionModal({ open, onClose, onCreated }: CreateTrans
           <Button type="button" variant="secondary" onClick={handleClose}>
             Cancel
           </Button>
-          <Button type="submit" isLoading={form.isSubmitting}>
-            Save transaction
+          <Button
+            type="submit"
+            isLoading={form.isSubmitting}
+            disabled={!isDirty(initialValues, form.values)}
+          >
+            Save changes
           </Button>
         </div>
       </form>
