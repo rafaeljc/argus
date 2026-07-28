@@ -159,6 +159,134 @@ class AlertRuleControllerIT {
         assertThat(errorCode(response)).isEqualTo("NOT_FOUND");
     }
 
+    @Test
+    void getAlertRules_authenticated_returnsOwnedPageWithEnvelope() throws Exception {
+        User user = seedVerified("ivan@example.com");
+        alertService.create(
+                user.id(), Direction.UP, new Percentage(new BigDecimal("5.0")), new AlertLookbackWindow(30));
+        alertService.create(
+                user.id(), Direction.DOWN, new Percentage(new BigDecimal("10.0")), new AlertLookbackWindow(90));
+
+        ResponseEntity<String> response = get(user, "");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        JsonNode body = json.readTree(response.getBody());
+        assertThat(body.get("data")).hasSize(2);
+        JsonNode meta = body.get("meta");
+        assertThat(meta.get("total").asInt()).isEqualTo(2);
+        assertThat(meta.get("page").asInt()).isEqualTo(1);
+        assertThat(meta.get("per_page").asInt()).isEqualTo(50);
+        assertThat(meta.get("total_pages").asInt()).isEqualTo(1);
+        JsonNode links = body.get("links");
+        assertThat(links.get("self").asString()).contains("page=1").contains("per_page=50");
+        assertThat(links.get("next").isNull()).isTrue();
+        assertThat(links.get("prev").isNull()).isTrue();
+    }
+
+    @Test
+    void getAlertRules_empty_returnsEmptyDataWithZeroMeta() throws Exception {
+        User user = seedVerified("judy2@example.com");
+
+        ResponseEntity<String> response = get(user, "");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        JsonNode body = json.readTree(response.getBody());
+        assertThat(body.get("data")).isEmpty();
+        assertThat(body.get("meta").get("total").asInt()).isZero();
+        assertThat(body.get("meta").get("total_pages").asInt()).isZero();
+        assertThat(body.get("links").get("next").isNull()).isTrue();
+        assertThat(body.get("links").get("prev").isNull()).isTrue();
+    }
+
+    @Test
+    void getAlertRules_perPageOne_secondPage_setsNextPrevLast() throws Exception {
+        User user = seedVerified("kevin2@example.com");
+        alertService.create(
+                user.id(), Direction.UP, new Percentage(new BigDecimal("1.0")), new AlertLookbackWindow(30));
+        alertService.create(
+                user.id(), Direction.UP, new Percentage(new BigDecimal("2.0")), new AlertLookbackWindow(30));
+        alertService.create(
+                user.id(), Direction.UP, new Percentage(new BigDecimal("3.0")), new AlertLookbackWindow(30));
+
+        ResponseEntity<String> response = get(user, "?page=2&per_page=1");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        JsonNode body = json.readTree(response.getBody());
+        assertThat(body.get("data")).hasSize(1);
+        JsonNode meta = body.get("meta");
+        assertThat(meta.get("total").asInt()).isEqualTo(3);
+        assertThat(meta.get("page").asInt()).isEqualTo(2);
+        assertThat(meta.get("total_pages").asInt()).isEqualTo(3);
+        JsonNode links = body.get("links");
+        assertThat(links.get("next").asString()).contains("page=3");
+        assertThat(links.get("prev").asString()).contains("page=1");
+        assertThat(links.get("last").asString()).contains("page=3");
+    }
+
+    @Test
+    void getAlertRules_onlyReturnsCallersRules() throws Exception {
+        User owner = seedVerified("laura2@example.com");
+        User other = seedVerified("mike2@example.com");
+        alertService.create(
+                owner.id(), Direction.UP, new Percentage(new BigDecimal("5.0")), new AlertLookbackWindow(30));
+        alertService.create(
+                other.id(), Direction.UP, new Percentage(new BigDecimal("5.0")), new AlertLookbackWindow(30));
+
+        ResponseEntity<String> response = get(owner, "");
+
+        JsonNode data = json.readTree(response.getBody()).get("data");
+        assertThat(data).hasSize(1);
+    }
+
+    @Test
+    void getAlertRules_perPageAboveMax_returns422() throws Exception {
+        User user = seedVerified("nina2@example.com");
+
+        ResponseEntity<String> response = get(user, "?per_page=201");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(422);
+        JsonNode error = json.readTree(response.getBody()).get("error");
+        assertThat(error.get("code").asString()).isEqualTo("VALIDATION_ERROR");
+        assertThat(error.get("details").get(0).get("field").asString()).isEqualTo("per_page");
+    }
+
+    @Test
+    void getAlertRule_owned_returns200WithEnvelope() throws Exception {
+        User user = seedVerified("oscar2@example.com");
+        AlertRule saved = alertService.create(
+                user.id(), Direction.UP, new Percentage(new BigDecimal("5.0")), new AlertLookbackWindow(30));
+
+        ResponseEntity<String> response = get(user, "/" + saved.id().value());
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        JsonNode data = json.readTree(response.getBody()).get("data");
+        assertThat(data.get("id").asString()).isEqualTo(saved.id().value().toString());
+        assertThat(data.get("direction").asString()).isEqualTo("UP");
+    }
+
+    @Test
+    void getAlertRule_otherUsersRule_returns404() throws Exception {
+        User owner = seedVerified("oliver2@example.com");
+        User other = seedVerified("peggy2@example.com");
+        AlertRule saved = alertService.create(
+                owner.id(), Direction.UP, new Percentage(new BigDecimal("5.0")), new AlertLookbackWindow(30));
+
+        ResponseEntity<String> response = get(other, "/" + saved.id().value());
+
+        assertThat(response.getStatusCode().value()).isEqualTo(404);
+        assertThat(errorCode(response)).isEqualTo("NOT_FOUND");
+    }
+
+    @Test
+    void getAlertRule_unknownId_returns404() throws Exception {
+        User user = seedVerified("quentin2@example.com");
+
+        ResponseEntity<String> response = get(user, "/" + UUID.randomUUID());
+
+        assertThat(response.getStatusCode().value()).isEqualTo(404);
+        assertThat(errorCode(response)).isEqualTo("NOT_FOUND");
+    }
+
     private String errorCode(ResponseEntity<String> response) {
         return json.readTree(response.getBody()).get("error").get("code").asString();
     }
@@ -185,6 +313,17 @@ class AlertRuleControllerIT {
                 "http://localhost:" + port + ENDPOINT,
                 HttpMethod.POST,
                 new HttpEntity<>(jsonBody, headers),
+                String.class);
+    }
+
+    private ResponseEntity<String> get(User authenticatedAs, String pathAndQuery) {
+        HttpHeaders headers = new HttpHeaders();
+        String sessionToken = seedSession(authenticatedAs);
+        headers.add(HttpHeaders.COOKIE, SessionCookieFactory.COOKIE_NAME + "=" + sessionToken);
+        return http.exchange(
+                "http://localhost:" + port + ENDPOINT + pathAndQuery,
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
                 String.class);
     }
 

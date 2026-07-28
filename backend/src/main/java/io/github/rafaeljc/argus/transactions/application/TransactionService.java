@@ -1,5 +1,6 @@
 package io.github.rafaeljc.argus.transactions.application;
 
+import io.github.rafaeljc.argus.common.application.PageResult;
 import io.github.rafaeljc.argus.common.domain.Quantity;
 import io.github.rafaeljc.argus.common.domain.Ticker;
 import io.github.rafaeljc.argus.common.domain.TransactionId;

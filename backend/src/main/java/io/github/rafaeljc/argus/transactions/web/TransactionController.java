@@ -1,5 +1,6 @@
 package io.github.rafaeljc.argus.transactions.web;
 
+import io.github.rafaeljc.argus.common.application.PageResult;
 import io.github.rafaeljc.argus.common.domain.Quantity;
 import io.github.rafaeljc.argus.common.domain.Ticker;
 import io.github.rafaeljc.argus.common.domain.TransactionId;
@@ -7,7 +8,6 @@ import io.github.rafaeljc.argus.common.domain.UserId;
 import io.github.rafaeljc.argus.common.web.CollectionEnvelope;
 import io.github.rafaeljc.argus.common.web.CurrentUserId;
 import io.github.rafaeljc.argus.common.web.SuccessEnvelope;
-import io.github.rafaeljc.argus.transactions.application.PageResult;
 import io.github.rafaeljc.argus.transactions.application.TransactionService;
 import io.github.rafaeljc.argus.transactions.domain.Transaction;
 import jakarta.validation.Valid;

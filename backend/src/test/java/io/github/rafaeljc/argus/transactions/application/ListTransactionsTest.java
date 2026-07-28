@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import com.github.f4b6a3.uuid.UuidCreator;
+import io.github.rafaeljc.argus.common.application.PageResult;
 import io.github.rafaeljc.argus.common.domain.Quantity;
 import io.github.rafaeljc.argus.common.domain.Ticker;
 import io.github.rafaeljc.argus.common.domain.TransactionId;

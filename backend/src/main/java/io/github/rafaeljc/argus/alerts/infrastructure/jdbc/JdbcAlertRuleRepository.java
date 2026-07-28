@@ -47,7 +47,7 @@ class JdbcAlertRuleRepository implements AlertRuleRepository {
             SELECT id, user_id, direction, threshold, window_days, created_at
             FROM alert_rules
             WHERE user_id = :userId
-            ORDER BY created_at DESC
+            ORDER BY created_at DESC, id DESC
             LIMIT :limit OFFSET :offset
             """;
 
