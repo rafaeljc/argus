@@ -1,4 +1,4 @@
-package io.github.rafaeljc.argus.transactions.application;
+package io.github.rafaeljc.argus.common.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

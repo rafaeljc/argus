@@ -1,4 +1,4 @@
-package io.github.rafaeljc.argus.transactions.application;
+package io.github.rafaeljc.argus.common.application;
 
 import java.util.List;
 
