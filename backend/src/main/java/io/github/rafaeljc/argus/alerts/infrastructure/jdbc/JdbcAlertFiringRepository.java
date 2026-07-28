@@ -53,9 +53,11 @@ class JdbcAlertFiringRepository implements AlertFiringRepository {
                    window_start_date, window_end_date
             FROM alert_firings
             WHERE user_id = :userId
-            ORDER BY fired_at DESC
+            ORDER BY fired_at DESC, id DESC
             LIMIT :limit OFFSET :offset
             """;
+
+    private static final String COUNT_BY_USER_SQL = "SELECT count(*) FROM alert_firings WHERE user_id = :userId";
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -84,6 +86,13 @@ class JdbcAlertFiringRepository implements AlertFiringRepository {
                 .addValue("limit", perPage)
                 .addValue("offset", (page - 1) * perPage);
         return jdbc.query(LIST_BY_USER_ORDERED_BY_FIRED_AT_DESC_SQL, params, JdbcAlertFiringRepository::mapRow);
+    }
+
+    @Override
+    public int countByUser(UserId userId) {
+        MapSqlParameterSource params = new MapSqlParameterSource().addValue("userId", userId.value());
+        Integer count = jdbc.queryForObject(COUNT_BY_USER_SQL, params, Integer.class);
+        return count == null ? 0 : count;
     }
 
     private static MapSqlParameterSource paramsFor(AlertFiring firing) {

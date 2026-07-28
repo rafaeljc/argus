@@ -13,4 +13,6 @@ public interface AlertFiringRepository {
     Optional<AlertFiring> findByIdAndUser(FiringId id, UserId userId);
 
     List<AlertFiring> listByUserOrderedByFiredAtDesc(UserId userId, int page, int perPage);
+
+    int countByUser(UserId userId);
 }

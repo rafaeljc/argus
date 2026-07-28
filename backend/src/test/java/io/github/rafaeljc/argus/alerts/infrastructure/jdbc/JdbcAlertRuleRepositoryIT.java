@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -128,6 +129,23 @@ class JdbcAlertRuleRepositoryIT {
 
         assertThat(pageOne).extracting(AlertRule::id).containsExactly(third.id(), second.id());
         assertThat(pageTwo).extracting(AlertRule::id).containsExactly(first.id());
+    }
+
+    @Test
+    void listActiveByUserOrderedByCreatedAtDesc_sameCreatedAt_ordersByIdDescAsTiebreaker() {
+        UserId userId = newUser();
+        RuleId lowerId = new RuleId(UUID.fromString("00000000-0000-0000-0000-000000000001"));
+        RuleId higherId = new RuleId(UUID.fromString("00000000-0000-0000-0000-000000000002"));
+        repository.insert(new AlertRule(
+                lowerId, userId, Direction.UP, new Percentage(new BigDecimal("1.0")),
+                new AlertLookbackWindow(30), RULE_CREATED));
+        repository.insert(new AlertRule(
+                higherId, userId, Direction.UP, new Percentage(new BigDecimal("2.0")),
+                new AlertLookbackWindow(30), RULE_CREATED));
+
+        List<AlertRule> page = repository.listActiveByUserOrderedByCreatedAtDesc(userId, 1, 50);
+
+        assertThat(page).extracting(AlertRule::id).containsExactly(higherId, lowerId);
     }
 
     @Test

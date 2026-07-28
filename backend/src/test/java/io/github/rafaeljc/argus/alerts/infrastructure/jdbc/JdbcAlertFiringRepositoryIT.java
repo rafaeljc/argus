@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -122,6 +123,55 @@ class JdbcAlertFiringRepositoryIT {
 
         assertThat(pageOne).extracting(AlertFiring::id).containsExactly(first.id(), second.id());
         assertThat(pageTwo).extracting(AlertFiring::id).containsExactly(third.id());
+    }
+
+    @Test
+    void listByUserOrderedByFiredAtDesc_sameFiredAt_ordersByIdDescAsTiebreaker() {
+        UserId userId = newUser();
+        FiringId lowerId = new FiringId(UUID.fromString("00000000-0000-0000-0000-000000000001"));
+        FiringId higherId = new FiringId(UUID.fromString("00000000-0000-0000-0000-000000000002"));
+        Instant firedAt = Instant.parse("2026-01-01T00:00:00Z");
+        repository.insert(new AlertFiring(
+                lowerId, userId, new RuleId(UuidCreator.getTimeOrderedEpoch()), Direction.UP,
+                new Percentage(new BigDecimal("1.0")), new AlertLookbackWindow(30), firedAt,
+                new Money(new BigDecimal("1000.00")), new Money(new BigDecimal("1050.00")),
+                new BigDecimal("5.00"), LocalDate.parse("2025-12-01"), LocalDate.parse("2026-01-01")));
+        repository.insert(new AlertFiring(
+                higherId, userId, new RuleId(UuidCreator.getTimeOrderedEpoch()), Direction.UP,
+                new Percentage(new BigDecimal("1.0")), new AlertLookbackWindow(30), firedAt,
+                new Money(new BigDecimal("1000.00")), new Money(new BigDecimal("1050.00")),
+                new BigDecimal("5.00"), LocalDate.parse("2025-12-01"), LocalDate.parse("2026-01-01")));
+
+        List<AlertFiring> page = repository.listByUserOrderedByFiredAtDesc(userId, 1, 50);
+
+        assertThat(page).extracting(AlertFiring::id).containsExactly(higherId, lowerId);
+    }
+
+    @Test
+    void countByUser_matchesNumberOfOwnedFirings() {
+        UserId userId = newUser();
+        UserId otherUser = newUser();
+        repository.insert(newFiring(
+                userId, Direction.UP, "5.0", 30, Instant.parse("2026-01-01T00:00:00Z"),
+                "1000.00", "1050.00", "5.00",
+                LocalDate.parse("2025-12-01"), LocalDate.parse("2026-01-01")));
+        repository.insert(newFiring(
+                userId, Direction.DOWN, "10.0", 90, Instant.parse("2026-02-01T00:00:00Z"),
+                "1000.00", "900.00", "-10.00",
+                LocalDate.parse("2025-11-01"), LocalDate.parse("2026-02-01")));
+        repository.insert(newFiring(
+                otherUser, Direction.UP, "5.0", 30, Instant.parse("2026-01-01T00:00:00Z"),
+                "1000.00", "1050.00", "5.00",
+                LocalDate.parse("2025-12-01"), LocalDate.parse("2026-01-01")));
+
+        assertThat(repository.countByUser(userId)).isEqualTo(2);
+    }
+
+    @Test
+    void countByUser_noFirings_returnsZero() {
+        UserId userId = newUser();
+
+        assertThat(repository.countByUser(userId)).isZero();
     }
 
     @Test
