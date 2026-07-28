@@ -7,6 +7,7 @@ import { TextField } from '../../shared/components/ui/TextField';
 import { useForm } from '../../shared/hooks/useForm';
 import { toast } from '../../shared/hooks/useToastStore';
 import { createTransaction } from './service';
+import { todayIso, validateQuantity, validateTicker, validateTradeDate } from './transactionForm';
 import type { TransactionInput } from './types';
 
 const INITIAL_VALUES: TransactionInput = {
@@ -21,43 +22,21 @@ const OPERATION_OPTIONS = [
   { value: 'SELL', label: 'Sell' },
 ] as const;
 
-const TICKER_PATTERN = /^[A-Z.]{1,10}$/;
-const QUANTITY_PATTERN = /^\d+(\.\d{1,6})?$/;
-
 const SUCCESS_MESSAGE = 'Transaction added.';
-const TICKER_ERROR = 'Ticker must be 1-10 uppercase letters or periods.';
-const QUANTITY_ERROR = 'Quantity must be a positive number with up to 6 decimal places.';
-const TRADE_DATE_REQUIRED_ERROR = 'Trade date is required.';
-const TRADE_DATE_FUTURE_ERROR = 'Trade date cannot be in the future.';
 
 type ValidationErrors = Partial<Record<keyof TransactionInput, string>>;
-
-// Mirrors the backend's Clock.today() (America/New_York trading day), not UTC or the
-// browser's local date — the future-date guard must agree with the server's own boundary,
-// since that's what actually decides TRADE_DATE_FUTURE.
-const MARKET_TIME_ZONE = 'America/New_York';
-const todayFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: MARKET_TIME_ZONE });
-
-function todayIso(): string {
-  return todayFormatter.format(new Date());
-}
 
 function validate(values: TransactionInput): ValidationErrors {
   const errors: ValidationErrors = {};
 
-  if (!TICKER_PATTERN.test(values.ticker)) {
-    errors.ticker = TICKER_ERROR;
-  }
+  const tickerError = validateTicker(values.ticker);
+  if (tickerError) errors.ticker = tickerError;
 
-  if (!QUANTITY_PATTERN.test(values.quantity.trim()) || Number(values.quantity) <= 0) {
-    errors.quantity = QUANTITY_ERROR;
-  }
+  const quantityError = validateQuantity(values.quantity);
+  if (quantityError) errors.quantity = quantityError;
 
-  if (!values.trade_date) {
-    errors.trade_date = TRADE_DATE_REQUIRED_ERROR;
-  } else if (values.trade_date > todayIso()) {
-    errors.trade_date = TRADE_DATE_FUTURE_ERROR;
-  }
+  const tradeDateError = validateTradeDate(values.trade_date);
+  if (tradeDateError) errors.trade_date = tradeDateError;
 
   return errors;
 }
