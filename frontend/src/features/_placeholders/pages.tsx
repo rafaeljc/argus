@@ -11,10 +11,6 @@ function Placeholder({ title }: PlaceholderProps) {
   );
 }
 
-export function PortfolioPage() {
-  return <Placeholder title="Portfolio" />;
-}
-
 export function PortfolioSnapshotsPage() {
   return <Placeholder title="Portfolio Snapshots" />;
 }

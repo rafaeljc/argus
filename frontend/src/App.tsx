@@ -17,9 +17,9 @@ import {
   AdminUsersPage,
   AlertFiringsPage,
   AlertsPage,
-  PortfolioPage,
   PortfolioSnapshotsPage,
 } from './features/_placeholders/pages';
+import { PortfolioPage } from './features/portfolio/PortfolioPage';
 import { TransactionDetailPage } from './features/transactions/TransactionDetailPage';
 import { TransactionsPage } from './features/transactions/TransactionsPage';
 import { AppLayout } from './shared/components/layout/AppLayout';
