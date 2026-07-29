@@ -47,11 +47,15 @@ class AlertServiceTest {
     @Mock
     private ListFirings listFirings;
 
+    @Mock
+    private EvaluateAlerts evaluateAlerts;
+
     private AlertService service;
 
     @BeforeEach
     void setUp() {
-        service = new AlertService(createAlertRule, cancelAlertRule, listActiveRules, getActiveRule, listFirings);
+        service = new AlertService(
+                createAlertRule, cancelAlertRule, listActiveRules, getActiveRule, listFirings, evaluateAlerts);
     }
 
     @Test
@@ -116,5 +120,14 @@ class AlertServiceTest {
 
         assertThat(result).isEqualTo(expected);
         verify(listFirings).list(USER_ID, 1, 50);
+    }
+
+    @Test
+    void evaluateForUser_delegatesToEvaluateAlerts() {
+        LocalDate runDate = LocalDate.parse("2026-07-01");
+
+        service.evaluateForUser(USER_ID, runDate);
+
+        verify(evaluateAlerts).forUser(USER_ID, runDate);
     }
 }
