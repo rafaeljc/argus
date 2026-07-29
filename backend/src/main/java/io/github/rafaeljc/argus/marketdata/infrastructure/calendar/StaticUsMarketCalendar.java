@@ -5,14 +5,12 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.Month;
 import java.time.temporal.TemporalAdjusters;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-// In-memory US-market calendar for local/test profiles. Weekends + US federal holidays with NYSE observed-shift rules
-// (Sat → prior Fri, Sun → next Mon). No half-day handling. Phase 10 replaces this with a vendor-driven adapter under
-// the prod profile.
+// In-memory US-market calendar. Weekends + US federal holidays with NYSE observed-shift rules
+// (Sat → prior Fri, Sun → next Mon). No half-day handling. Phase 10 replaces this with a
+// vendor-driven adapter.
 @Component
-@Profile({"local", "test"})
 class StaticUsMarketCalendar implements MarketCalendar {
 
     @Override
