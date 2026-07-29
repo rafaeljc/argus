@@ -97,9 +97,9 @@ describe('AppNav', () => {
 
   it('keeps the parent tab active on nested routes', () => {
     setAuth(NON_ADMIN_USER, 'authenticated');
-    renderNav('/portfolio/snapshots');
+    renderNav('/transactions/11111111-1111-4111-8111-111111111111');
     const desktop = screen.getByTestId('app-nav-desktop');
-    const active = within(desktop).getByRole('link', { name: 'Portfolio' });
+    const active = within(desktop).getByRole('link', { name: 'Transactions' });
     expect(active).toHaveAttribute('aria-current', 'page');
   });
 
