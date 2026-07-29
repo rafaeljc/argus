@@ -17,7 +17,6 @@ import {
   AdminUsersPage,
   AlertFiringsPage,
   AlertsPage,
-  PortfolioSnapshotsPage,
 } from './features/_placeholders/pages';
 import { PortfolioPage } from './features/portfolio/PortfolioPage';
 import { TransactionDetailPage } from './features/transactions/TransactionDetailPage';
@@ -51,7 +50,6 @@ function App() {
             <Route path="/transactions/:id" element={<TransactionDetailPage />} />
 
             <Route path="/portfolio" element={<PortfolioPage />} />
-            <Route path="/portfolio/snapshots" element={<PortfolioSnapshotsPage />} />
 
             <Route path="/alerts" element={<AlertsPage />} />
             <Route path="/alerts/firings" element={<AlertFiringsPage />} />

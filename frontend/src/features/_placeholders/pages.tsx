@@ -11,10 +11,6 @@ function Placeholder({ title }: PlaceholderProps) {
   );
 }
 
-export function PortfolioSnapshotsPage() {
-  return <Placeholder title="Portfolio Snapshots" />;
-}
-
 export function AlertsPage() {
   return <Placeholder title="Alerts" />;
 }
