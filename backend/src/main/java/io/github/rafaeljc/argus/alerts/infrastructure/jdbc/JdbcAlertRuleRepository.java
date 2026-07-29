@@ -51,6 +51,14 @@ class JdbcAlertRuleRepository implements AlertRuleRepository {
             LIMIT :limit OFFSET :offset
             """;
 
+    private static final String LIST_ALL_ACTIVE_BY_USER_SQL =
+            """
+            SELECT id, user_id, direction, threshold, window_days, created_at
+            FROM alert_rules
+            WHERE user_id = :userId
+            ORDER BY created_at DESC, id DESC
+            """;
+
     private static final String DELETE_ACTIVE_AND_RETURN_SQL =
             """
             DELETE FROM alert_rules
@@ -98,6 +106,12 @@ class JdbcAlertRuleRepository implements AlertRuleRepository {
                 .addValue("limit", perPage)
                 .addValue("offset", (page - 1) * perPage);
         return jdbc.query(LIST_ACTIVE_BY_USER_ORDERED_BY_CREATED_AT_DESC_SQL, params, JdbcAlertRuleRepository::mapRow);
+    }
+
+    @Override
+    public List<AlertRule> listAllActiveByUser(UserId userId) {
+        MapSqlParameterSource params = new MapSqlParameterSource().addValue("userId", userId.value());
+        return jdbc.query(LIST_ALL_ACTIVE_BY_USER_SQL, params, JdbcAlertRuleRepository::mapRow);
     }
 
     @Override
