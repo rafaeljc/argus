@@ -8,6 +8,7 @@ import io.github.rafaeljc.argus.common.application.PageResult;
 import io.github.rafaeljc.argus.common.domain.Percentage;
 import io.github.rafaeljc.argus.common.domain.RuleId;
 import io.github.rafaeljc.argus.common.domain.UserId;
+import java.time.LocalDate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,18 +20,21 @@ public class AlertService {
     private final ListActiveRules listActiveRules;
     private final GetActiveRule getActiveRule;
     private final ListFirings listFirings;
+    private final EvaluateAlerts evaluateAlerts;
 
     public AlertService(
             CreateAlertRule createAlertRule,
             CancelAlertRule cancelAlertRule,
             ListActiveRules listActiveRules,
             GetActiveRule getActiveRule,
-            ListFirings listFirings) {
+            ListFirings listFirings,
+            EvaluateAlerts evaluateAlerts) {
         this.createAlertRule = createAlertRule;
         this.cancelAlertRule = cancelAlertRule;
         this.listActiveRules = listActiveRules;
         this.getActiveRule = getActiveRule;
         this.listFirings = listFirings;
+        this.evaluateAlerts = evaluateAlerts;
     }
 
     @Transactional
@@ -56,5 +60,10 @@ public class AlertService {
     @Transactional(readOnly = true)
     public PageResult<AlertFiring> listFirings(UserId userId, int page, int perPage) {
         return listFirings.list(userId, page, perPage);
+    }
+
+    @Transactional
+    public void evaluateForUser(UserId userId, LocalDate runDate) {
+        evaluateAlerts.forUser(userId, runDate);
     }
 }

@@ -16,5 +16,7 @@ public interface AlertRuleRepository {
 
     List<AlertRule> listActiveByUserOrderedByCreatedAtDesc(UserId userId, int page, int perPage);
 
+    List<AlertRule> listAllActiveByUser(UserId userId);
+
     Optional<AlertRule> deleteActiveAndReturn(RuleId id, UserId userId);
 }
