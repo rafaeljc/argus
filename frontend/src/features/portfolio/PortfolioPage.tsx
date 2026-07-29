@@ -7,6 +7,7 @@ import { EmptyState } from '../../shared/components/ui/EmptyState';
 import { Skeleton } from '../../shared/components/ui/Skeleton';
 import { AllocationSummary } from './AllocationSummary';
 import { HoldingsTable } from './HoldingsTable';
+import { PortfolioHistoryChart } from './PortfolioHistoryChart';
 import { PortfolioValueHeader } from './PortfolioValueHeader';
 import { getPortfolio } from './service';
 import type { Portfolio } from './types';
@@ -81,6 +82,7 @@ export function PortfolioPage() {
         {status !== 'error' && result && result.positions.length > 0 && (
           <>
             <PortfolioValueHeader portfolio={result} />
+            <PortfolioHistoryChart />
             <AllocationSummary positions={result.positions} />
             <HoldingsTable positions={result.positions} />
           </>
