@@ -15,8 +15,8 @@ import {
   AdminEodPipelineRunPage,
   AdminUserDetailPage,
   AdminUsersPage,
-  AlertFiringsPage,
 } from './features/_placeholders/pages';
+import { AlertFiringsPage } from './features/alerts/AlertFiringsPage';
 import { AlertRulesPage } from './features/alerts/AlertRulesPage';
 import { PortfolioPage } from './features/portfolio/PortfolioPage';
 import { TransactionDetailPage } from './features/transactions/TransactionDetailPage';

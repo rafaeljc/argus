@@ -3,16 +3,12 @@ import { clsx } from 'clsx';
 
 import { Button } from '../../shared/components/ui/Button';
 import { Card } from '../../shared/components/ui/Card';
-import { ruleVerb, summarizeRule, windowDaysLabel } from './alertForm';
+import { capitalize, ruleVerb, summarizeRule, windowDaysLabel } from './alertForm';
 import type { AlertRule } from './types';
 
 export interface AlertRuleCardProps {
   rule: AlertRule;
   onCancel: (rule: AlertRule) => void;
-}
-
-function capitalize(word: string): string {
-  return `${word.charAt(0).toUpperCase()}${word.slice(1)}`;
 }
 
 export function AlertRuleCard({ rule, onCancel }: AlertRuleCardProps) {
