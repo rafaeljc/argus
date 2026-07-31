@@ -62,3 +62,17 @@ export function ruleVerb(direction: AlertDirection): string {
 export function summarizeRule(rule: AlertRule): string {
   return `Portfolio ${ruleVerb(rule.direction)} ${rule.threshold}% over ${windowDaysLabel(rule.window_days)}`;
 }
+
+export interface RuleShape {
+  direction: AlertDirection;
+  threshold: number;
+  window_days: number;
+}
+
+export function summarizeFiringRule(rule: RuleShape): string {
+  return `${capitalize(ruleVerb(rule.direction))} ${rule.threshold}% over ${windowDaysLabel(rule.window_days)}`;
+}
+
+export function capitalize(word: string): string {
+  return `${word.charAt(0).toUpperCase()}${word.slice(1)}`;
+}

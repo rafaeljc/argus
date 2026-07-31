@@ -65,8 +65,8 @@ describe('AppNav', () => {
     renderNav();
     const desktop = screen.getByTestId('app-nav-desktop');
     expect(navLabels(desktop)).toEqual([
-      'Transactions',
       'Portfolio',
+      'Transactions',
       'Alerts',
       'Account',
       'Logout',
@@ -78,8 +78,8 @@ describe('AppNav', () => {
     renderNav();
     const desktop = screen.getByTestId('app-nav-desktop');
     expect(navLabels(desktop)).toEqual([
-      'Transactions',
       'Portfolio',
+      'Transactions',
       'Alerts',
       'Admin',
       'Account',
@@ -121,8 +121,8 @@ describe('AppNav', () => {
       await user.click(screen.getByRole('button', { name: /open main navigation/i }));
       const dialog = screen.getByRole('dialog', { name: /main navigation/i });
       expect(navLabels(dialog)).toEqual([
-        'Transactions',
         'Portfolio',
+        'Transactions',
         'Alerts',
         'Account',
         'Logout',

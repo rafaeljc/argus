@@ -15,8 +15,8 @@ import {
   AdminEodPipelineRunPage,
   AdminUserDetailPage,
   AdminUsersPage,
-  AlertFiringsPage,
 } from './features/_placeholders/pages';
+import { AlertFiringsPage } from './features/alerts/AlertFiringsPage';
 import { AlertRulesPage } from './features/alerts/AlertRulesPage';
 import { PortfolioPage } from './features/portfolio/PortfolioPage';
 import { TransactionDetailPage } from './features/transactions/TransactionDetailPage';
@@ -33,7 +33,7 @@ function App() {
       <ToastProvider />
       <Routes>
         <Route element={<AppLayout />}>
-          <Route path="/" element={<Navigate to="/account" replace />} />
+          <Route path="/" element={<Navigate to="/portfolio" replace />} />
 
           <Route path="/login" element={<LoginPage />} />
           <Route path="/logout" element={<LogoutPage />} />

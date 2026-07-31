@@ -23,7 +23,7 @@ const INITIAL_VALUES: LoginBody = { email: '', password: '' };
 
 function resolveVerifiedTarget(fromPath: string | undefined): string {
   if (fromPath && fromPath !== '/login') return fromPath;
-  return '/account';
+  return '/portfolio';
 }
 
 export function LoginPage() {
