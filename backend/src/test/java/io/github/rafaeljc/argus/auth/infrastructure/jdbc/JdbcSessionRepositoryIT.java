@@ -1,4 +1,4 @@
-package io.github.rafaeljc.argus.auth.infrastructure.jpa;
+package io.github.rafaeljc.argus.auth.infrastructure.jdbc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatNoException;
@@ -22,7 +22,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 
 @Import(PostgresContainer.class)
 @SpringBootTest
-class JpaSessionRepositoryIT {
+class JdbcSessionRepositoryIT {
 
     private static final String TOKEN_HASH = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     private static final Instant CREATED = Instant.parse("2026-06-22T12:00:00Z");
