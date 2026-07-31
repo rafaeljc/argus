@@ -19,6 +19,14 @@ if (typeof window.matchMedia !== 'function') {
     }) as unknown as MediaQueryList;
 }
 
+if (typeof window.ResizeObserver !== 'function') {
+  window.ResizeObserver = class ResizeObserver {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  };
+}
+
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
