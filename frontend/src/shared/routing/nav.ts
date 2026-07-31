@@ -15,8 +15,8 @@ const AUTH_ITEMS: readonly NavItem[] = [
 ] as const;
 
 const PRIMARY_ITEMS: readonly NavItem[] = [
-  { label: 'Transactions', to: '/transactions', section: 'primary' },
   { label: 'Portfolio', to: '/portfolio', section: 'primary' },
+  { label: 'Transactions', to: '/transactions', section: 'primary' },
   { label: 'Alerts', to: '/alerts', section: 'primary' },
 ] as const;
 

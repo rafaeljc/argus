@@ -33,7 +33,7 @@ function App() {
       <ToastProvider />
       <Routes>
         <Route element={<AppLayout />}>
-          <Route path="/" element={<Navigate to="/account" replace />} />
+          <Route path="/" element={<Navigate to="/portfolio" replace />} />
 
           <Route path="/login" element={<LoginPage />} />
           <Route path="/logout" element={<LogoutPage />} />

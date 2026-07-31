@@ -99,7 +99,7 @@ describe('LoginPage', () => {
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
   });
 
-  it('signs a verified user in and redirects to /account', async () => {
+  it('signs a verified user in and redirects to /portfolio', async () => {
     server.use(anonymousMe(), loginSucceeds());
     const user = userEvent.setup();
     renderAppAt('/login');
@@ -109,7 +109,7 @@ describe('LoginPage', () => {
     await fillAndSubmit(user);
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /^account$/i })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /^portfolio$/i })).toBeInTheDocument();
     });
   });
 
@@ -253,7 +253,7 @@ describe('LoginPage', () => {
 
     await waitFor(
       () => {
-        expect(screen.getByRole('heading', { name: /^account$/i })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /^portfolio$/i })).toBeInTheDocument();
       },
       { timeout: 3000 },
     );
