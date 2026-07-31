@@ -11,10 +11,6 @@ function Placeholder({ title }: PlaceholderProps) {
   );
 }
 
-export function AlertsPage() {
-  return <Placeholder title="Alerts" />;
-}
-
 export function AlertFiringsPage() {
   return <Placeholder title="Alert Firings" />;
 }

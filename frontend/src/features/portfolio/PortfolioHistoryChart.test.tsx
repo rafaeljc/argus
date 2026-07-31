@@ -44,12 +44,6 @@ const VERIFIED_USER: CurrentUser = {
   created_at: '2026-01-01T00:00:00Z',
 };
 
-class ResizeObserverStub {
-  observe(): void {}
-  unobserve(): void {}
-  disconnect(): void {}
-}
-
 function clearAllCookies(): void {
   for (const entry of document.cookie.split(';')) {
     const name = entry.split('=')[0]?.trim();
@@ -155,7 +149,6 @@ describe('PortfolioHistoryChart', () => {
     clearAllCookies();
     setCsrfCookie();
     window.localStorage.clear();
-    vi.stubGlobal('ResizeObserver', ResizeObserverStub);
   });
 
   afterEach(() => {
@@ -164,7 +157,6 @@ describe('PortfolioHistoryChart', () => {
     resetToastStoreForTest();
     clearAllCookies();
     window.localStorage.clear();
-    vi.unstubAllGlobals();
   });
 
   it('shows a skeleton while loading, then renders the chart once resolved', async () => {
