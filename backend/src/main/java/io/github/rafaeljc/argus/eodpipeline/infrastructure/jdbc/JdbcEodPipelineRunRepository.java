@@ -1,0 +1,139 @@
+package io.github.rafaeljc.argus.eodpipeline.infrastructure.jdbc;
+
+import io.github.rafaeljc.argus.common.domain.RunId;
+import io.github.rafaeljc.argus.eodpipeline.application.port.EodPipelineRunRepository;
+import io.github.rafaeljc.argus.eodpipeline.domain.EodPipelineRun;
+import io.github.rafaeljc.argus.eodpipeline.domain.RunStatus;
+import io.github.rafaeljc.argus.eodpipeline.domain.StepStatus;
+import io.github.rafaeljc.argus.eodpipeline.domain.Trigger;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.stereotype.Repository;
+
+@Repository
+class JdbcEodPipelineRunRepository implements EodPipelineRunRepository {
+
+    private static final String INSERT_SQL =
+            """
+            INSERT INTO eod_pipeline_runs
+                (id, run_date, trigger, status, started_at, finished_at,
+                 step_symbols_status, step_prices_status, step_evaluate_status, error_message)
+            VALUES
+                (:id, :runDate, :trigger, :status, :startedAt, :finishedAt,
+                 :stepSymbolsStatus, :stepPricesStatus, :stepEvaluateStatus, :errorMessage)
+            """;
+
+    private static final String UPDATE_SQL =
+            """
+            UPDATE eod_pipeline_runs
+               SET status               = :status,
+                   finished_at          = :finishedAt,
+                   step_symbols_status  = :stepSymbolsStatus,
+                   step_prices_status   = :stepPricesStatus,
+                   step_evaluate_status = :stepEvaluateStatus,
+                   error_message        = :errorMessage
+             WHERE id = :id
+            """;
+
+    private static final String SELECT_COLUMNS =
+            """
+            SELECT id, run_date, trigger, status, started_at, finished_at,
+                   step_symbols_status, step_prices_status, step_evaluate_status, error_message
+            FROM eod_pipeline_runs
+            """;
+
+    private static final String FIND_BY_ID_SQL = SELECT_COLUMNS + " WHERE id = :id";
+
+    private static final String FIND_ACTIVE_FOR_DATE_SQL =
+            SELECT_COLUMNS + " WHERE run_date = :runDate AND status IN ('pending', 'in_progress')";
+
+    private static final String LIST_PAGED_SQL =
+            SELECT_COLUMNS + " ORDER BY started_at DESC, id DESC LIMIT :limit OFFSET :offset";
+
+    private final NamedParameterJdbcTemplate jdbc;
+
+    JdbcEodPipelineRunRepository(NamedParameterJdbcTemplate jdbc) {
+        this.jdbc = jdbc;
+    }
+
+    @Override
+    public EodPipelineRun insert(EodPipelineRun run) {
+        jdbc.update(INSERT_SQL, paramsFor(run));
+        return run;
+    }
+
+    @Override
+    public EodPipelineRun update(EodPipelineRun run) {
+        jdbc.update(UPDATE_SQL, paramsFor(run));
+        return run;
+    }
+
+    @Override
+    public Optional<EodPipelineRun> findById(RunId id) {
+        List<EodPipelineRun> rows = jdbc.query(
+                FIND_BY_ID_SQL, new MapSqlParameterSource("id", id.value()), JdbcEodPipelineRunRepository::mapRow);
+        return rows.stream().findFirst();
+    }
+
+    @Override
+    public Optional<EodPipelineRun> findActiveForDate(LocalDate runDate) {
+        List<EodPipelineRun> rows = jdbc.query(
+                FIND_ACTIVE_FOR_DATE_SQL,
+                new MapSqlParameterSource("runDate", runDate),
+                JdbcEodPipelineRunRepository::mapRow);
+        return rows.stream().findFirst();
+    }
+
+    @Override
+    public List<EodPipelineRun> listPaged(int page, int perPage) {
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("limit", perPage)
+                .addValue("offset", (page - 1) * perPage);
+        return jdbc.query(LIST_PAGED_SQL, params, JdbcEodPipelineRunRepository::mapRow);
+    }
+
+    private static MapSqlParameterSource paramsFor(EodPipelineRun run) {
+        return new MapSqlParameterSource()
+                .addValue("id", run.id().value())
+                .addValue("runDate", run.runDate())
+                .addValue("trigger", run.trigger().dbValue())
+                .addValue("status", run.status().dbValue())
+                .addValue("startedAt", toOffsetDateTime(run.startedAt()))
+                .addValue("finishedAt", toOffsetDateTime(run.finishedAt()))
+                .addValue("stepSymbolsStatus", run.stepSymbolsStatus().dbValue())
+                .addValue("stepPricesStatus", run.stepPricesStatus().dbValue())
+                .addValue("stepEvaluateStatus", run.stepEvaluateStatus().dbValue())
+                .addValue("errorMessage", run.errorMessage());
+    }
+
+    private static OffsetDateTime toOffsetDateTime(Instant value) {
+        return value == null ? null : OffsetDateTime.ofInstant(value, ZoneOffset.UTC);
+    }
+
+    private static Instant toInstant(OffsetDateTime value) {
+        return value == null ? null : value.toInstant();
+    }
+
+    private static EodPipelineRun mapRow(ResultSet rs, int rowNum) throws SQLException {
+        return new EodPipelineRun(
+                new RunId(rs.getObject("id", UUID.class)),
+                rs.getObject("run_date", LocalDate.class),
+                Trigger.fromDbValue(rs.getString("trigger")),
+                RunStatus.fromDbValue(rs.getString("status")),
+                toInstant(rs.getObject("started_at", OffsetDateTime.class)),
+                toInstant(rs.getObject("finished_at", OffsetDateTime.class)),
+                StepStatus.fromDbValue(rs.getString("step_symbols_status")),
+                StepStatus.fromDbValue(rs.getString("step_prices_status")),
+                StepStatus.fromDbValue(rs.getString("step_evaluate_status")),
+                rs.getString("error_message"));
+    }
+}
