@@ -209,5 +209,10 @@ class BackfillWorkerIT {
             }
             return prices;
         }
+
+        @Override
+        public List<PriceHistory> fetchClosesOn(Set<Ticker> tickers, LocalDate tradeDate) {
+            throw new UnsupportedOperationException("not used by BackfillWorkerIT");
+        }
     }
 }
