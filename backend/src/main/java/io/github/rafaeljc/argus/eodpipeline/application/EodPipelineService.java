@@ -16,17 +16,22 @@ import io.github.rafaeljc.argus.users.application.port.ActiveUserIds;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class EodPipelineService {
 
+    private static final Logger log = LoggerFactory.getLogger(EodPipelineService.class);
+
     private final EodPipelineRunRepository runs;
     private final SyncSymbolUniverse syncSymbolUniverse;
     private final ActiveUserIds activeUserIds;
     private final HeldTickers heldTickers;
     private final SyncDailyCloses syncDailyCloses;
+    private final WriteSnapshotAndEvaluateAlerts writeSnapshotAndEvaluateAlerts;
     private final Clock clock;
 
     public EodPipelineService(
@@ -35,12 +40,14 @@ public class EodPipelineService {
             ActiveUserIds activeUserIds,
             HeldTickers heldTickers,
             SyncDailyCloses syncDailyCloses,
+            WriteSnapshotAndEvaluateAlerts writeSnapshotAndEvaluateAlerts,
             Clock clock) {
         this.runs = runs;
         this.syncSymbolUniverse = syncSymbolUniverse;
         this.activeUserIds = activeUserIds;
         this.heldTickers = heldTickers;
         this.syncDailyCloses = syncDailyCloses;
+        this.writeSnapshotAndEvaluateAlerts = writeSnapshotAndEvaluateAlerts;
         this.clock = clock;
     }
 
@@ -105,6 +112,42 @@ public class EodPipelineService {
         }
     }
 
+    // Same never-throws contract as runSymbols/runPrices, but each active user's snapshot+evaluate
+    // runs in its own transaction (WriteSnapshotAndEvaluateAlerts is REQUIRES_NEW), so one user's
+    // failure never rolls back another user's already-committed work; the step is failed/succeeded
+    // in aggregate afterward.
+    @Transactional
+    public EodPipelineRun runEvaluate(RunId id) {
+        EodPipelineRun run = runs.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("eod pipeline run not found: " + id.value()));
+
+        RunStatus startedStatus = run.status() == RunStatus.PENDING ? RunStatus.IN_PROGRESS : run.status();
+        EodPipelineRun started = withEvaluateStep(run, startedStatus, StepStatus.IN_PROGRESS, null, null);
+        runs.update(started);
+
+        List<UserId> userIds = activeUserIds.find();
+        int failures = 0;
+        for (UserId userId : userIds) {
+            try {
+                writeSnapshotAndEvaluateAlerts.forUser(userId, started.runDate());
+            } catch (RuntimeException e) {
+                failures++;
+                log.warn("eod evaluate failed for user {} run {}", userId.value(), id.value(), e);
+            }
+        }
+
+        if (failures == 0) {
+            EodPipelineRun succeeded =
+                    withEvaluateStep(started, RunStatus.IN_PROGRESS, StepStatus.SUCCEEDED, null, null);
+            runs.update(succeeded);
+            return succeeded;
+        }
+        String message = "evaluate failed for %d of %d users".formatted(failures, userIds.size());
+        EodPipelineRun failed = withEvaluateStep(started, RunStatus.FAILED, StepStatus.FAILED, clock.now(), message);
+        runs.update(failed);
+        return failed;
+    }
+
     private static EodPipelineRun withSymbolsStep(
             EodPipelineRun run,
             RunStatus status,
@@ -125,5 +168,16 @@ public class EodPipelineService {
         return new EodPipelineRun(
                 run.id(), run.runDate(), run.trigger(), status, run.startedAt(), finishedAt,
                 run.stepSymbolsStatus(), stepPricesStatus, run.stepEvaluateStatus(), errorMessage);
+    }
+
+    private static EodPipelineRun withEvaluateStep(
+            EodPipelineRun run,
+            RunStatus status,
+            StepStatus stepEvaluateStatus,
+            Instant finishedAt,
+            String errorMessage) {
+        return new EodPipelineRun(
+                run.id(), run.runDate(), run.trigger(), status, run.startedAt(), finishedAt,
+                run.stepSymbolsStatus(), run.stepPricesStatus(), stepEvaluateStatus, errorMessage);
     }
 }
