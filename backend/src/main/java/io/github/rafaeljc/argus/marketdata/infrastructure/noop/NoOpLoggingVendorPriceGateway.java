@@ -35,4 +35,10 @@ public class NoOpLoggingVendorPriceGateway implements VendorPriceGateway {
                 end);
         throw new ServiceUnavailableException("vendor marketdata unavailable (no-op adapter)");
     }
+
+    @Override
+    public List<PriceHistory> fetchClosesOn(Set<Ticker> tickers, LocalDate tradeDate) {
+        log.info("vendor marketdata no-op fetchClosesOn: tickers={} tradeDate={}", tickers.size(), tradeDate);
+        throw new ServiceUnavailableException("vendor marketdata unavailable (no-op adapter)");
+    }
 }

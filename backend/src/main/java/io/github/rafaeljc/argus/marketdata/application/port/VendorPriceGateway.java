@@ -12,4 +12,6 @@ public interface VendorPriceGateway {
     Set<Symbol> fetchSymbolUniverse();
 
     List<PriceHistory> fetchPriceHistory(Ticker ticker, LocalDate start, LocalDate end);
+
+    List<PriceHistory> fetchClosesOn(Set<Ticker> tickers, LocalDate tradeDate);
 }

@@ -38,6 +38,7 @@ graph TD
   admin --> users
   admin --> eod
 
+  eod --> users
   eod --> marketdata
   eod --> portfolio
   eod --> alerts
