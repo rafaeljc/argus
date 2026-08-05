@@ -247,6 +247,32 @@ class EodPipelineServiceTest {
         verify(writeSnapshotAndEvaluateAlerts).forUser(secondUser, LocalDate.of(2026, 6, 22));
     }
 
+    // --- markSucceeded -------------------------------------------------------------------------
+
+    @Test
+    void markSucceeded_inProgressRun_setsSucceededStatusAndFinishedAt() {
+        EodPipelineRun inProgress = new EodPipelineRun(
+                RUN_ID, LocalDate.of(2026, 6, 22), Trigger.CRON, RunStatus.IN_PROGRESS, NOW, null,
+                StepStatus.SUCCEEDED, StepStatus.SUCCEEDED, StepStatus.SUCCEEDED, null);
+        when(runs.findById(RUN_ID)).thenReturn(Optional.of(inProgress));
+
+        EodPipelineRun result = service.markSucceeded(RUN_ID);
+
+        assertThat(result.status()).isEqualTo(RunStatus.SUCCEEDED);
+        assertThat(result.finishedAt()).isEqualTo(NOW);
+        assertThat(result.errorMessage()).isNull();
+        verify(runs).update(result);
+    }
+
+    @Test
+    void markSucceeded_missingRun_throwsResourceNotFoundException() {
+        when(runs.findById(RUN_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.markSucceeded(RUN_ID)).isInstanceOf(ResourceNotFoundException.class);
+
+        verify(runs, never()).update(any());
+    }
+
     // --- shared across all three steps ---------------------------------------------------------
 
     private static Stream<Arguments> steps() {

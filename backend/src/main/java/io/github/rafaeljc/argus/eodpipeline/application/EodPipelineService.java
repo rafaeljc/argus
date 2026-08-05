@@ -148,6 +148,18 @@ public class EodPipelineService {
         return failed;
     }
 
+    @Transactional
+    public EodPipelineRun markSucceeded(RunId id) {
+        EodPipelineRun run = runs.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("eod pipeline run not found: " + id.value()));
+
+        EodPipelineRun succeeded = new EodPipelineRun(
+                run.id(), run.runDate(), run.trigger(), RunStatus.SUCCEEDED, run.startedAt(), clock.now(),
+                run.stepSymbolsStatus(), run.stepPricesStatus(), run.stepEvaluateStatus(), run.errorMessage());
+        runs.update(succeeded);
+        return succeeded;
+    }
+
     private static EodPipelineRun withSymbolsStep(
             EodPipelineRun run,
             RunStatus status,
