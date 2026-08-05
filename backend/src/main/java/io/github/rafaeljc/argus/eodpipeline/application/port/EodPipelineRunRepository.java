@@ -17,4 +17,6 @@ public interface EodPipelineRunRepository {
     Optional<EodPipelineRun> findActiveForDate(LocalDate runDate);
 
     List<EodPipelineRun> listPaged(int page, int perPage);
+
+    int count();
 }

@@ -140,6 +140,109 @@ class AdminEodPipelineControllerIT {
         assertThat(response.getStatusCode().value()).isEqualTo(401);
     }
 
+    @Test
+    void getRuns_authenticated_returnsPageWithEnvelope() throws Exception {
+        User admin = seedVerified("admin4@example.com");
+        runs.insert(runStartedAt(LocalDate.of(2026, 6, 25), Instant.parse("2026-06-25T21:30:00Z")));
+        runs.insert(runStartedAt(LocalDate.of(2026, 6, 26), Instant.parse("2026-06-26T21:30:00Z")));
+
+        ResponseEntity<String> response = get(admin, "");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        JsonNode body = json.readTree(response.getBody());
+        assertThat(body.get("data")).hasSize(2);
+        JsonNode meta = body.get("meta");
+        assertThat(meta.get("total").asInt()).isEqualTo(2);
+        assertThat(meta.get("page").asInt()).isEqualTo(1);
+        assertThat(meta.get("per_page").asInt()).isEqualTo(50);
+        assertThat(meta.get("total_pages").asInt()).isEqualTo(1);
+        JsonNode links = body.get("links");
+        assertThat(links.get("self").asString()).contains("page=1").contains("per_page=50");
+        assertThat(links.get("last").asString()).contains("page=1");
+        assertThat(links.get("next").isNull()).isTrue();
+        assertThat(links.get("prev").isNull()).isTrue();
+    }
+
+    @Test
+    void getRuns_multiplePages_slicesAndOrdersByStartedAtDescending() throws Exception {
+        User admin = seedVerified("admin5@example.com");
+        LocalDate d1 = LocalDate.of(2026, 6, 27);
+        LocalDate d2 = LocalDate.of(2026, 6, 28);
+        LocalDate d3 = LocalDate.of(2026, 6, 29);
+        EodPipelineRun oldest = runs.insert(runStartedAt(d1, Instant.parse("2026-06-27T21:30:00Z")));
+        EodPipelineRun middle = runs.insert(runStartedAt(d2, Instant.parse("2026-06-28T21:30:00Z")));
+        EodPipelineRun newest = runs.insert(runStartedAt(d3, Instant.parse("2026-06-29T21:30:00Z")));
+
+        ResponseEntity<String> firstPage = get(admin, "?page=1&per_page=2");
+        ResponseEntity<String> secondPage = get(admin, "?page=2&per_page=2");
+
+        JsonNode firstPageData = json.readTree(firstPage.getBody()).get("data");
+        assertThat(firstPageData.get(0).get("run_id").asString()).isEqualTo(newest.id().value().toString());
+        assertThat(firstPageData.get(1).get("run_id").asString()).isEqualTo(middle.id().value().toString());
+        JsonNode secondPageBody = json.readTree(secondPage.getBody());
+        JsonNode secondPageData = secondPageBody.get("data");
+        assertThat(secondPageData).hasSize(1);
+        assertThat(secondPageData.get(0).get("run_id").asString()).isEqualTo(oldest.id().value().toString());
+        JsonNode links = secondPageBody.get("links");
+        assertThat(links.get("prev").asString()).contains("page=1");
+        assertThat(links.get("next").isNull()).isTrue();
+    }
+
+    @Test
+    void getRun_existingId_returns200WithRunFields() throws Exception {
+        User admin = seedVerified("admin6@example.com");
+        LocalDate runDate = LocalDate.of(2026, 6, 30);
+        EodPipelineRun saved = runs.insert(runStartedAt(runDate, Instant.parse("2026-06-30T21:30:00Z")));
+
+        ResponseEntity<String> response = get(admin, "/" + saved.id().value());
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        JsonNode data = json.readTree(response.getBody()).get("data");
+        assertThat(data.get("run_id").asString()).isEqualTo(saved.id().value().toString());
+        assertThat(data.get("run_date").asString()).isEqualTo("2026-06-30");
+        assertThat(data.get("status").asString()).isEqualTo("pending");
+        assertThat(data.get("step_symbols_status").asString()).isEqualTo("pending");
+    }
+
+    @Test
+    void getRun_unknownId_returns404() throws Exception {
+        User admin = seedVerified("admin7@example.com");
+
+        ResponseEntity<String> response = get(admin, "/" + UuidCreator.getTimeOrderedEpoch());
+
+        assertThat(response.getStatusCode().value()).isEqualTo(404);
+        JsonNode error = json.readTree(response.getBody()).get("error");
+        assertThat(error.get("code").asString()).isEqualTo("NOT_FOUND");
+    }
+
+    @Test
+    void getRuns_noSession_returns401() {
+        ResponseEntity<String> response = http.exchange(
+                "http://localhost:" + port + ENDPOINT,
+                HttpMethod.GET,
+                new HttpEntity<>(new HttpHeaders()),
+                String.class);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(401);
+    }
+
+    private ResponseEntity<String> get(User authenticatedAs, String pathAndQuery) {
+        HttpHeaders headers = new HttpHeaders();
+        String sessionToken = seedSession(authenticatedAs);
+        headers.add(HttpHeaders.COOKIE, SessionCookieFactory.COOKIE_NAME + "=" + sessionToken);
+        return http.exchange(
+                "http://localhost:" + port + ENDPOINT + pathAndQuery,
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                String.class);
+    }
+
+    private static EodPipelineRun runStartedAt(LocalDate runDate, Instant startedAt) {
+        return new EodPipelineRun(
+                new RunId(UuidCreator.getTimeOrderedEpoch()), runDate, Trigger.CRON, RunStatus.PENDING, startedAt,
+                null, StepStatus.PENDING, StepStatus.PENDING, StepStatus.PENDING, null);
+    }
+
     private ResponseEntity<String> post(User authenticatedAs, String jsonBody) {
         HttpHeaders headers = new HttpHeaders();
         String sessionToken = seedSession(authenticatedAs);
