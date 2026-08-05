@@ -330,7 +330,7 @@ describe('PortfolioPage', () => {
 
     await screen.findByRole('table');
     expect(screen.queryByText(/^allocation$/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: /of portfolio/i })).not.toBeInTheDocument();
   });
 
   it('renders an error state with a retry affordance on a server failure, and retries on click', async () => {

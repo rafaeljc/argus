@@ -1,4 +1,6 @@
-# Argus
+<p align="center">
+  <img src="docs/brand/argus-lockup.svg" alt="Argus" height="52">
+</p>
 
 > Portfolio monitoring for investors who hold assets across multiple brokers.
 
