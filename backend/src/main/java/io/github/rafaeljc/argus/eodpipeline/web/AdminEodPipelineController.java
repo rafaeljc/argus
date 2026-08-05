@@ -2,7 +2,7 @@ package io.github.rafaeljc.argus.eodpipeline.web;
 
 import io.github.rafaeljc.argus.common.domain.Clock;
 import io.github.rafaeljc.argus.common.web.SuccessEnvelope;
-import io.github.rafaeljc.argus.eodpipeline.application.TriggerRun;
+import io.github.rafaeljc.argus.eodpipeline.application.EodPipelineService;
 import io.github.rafaeljc.argus.eodpipeline.domain.EodPipelineRun;
 import io.github.rafaeljc.argus.eodpipeline.domain.Trigger;
 import jakarta.validation.Valid;
@@ -18,11 +18,11 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 @RequestMapping("/admin/eod-pipeline/runs")
 class AdminEodPipelineController {
 
-    private final TriggerRun triggerRun;
+    private final EodPipelineService eodPipelineService;
     private final Clock clock;
 
-    AdminEodPipelineController(TriggerRun triggerRun, Clock clock) {
-        this.triggerRun = triggerRun;
+    AdminEodPipelineController(EodPipelineService eodPipelineService, Clock clock) {
+        this.eodPipelineService = eodPipelineService;
         this.clock = clock;
     }
 
@@ -30,7 +30,7 @@ class AdminEodPipelineController {
     ResponseEntity<SuccessEnvelope<EodPipelineRunResponse>> trigger(
             @Valid @RequestBody(required = false) TriggerRunRequest body) {
         LocalDate runDate = (body != null && body.runDate() != null) ? body.runDate() : clock.today();
-        EodPipelineRun run = triggerRun.execute(runDate, Trigger.ADMIN);
+        EodPipelineRun run = eodPipelineService.triggerPipelineRun(runDate, Trigger.ADMIN);
         return ResponseEntity.created(ServletUriComponentsBuilder.fromCurrentRequest()
                         .path("/{id}")
                         .buildAndExpand(run.id().value())
