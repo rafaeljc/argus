@@ -3,6 +3,7 @@ package io.github.rafaeljc.argus.eodpipeline.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
+import io.github.rafaeljc.argus.common.application.PageResult;
 import io.github.rafaeljc.argus.common.domain.RunId;
 import io.github.rafaeljc.argus.eodpipeline.domain.EodPipelineRun;
 import io.github.rafaeljc.argus.eodpipeline.domain.RunStatus;
@@ -10,6 +11,7 @@ import io.github.rafaeljc.argus.eodpipeline.domain.StepStatus;
 import io.github.rafaeljc.argus.eodpipeline.domain.Trigger;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,11 +37,17 @@ class EodPipelineServiceTest {
     @Mock
     private TriggerRun triggerRun;
 
+    @Mock
+    private ListRuns listRuns;
+
+    @Mock
+    private GetRun getRun;
+
     private EodPipelineService service;
 
     @BeforeEach
     void setUp() {
-        service = new EodPipelineService(runSymbolsStep, runPricesStep, runEvaluateStep, triggerRun);
+        service = new EodPipelineService(runSymbolsStep, runPricesStep, runEvaluateStep, triggerRun, listRuns, getRun);
     }
 
     private static EodPipelineRun pendingRun() {
@@ -84,6 +92,26 @@ class EodPipelineServiceTest {
         when(triggerRun.execute(run.runDate(), Trigger.ADMIN)).thenReturn(run);
 
         EodPipelineRun result = service.triggerPipelineRun(run.runDate(), Trigger.ADMIN);
+
+        assertThat(result).isEqualTo(run);
+    }
+
+    @Test
+    void listRuns_delegatesToListRunsUseCase() {
+        PageResult<EodPipelineRun> page = new PageResult<>(List.of(pendingRun()), 1, 1, 50);
+        when(listRuns.list(1, 50)).thenReturn(page);
+
+        PageResult<EodPipelineRun> result = service.listRuns(1, 50);
+
+        assertThat(result).isEqualTo(page);
+    }
+
+    @Test
+    void getRun_delegatesToGetRunUseCase() {
+        EodPipelineRun run = pendingRun();
+        when(getRun.get(RUN_ID)).thenReturn(run);
+
+        EodPipelineRun result = service.getRun(RUN_ID);
 
         assertThat(result).isEqualTo(run);
     }

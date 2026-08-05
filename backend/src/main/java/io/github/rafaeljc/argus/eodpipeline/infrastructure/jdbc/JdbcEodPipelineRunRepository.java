@@ -61,6 +61,8 @@ class JdbcEodPipelineRunRepository implements EodPipelineRunRepository {
     private static final String LIST_PAGED_SQL =
             SELECT_COLUMNS + " ORDER BY started_at DESC, id DESC LIMIT :limit OFFSET :offset";
 
+    private static final String COUNT_SQL = "SELECT count(*) FROM eod_pipeline_runs";
+
     private static final String IN_PROGRESS_UNIQUE_INDEX = "eod_pipeline_runs_in_progress_uidx";
 
     private final NamedParameterJdbcTemplate jdbc;
@@ -110,6 +112,12 @@ class JdbcEodPipelineRunRepository implements EodPipelineRunRepository {
                 .addValue("limit", perPage)
                 .addValue("offset", (page - 1) * perPage);
         return jdbc.query(LIST_PAGED_SQL, params, JdbcEodPipelineRunRepository::mapRow);
+    }
+
+    @Override
+    public int count() {
+        Integer count = jdbc.queryForObject(COUNT_SQL, new MapSqlParameterSource(), Integer.class);
+        return count == null ? 0 : count;
     }
 
     private static MapSqlParameterSource paramsFor(EodPipelineRun run) {

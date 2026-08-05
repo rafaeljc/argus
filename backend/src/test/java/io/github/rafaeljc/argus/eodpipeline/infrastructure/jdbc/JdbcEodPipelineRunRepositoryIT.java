@@ -177,6 +177,20 @@ class JdbcEodPipelineRunRepositoryIT {
         assertThat(secondPage).hasSize(1);
     }
 
+    @Test
+    void count_noRuns_returnsZero() {
+        assertThat(runs.count()).isZero();
+    }
+
+    @Test
+    void count_multipleRuns_returnsTotalRowCount() {
+        runs.insert(pendingRun(newRunId(), LocalDate.of(2026, 6, 12)));
+        runs.insert(pendingRun(newRunId(), LocalDate.of(2026, 6, 13)));
+        runs.insert(pendingRun(newRunId(), LocalDate.of(2026, 6, 14)));
+
+        assertThat(runs.count()).isEqualTo(3);
+    }
+
     private static EodPipelineRun pendingRun(RunId id, LocalDate runDate) {
         return new EodPipelineRun(
                 id, runDate, Trigger.CRON, RunStatus.PENDING, NOW, null,
