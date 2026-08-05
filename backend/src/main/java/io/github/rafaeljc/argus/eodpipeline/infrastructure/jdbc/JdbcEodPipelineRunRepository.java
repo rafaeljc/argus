@@ -3,6 +3,7 @@ package io.github.rafaeljc.argus.eodpipeline.infrastructure.jdbc;
 import io.github.rafaeljc.argus.common.domain.RunId;
 import io.github.rafaeljc.argus.eodpipeline.application.port.EodPipelineRunRepository;
 import io.github.rafaeljc.argus.eodpipeline.domain.EodPipelineRun;
+import io.github.rafaeljc.argus.eodpipeline.domain.RunAlreadyActiveException;
 import io.github.rafaeljc.argus.eodpipeline.domain.RunStatus;
 import io.github.rafaeljc.argus.eodpipeline.domain.StepStatus;
 import io.github.rafaeljc.argus.eodpipeline.domain.Trigger;
@@ -15,6 +16,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -59,6 +61,8 @@ class JdbcEodPipelineRunRepository implements EodPipelineRunRepository {
     private static final String LIST_PAGED_SQL =
             SELECT_COLUMNS + " ORDER BY started_at DESC, id DESC LIMIT :limit OFFSET :offset";
 
+    private static final String IN_PROGRESS_UNIQUE_INDEX = "eod_pipeline_runs_in_progress_uidx";
+
     private final NamedParameterJdbcTemplate jdbc;
 
     JdbcEodPipelineRunRepository(NamedParameterJdbcTemplate jdbc) {
@@ -67,7 +71,14 @@ class JdbcEodPipelineRunRepository implements EodPipelineRunRepository {
 
     @Override
     public EodPipelineRun insert(EodPipelineRun run) {
-        jdbc.update(INSERT_SQL, paramsFor(run));
+        try {
+            jdbc.update(INSERT_SQL, paramsFor(run));
+        } catch (DataIntegrityViolationException e) {
+            if (isActiveRunUniqueViolation(e)) {
+                throw new RunAlreadyActiveException(run.runDate());
+            }
+            throw e;
+        }
         return run;
     }
 
@@ -113,6 +124,12 @@ class JdbcEodPipelineRunRepository implements EodPipelineRunRepository {
                 .addValue("stepPricesStatus", run.stepPricesStatus().dbValue())
                 .addValue("stepEvaluateStatus", run.stepEvaluateStatus().dbValue())
                 .addValue("errorMessage", run.errorMessage());
+    }
+
+    private static boolean isActiveRunUniqueViolation(DataIntegrityViolationException e) {
+        Throwable cause = e.getMostSpecificCause();
+        String message = cause == null ? e.getMessage() : cause.getMessage();
+        return message != null && message.contains(IN_PROGRESS_UNIQUE_INDEX);
     }
 
     private static OffsetDateTime toOffsetDateTime(Instant value) {

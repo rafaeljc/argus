@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.github.rafaeljc.argus.common.domain.RunId;
 import io.github.rafaeljc.argus.eodpipeline.application.port.EodPipelineRunRepository;
 import io.github.rafaeljc.argus.eodpipeline.domain.EodPipelineRun;
+import io.github.rafaeljc.argus.eodpipeline.domain.RunAlreadyActiveException;
 import io.github.rafaeljc.argus.eodpipeline.domain.RunStatus;
 import io.github.rafaeljc.argus.eodpipeline.domain.StepStatus;
 import io.github.rafaeljc.argus.eodpipeline.domain.Trigger;
@@ -21,7 +22,6 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.dao.DataIntegrityViolationException;
 
 @Import(PostgresContainer.class)
 @SpringBootTest
@@ -63,13 +63,16 @@ class JdbcEodPipelineRunRepositoryIT {
     }
 
     @Test
-    void insert_secondActiveRunForSameDate_isRejectedByUniqueIndex() {
+    void insert_secondActiveRunForSameDate_throwsRunAlreadyActiveException() {
         LocalDate runDate = LocalDate.of(2026, 6, 3);
         runs.insert(pendingRun(newRunId(), runDate));
 
         EodPipelineRun duplicate = pendingRun(newRunId(), runDate);
 
-        assertThatThrownBy(() -> runs.insert(duplicate)).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> runs.insert(duplicate))
+                .isInstanceOf(RunAlreadyActiveException.class)
+                .extracting("runDate")
+                .isEqualTo(runDate);
     }
 
     @ParameterizedTest
