@@ -2,6 +2,10 @@
 
 @theme {
   --color-brand: #034694;
+  /* Secondary and signal tones, used by the brand mark. The signal tone marks
+     the part of a series that has crossed its level. */
+  --color-brand-soft: #2e73c8;
+  --color-signal: #b45309;
 }
 
 html {
