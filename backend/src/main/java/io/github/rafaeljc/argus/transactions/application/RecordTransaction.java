@@ -55,7 +55,7 @@ public class RecordTransaction {
 
     public Transaction record(
             UserId userId, Ticker ticker, Operation operation, Quantity quantity, LocalDate tradeDate) {
-        lock.acquireResourceForUser("transaction", userId);
+        lock.acquireResourceById("transaction", userId.value());
 
         if (!symbolLookup.exists(ticker)) {
             throw new TickerNotFoundException(ticker);

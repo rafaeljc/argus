@@ -29,7 +29,7 @@ public class CreateAlertRule {
     }
 
     public AlertRule create(UserId userId, Direction direction, Percentage threshold, AlertLookbackWindow window) {
-        lock.acquireResourceForUser("alert-rule", userId);
+        lock.acquireResourceById("alert-rule", userId.value());
 
         if (repository.countActiveByUser(userId) >= MAX_ACTIVE_RULES) {
             throw new TooManyAlertRulesException(MAX_ACTIVE_RULES);

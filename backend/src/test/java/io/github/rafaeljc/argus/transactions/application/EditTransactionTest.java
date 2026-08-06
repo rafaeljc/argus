@@ -245,7 +245,7 @@ class EditTransactionTest {
                 .isInstanceOf(ResourceNotFoundException.class);
 
         InOrder order = Mockito.inOrder(lock, repository);
-        order.verify(lock).acquireResourceForUser("transaction", USER_ID);
+        order.verify(lock).acquireResourceById("transaction", USER_ID.value());
         order.verify(repository).findByIdAndUserId(ID, USER_ID);
     }
 

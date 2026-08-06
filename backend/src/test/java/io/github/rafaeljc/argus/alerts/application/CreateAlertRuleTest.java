@@ -105,7 +105,7 @@ class CreateAlertRuleTest {
         createAlertRule.create(USER_ID, DIRECTION, THRESHOLD, WINDOW);
 
         InOrder order = Mockito.inOrder(lock, repository);
-        order.verify(lock).acquireResourceForUser("alert-rule", USER_ID);
+        order.verify(lock).acquireResourceById("alert-rule", USER_ID.value());
         order.verify(repository).countActiveByUser(USER_ID);
     }
 }

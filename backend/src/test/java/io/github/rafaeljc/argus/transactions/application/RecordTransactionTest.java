@@ -94,7 +94,7 @@ class RecordTransactionTest {
         assertThat(saved.updatedAt()).isEqualTo(FIXED_NOW);
 
         InOrder order = Mockito.inOrder(lock, symbolLookup, repository, holdingRebuild, enqueueBackfillJob);
-        order.verify(lock).acquireResourceForUser("transaction", USER_ID);
+        order.verify(lock).acquireResourceById("transaction", USER_ID.value());
         order.verify(symbolLookup).exists(TICKER);
         order.verify(symbolLookup).isDelisted(TICKER);
         order.verify(repository).save(any());
@@ -218,7 +218,7 @@ class RecordTransactionTest {
                 .isInstanceOf(TickerNotFoundException.class);
 
         InOrder order = Mockito.inOrder(lock, symbolLookup);
-        order.verify(lock).acquireResourceForUser("transaction", USER_ID);
+        order.verify(lock).acquireResourceById("transaction", USER_ID.value());
         order.verify(symbolLookup).exists(TICKER);
     }
 
