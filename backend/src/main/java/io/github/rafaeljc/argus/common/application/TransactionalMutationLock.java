@@ -1,8 +1,8 @@
 package io.github.rafaeljc.argus.common.application;
 
-import io.github.rafaeljc.argus.common.domain.UserId;
+import java.util.UUID;
 
 public interface TransactionalMutationLock {
 
-    void acquireResourceForUser(String resource, UserId userId);
+    void acquireResourceById(String resource, UUID id);
 }

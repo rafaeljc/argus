@@ -53,7 +53,7 @@ public class EditTransaction {
 
     public Transaction edit(
             UserId userId, TransactionId id, Operation operation, Quantity quantity, LocalDate tradeDate) {
-        lock.acquireResourceForUser("transaction", userId);
+        lock.acquireResourceById("transaction", userId.value());
 
         Transaction current = repository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("transaction not found: " + id.value()));

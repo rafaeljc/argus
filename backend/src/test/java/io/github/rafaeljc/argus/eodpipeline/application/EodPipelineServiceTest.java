@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 import io.github.rafaeljc.argus.common.application.PageResult;
 import io.github.rafaeljc.argus.common.domain.RunId;
 import io.github.rafaeljc.argus.eodpipeline.domain.EodPipelineRun;
+import io.github.rafaeljc.argus.eodpipeline.domain.PipelineStep;
 import io.github.rafaeljc.argus.eodpipeline.domain.RunStatus;
 import io.github.rafaeljc.argus.eodpipeline.domain.StepStatus;
 import io.github.rafaeljc.argus.eodpipeline.domain.Trigger;
@@ -38,6 +39,9 @@ class EodPipelineServiceTest {
     private TriggerRun triggerRun;
 
     @Mock
+    private RerunFromStep rerunFromStep;
+
+    @Mock
     private ListRuns listRuns;
 
     @Mock
@@ -47,7 +51,8 @@ class EodPipelineServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new EodPipelineService(runSymbolsStep, runPricesStep, runEvaluateStep, triggerRun, listRuns, getRun);
+        service = new EodPipelineService(
+                runSymbolsStep, runPricesStep, runEvaluateStep, triggerRun, rerunFromStep, listRuns, getRun);
     }
 
     private static EodPipelineRun pendingRun() {
@@ -92,6 +97,16 @@ class EodPipelineServiceTest {
         when(triggerRun.execute(run.runDate(), Trigger.ADMIN)).thenReturn(run);
 
         EodPipelineRun result = service.triggerPipelineRun(run.runDate(), Trigger.ADMIN);
+
+        assertThat(result).isEqualTo(run);
+    }
+
+    @Test
+    void rerunFromStep_delegatesToRerunFromStepUseCase() {
+        EodPipelineRun run = pendingRun();
+        when(rerunFromStep.execute(RUN_ID, PipelineStep.PRICES)).thenReturn(run);
+
+        EodPipelineRun result = service.rerunFromStep(RUN_ID, PipelineStep.PRICES);
 
         assertThat(result).isEqualTo(run);
     }

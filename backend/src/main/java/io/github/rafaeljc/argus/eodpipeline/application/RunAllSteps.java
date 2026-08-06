@@ -4,7 +4,10 @@ import io.github.rafaeljc.argus.common.domain.Clock;
 import io.github.rafaeljc.argus.common.domain.RunId;
 import io.github.rafaeljc.argus.eodpipeline.application.port.EodPipelineRunRepository;
 import io.github.rafaeljc.argus.eodpipeline.domain.EodPipelineRun;
+import io.github.rafaeljc.argus.eodpipeline.domain.PipelineStep;
 import io.github.rafaeljc.argus.eodpipeline.domain.RunStatus;
+import java.util.List;
+import java.util.function.Function;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -36,22 +39,29 @@ public class RunAllSteps {
     // ExecutorRunDispatcher (this class's caller) is itself reached from EodPipelineService via
     // TriggerRun, so this class must not point back at the facade.
     public void forRun(RunId id) {
-        EodPipelineRun afterSymbols = runSymbolsStep.execute(id);
-        if (afterSymbols.status() == RunStatus.FAILED) {
-            return;
-        }
+        fromStep(id, PipelineStep.SYMBOLS);
+    }
 
-        EodPipelineRun afterPrices = runPricesStep.execute(id);
-        if (afterPrices.status() == RunStatus.FAILED) {
-            return;
+    // Re-enters the pipeline at entryStep and runs through to the end, so a rerun always reaches
+    // a terminal status via markSucceeded below — see RerunFromStep for why a rerun can never
+    // stop partway without stranding the run at IN_PROGRESS.
+    public void fromStep(RunId id, PipelineStep entryStep) {
+        EodPipelineRun stepResult = null;
+        for (Function<RunId, EodPipelineRun> step : stepsFrom(entryStep)) {
+            stepResult = step.apply(id);
+            if (stepResult.status() == RunStatus.FAILED) {
+                return;
+            }
         }
+        // stepsFrom always returns at least one step (PipelineStep has 3 values), so stepResult
+        // is guaranteed non-null here.
+        markSucceeded(stepResult);
+    }
 
-        EodPipelineRun afterEvaluate = runEvaluateStep.execute(id);
-        if (afterEvaluate.status() == RunStatus.FAILED) {
-            return;
-        }
-
-        markSucceeded(afterEvaluate);
+    private List<Function<RunId, EodPipelineRun>> stepsFrom(PipelineStep entryStep) {
+        List<Function<RunId, EodPipelineRun>> all = List.of(
+                runSymbolsStep::execute, runPricesStep::execute, runEvaluateStep::execute);
+        return all.subList(entryStep.ordinal(), all.size());
     }
 
     private void markSucceeded(EodPipelineRun run) {

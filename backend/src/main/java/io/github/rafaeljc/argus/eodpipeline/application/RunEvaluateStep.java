@@ -1,5 +1,6 @@
 package io.github.rafaeljc.argus.eodpipeline.application;
 
+import io.github.rafaeljc.argus.common.application.TransactionalMutationLock;
 import io.github.rafaeljc.argus.common.domain.Clock;
 import io.github.rafaeljc.argus.common.domain.ResourceNotFoundException;
 import io.github.rafaeljc.argus.common.domain.RunId;
@@ -20,20 +21,24 @@ import org.springframework.transaction.annotation.Transactional;
 public class RunEvaluateStep {
 
     private static final Logger log = LoggerFactory.getLogger(RunEvaluateStep.class);
+    private static final String LOCK_RESOURCE = "eod-pipeline-run";
 
     private final EodPipelineRunRepository runs;
     private final ActiveUserIds activeUserIds;
     private final WriteSnapshotAndEvaluateAlerts writeSnapshotAndEvaluateAlerts;
+    private final TransactionalMutationLock lock;
     private final Clock clock;
 
     public RunEvaluateStep(
             EodPipelineRunRepository runs,
             ActiveUserIds activeUserIds,
             WriteSnapshotAndEvaluateAlerts writeSnapshotAndEvaluateAlerts,
+            TransactionalMutationLock lock,
             Clock clock) {
         this.runs = runs;
         this.activeUserIds = activeUserIds;
         this.writeSnapshotAndEvaluateAlerts = writeSnapshotAndEvaluateAlerts;
+        this.lock = lock;
         this.clock = clock;
     }
 
@@ -44,6 +49,8 @@ public class RunEvaluateStep {
     // reason as the other steps: RunAllSteps bypasses EodPipelineService entirely.
     @Transactional
     public EodPipelineRun execute(RunId id) {
+        lock.acquireResourceById(LOCK_RESOURCE, id.value());
+
         EodPipelineRun run = runs.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("eod pipeline run not found: " + id.value()));
 

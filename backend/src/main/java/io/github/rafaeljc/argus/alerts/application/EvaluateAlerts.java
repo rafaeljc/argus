@@ -67,7 +67,7 @@ public class EvaluateAlerts {
     }
 
     public void forUser(UserId userId, LocalDate runDate) {
-        lock.acquireResourceForUser(LOCK_RESOURCE, userId);
+        lock.acquireResourceById(LOCK_RESOURCE, userId.value());
 
         Optional<PortfolioSnapshot> endSnapshot = getSnapshot.at(userId, runDate);
         if (endSnapshot.isEmpty()) {

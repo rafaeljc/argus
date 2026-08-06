@@ -4,7 +4,7 @@ End-of-day orchestration kicked off ~21:00 ET on US trading days. Owns the
 post-close sequence: refresh symbols → fetch today's closes → snapshot every
 active user's portfolio → evaluate every active alert rule → enqueue digest
 emails. Retries inside the NFR-A6 window; per-step status persisted to
-`eod_pipeline_runs` so the admin UI can re-run any single step.
+`eod_pipeline_runs` so the admin UI can re-run the pipeline from any step.
 
 ```mermaid
 sequenceDiagram
@@ -94,9 +94,12 @@ sequenceDiagram
   the run is marked failed. The scheduler retries the **whole pipeline**
   until the NFR-A6 window closes; the per-step UPSERT semantics (prices,
   symbols) and the per-user idempotence on snapshots make retries safe.
-- **Admin re-run** of a single step (`POST /admin/eod-pipeline/runs/:id/steps/:step`)
-  operates on the same `run_id`, overwriting that step's status without
-  rolling back upstream work.
+- **Admin re-run from a step** (`POST /admin/eod-pipeline/runs/:id/steps/:step`)
+  operates on the same `run_id`: the named step and every step after it are
+  re-executed in order, without rolling back upstream work — steps before the
+  named one keep their status. Downstream steps reset to `pending` because
+  their inputs may have changed once an earlier step re-runs. Returns 409 if
+  any step of the run is currently `in_progress`.
 - **Email delivery is decoupled.** Steps 1–3 complete (and the pipeline is
   reported successful) the moment outbox rows are written. The worker is a
   separate background thread; vendor outages never block evaluation or

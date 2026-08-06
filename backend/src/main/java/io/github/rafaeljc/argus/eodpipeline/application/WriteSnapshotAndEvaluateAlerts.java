@@ -29,7 +29,7 @@ public class WriteSnapshotAndEvaluateAlerts {
     // so one user's failure never undoes another's already-committed snapshot/firings.
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void forUser(UserId userId, LocalDate runDate) {
-        lock.acquireResourceForUser(LOCK_RESOURCE, userId);
+        lock.acquireResourceById(LOCK_RESOURCE, userId.value());
         portfolioService.writeSnapshot(userId, runDate);
         alertService.evaluateForUser(userId, runDate);
     }

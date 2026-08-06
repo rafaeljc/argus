@@ -12,6 +12,7 @@ import io.github.rafaeljc.argus.common.domain.SessionId;
 import io.github.rafaeljc.argus.eodpipeline.application.port.EodPipelineRunRepository;
 import io.github.rafaeljc.argus.eodpipeline.application.port.RunDispatcher;
 import io.github.rafaeljc.argus.eodpipeline.domain.EodPipelineRun;
+import io.github.rafaeljc.argus.eodpipeline.domain.PipelineStep;
 import io.github.rafaeljc.argus.eodpipeline.domain.RunStatus;
 import io.github.rafaeljc.argus.eodpipeline.domain.StepStatus;
 import io.github.rafaeljc.argus.eodpipeline.domain.Trigger;
@@ -226,6 +227,126 @@ class AdminEodPipelineControllerIT {
         assertThat(response.getStatusCode().value()).isEqualTo(401);
     }
 
+    @Test
+    void postStep_prices_returns200AndResetsPricesAndEvaluateAndDispatchesFromPrices() throws Exception {
+        User admin = seedVerified("admin8@example.com");
+        LocalDate runDate = LocalDate.of(2026, 7, 1);
+        EodPipelineRun saved = runs.insert(failedRun(
+                runDate, StepStatus.SUCCEEDED, StepStatus.FAILED, StepStatus.SKIPPED));
+
+        ResponseEntity<String> response = postStep(admin, saved.id(), "prices");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        JsonNode data = json.readTree(response.getBody()).get("data");
+        assertThat(data.get("run_id").asString()).isEqualTo(saved.id().value().toString());
+        assertThat(data.get("step").asString()).isEqualTo("prices");
+        assertThat(data.get("status").asString()).isEqualTo("in_progress");
+
+        EodPipelineRun updated = runs.findById(saved.id()).orElseThrow();
+        assertThat(updated.stepSymbolsStatus()).isEqualTo(StepStatus.SUCCEEDED);
+        assertThat(updated.stepPricesStatus()).isEqualTo(StepStatus.IN_PROGRESS);
+        assertThat(updated.stepEvaluateStatus()).isEqualTo(StepStatus.PENDING);
+        assertThat(dispatcher.dispatchedFrom())
+                .contains(new RecordingRunDispatcher.DispatchedFrom(saved.id(), PipelineStep.PRICES));
+    }
+
+    @Test
+    void postStep_namedStepAlreadyInProgress_returns409Conflict() throws Exception {
+        User admin = seedVerified("admin9@example.com");
+        LocalDate runDate = LocalDate.of(2026, 7, 2);
+        EodPipelineRun saved = runs.insert(inProgressRun(
+                runDate, StepStatus.SUCCEEDED, StepStatus.IN_PROGRESS, StepStatus.PENDING));
+
+        ResponseEntity<String> response = postStep(admin, saved.id(), "prices");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(409);
+        JsonNode error = json.readTree(response.getBody()).get("error");
+        assertThat(error.get("code").asString()).isEqualTo("CONFLICT");
+    }
+
+    @Test
+    void postStep_differentStepInProgress_returns409Conflict() throws Exception {
+        User admin = seedVerified("admin10@example.com");
+        LocalDate runDate = LocalDate.of(2026, 7, 3);
+        EodPipelineRun saved = runs.insert(inProgressRun(
+                runDate, StepStatus.SUCCEEDED, StepStatus.IN_PROGRESS, StepStatus.PENDING));
+
+        ResponseEntity<String> response = postStep(admin, saved.id(), "evaluate");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(409);
+        JsonNode error = json.readTree(response.getBody()).get("error");
+        assertThat(error.get("code").asString()).isEqualTo("CONFLICT");
+    }
+
+    @Test
+    void postStep_unknownRunId_returns404() throws Exception {
+        User admin = seedVerified("admin11@example.com");
+
+        ResponseEntity<String> response = postStep(admin, new RunId(UuidCreator.getTimeOrderedEpoch()), "prices");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(404);
+        JsonNode error = json.readTree(response.getBody()).get("error");
+        assertThat(error.get("code").asString()).isEqualTo("NOT_FOUND");
+    }
+
+    @Test
+    void postStep_unknownStep_returns404() throws Exception {
+        User admin = seedVerified("admin12@example.com");
+        EodPipelineRun saved = runs.insert(pendingRun(LocalDate.of(2026, 7, 4)));
+
+        ResponseEntity<String> response = postStep(admin, saved.id(), "bogus");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(404);
+        JsonNode error = json.readTree(response.getBody()).get("error");
+        assertThat(error.get("code").asString()).isEqualTo("NOT_FOUND");
+    }
+
+    @Test
+    void postStep_noSession_returns401() {
+        RunId runId = new RunId(UuidCreator.getTimeOrderedEpoch());
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        ResponseEntity<String> response = http.exchange(
+                "http://localhost:" + port + ENDPOINT + "/" + runId.value() + "/steps/prices",
+                HttpMethod.POST,
+                new HttpEntity<>(headers),
+                String.class);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(401);
+    }
+
+    private ResponseEntity<String> postStep(User authenticatedAs, RunId runId, String step) {
+        HttpHeaders headers = new HttpHeaders();
+        String sessionToken = seedSession(authenticatedAs);
+        headers.add(HttpHeaders.COOKIE,
+                SessionCookieFactory.COOKIE_NAME + "=" + sessionToken
+                        + "; " + CsrfCookieFactory.COOKIE_NAME + "=" + CSRF_VALUE);
+        headers.add("X-CSRF-Token", CSRF_VALUE);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return http.exchange(
+                "http://localhost:" + port + ENDPOINT + "/" + runId.value() + "/steps/" + step,
+                HttpMethod.POST,
+                new HttpEntity<>(headers),
+                String.class);
+    }
+
+    private static EodPipelineRun failedRun(
+            LocalDate runDate, StepStatus symbols, StepStatus prices, StepStatus evaluate) {
+        Instant now = Instant.now();
+        return new EodPipelineRun(
+                new RunId(UuidCreator.getTimeOrderedEpoch()), runDate, Trigger.CRON, RunStatus.FAILED, now,
+                now.plusSeconds(60), symbols, prices, evaluate, "boom");
+    }
+
+    private static EodPipelineRun inProgressRun(
+            LocalDate runDate, StepStatus symbols, StepStatus prices, StepStatus evaluate) {
+        Instant now = Instant.now();
+        return new EodPipelineRun(
+                new RunId(UuidCreator.getTimeOrderedEpoch()), runDate, Trigger.CRON, RunStatus.IN_PROGRESS, now,
+                null, symbols, prices, evaluate, null);
+    }
+
     private ResponseEntity<String> get(User authenticatedAs, String pathAndQuery) {
         HttpHeaders headers = new HttpHeaders();
         String sessionToken = seedSession(authenticatedAs);
@@ -307,14 +428,27 @@ class AdminEodPipelineControllerIT {
     // vendor gateways and race the next test's TRUNCATE cleanup) from running during this HTTP-slice IT.
     static final class RecordingRunDispatcher implements RunDispatcher {
         private final CopyOnWriteArrayList<RunId> dispatched = new CopyOnWriteArrayList<>();
+        private final CopyOnWriteArrayList<DispatchedFrom> dispatchedFrom = new CopyOnWriteArrayList<>();
 
         @Override
         public void dispatch(RunId id) {
             dispatched.add(id);
         }
 
+        @Override
+        public void dispatchFrom(RunId id, PipelineStep entryStep) {
+            dispatchedFrom.add(new DispatchedFrom(id, entryStep));
+        }
+
         CopyOnWriteArrayList<RunId> dispatched() {
             return dispatched;
+        }
+
+        CopyOnWriteArrayList<DispatchedFrom> dispatchedFrom() {
+            return dispatchedFrom;
+        }
+
+        record DispatchedFrom(RunId runId, PipelineStep entryStep) {
         }
     }
 }

@@ -27,30 +27,30 @@ class PostgresTransactionalMutationLockIT {
     private PlatformTransactionManager transactionManager;
 
     @Test
-    void acquireResourceForUser_withinTransaction_doesNotThrow() {
+    void acquireResourceById_withinTransaction_doesNotThrow() {
         UserId userId = new UserId(UuidCreator.getTimeOrderedEpoch());
         TransactionTemplate template = new TransactionTemplate(transactionManager);
 
         assertThatNoException().isThrownBy(
-                () -> template.executeWithoutResult(status -> lock.acquireResourceForUser(RESOURCE, userId)));
+                () -> template.executeWithoutResult(status -> lock.acquireResourceById(RESOURCE, userId.value())));
     }
 
     @Test
-    void acquireResourceForUser_calledTwiceForSameResourceAndUserInSameTransaction_doesNotDeadlock() {
+    void acquireResourceById_calledTwiceForSameResourceAndIdInSameTransaction_doesNotDeadlock() {
         UserId userId = new UserId(UuidCreator.getTimeOrderedEpoch());
         TransactionTemplate template = new TransactionTemplate(transactionManager);
 
         assertThatNoException().isThrownBy(() -> template.executeWithoutResult(status -> {
-            lock.acquireResourceForUser(RESOURCE, userId);
-            lock.acquireResourceForUser(RESOURCE, userId);
+            lock.acquireResourceById(RESOURCE, userId.value());
+            lock.acquireResourceById(RESOURCE, userId.value());
         }));
     }
 
     @Test
-    void acquireResourceForUser_outsideActiveTransaction_throwsIllegalState() {
+    void acquireResourceById_outsideActiveTransaction_throwsIllegalState() {
         UserId userId = new UserId(UuidCreator.getTimeOrderedEpoch());
 
-        assertThatThrownBy(() -> lock.acquireResourceForUser(RESOURCE, userId))
+        assertThatThrownBy(() -> lock.acquireResourceById(RESOURCE, userId.value()))
                 .hasRootCauseInstanceOf(IllegalStateException.class);
     }
 }

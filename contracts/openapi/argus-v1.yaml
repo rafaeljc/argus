@@ -696,7 +696,12 @@ paths:
         schema: { type: string, enum: [symbols, prices, evaluate] }
     post:
       tags: [eod-pipeline]
-      summary: Re-run a single pipeline step against an existing run
+      summary: Re-run the pipeline from this step onward
+      description: >
+        Re-executes the named step and every step after it, in order; steps before it are left
+        untouched. The run returns to in_progress and settles on a terminal status once the
+        sequence completes. Returns 409 if any step of the run is currently in_progress, or if
+        another run already holds the same run_date.
       security:
         - sessionCookie: []
           csrfToken: []
@@ -709,6 +714,7 @@ paths:
           description: Step re-running
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
 
 components:
   securitySchemes:

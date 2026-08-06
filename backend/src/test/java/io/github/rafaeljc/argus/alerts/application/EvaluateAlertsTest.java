@@ -265,7 +265,7 @@ class EvaluateAlertsTest {
         evaluateAlerts.forUser(USER_ID, RUN_DATE);
 
         InOrder order = Mockito.inOrder(lock, getSnapshot);
-        order.verify(lock).acquireResourceForUser("alert-eval", USER_ID);
+        order.verify(lock).acquireResourceById("alert-eval", USER_ID.value());
         order.verify(getSnapshot).at(USER_ID, RUN_DATE);
     }
 
