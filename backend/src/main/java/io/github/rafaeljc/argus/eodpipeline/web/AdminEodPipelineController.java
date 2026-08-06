@@ -2,11 +2,13 @@ package io.github.rafaeljc.argus.eodpipeline.web;
 
 import io.github.rafaeljc.argus.common.application.PageResult;
 import io.github.rafaeljc.argus.common.domain.Clock;
+import io.github.rafaeljc.argus.common.domain.ResourceNotFoundException;
 import io.github.rafaeljc.argus.common.domain.RunId;
 import io.github.rafaeljc.argus.common.web.CollectionEnvelope;
 import io.github.rafaeljc.argus.common.web.SuccessEnvelope;
 import io.github.rafaeljc.argus.eodpipeline.application.EodPipelineService;
 import io.github.rafaeljc.argus.eodpipeline.domain.EodPipelineRun;
+import io.github.rafaeljc.argus.eodpipeline.domain.PipelineStep;
 import io.github.rafaeljc.argus.eodpipeline.domain.Trigger;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -70,6 +72,15 @@ class AdminEodPipelineController {
     ResponseEntity<SuccessEnvelope<EodPipelineRunResponse>> get(@PathVariable UUID runId) {
         EodPipelineRun run = eodPipelineService.getRun(new RunId(runId));
         return ResponseEntity.ok(new SuccessEnvelope<>(EodPipelineRunResponse.from(run)));
+    }
+
+    @PostMapping("/{runId}/steps/{step}")
+    ResponseEntity<SuccessEnvelope<EodStepResponse>> rerunFromStep(
+            @PathVariable UUID runId, @PathVariable String step) {
+        PipelineStep entryStep = PipelineStep.fromWireValue(step)
+                .orElseThrow(() -> new ResourceNotFoundException("unknown eod pipeline step: " + step));
+        EodPipelineRun run = eodPipelineService.rerunFromStep(new RunId(runId), entryStep);
+        return ResponseEntity.ok(new SuccessEnvelope<>(EodStepResponse.from(run, entryStep)));
     }
 
     private static String pageUri(int page, int perPage) {
