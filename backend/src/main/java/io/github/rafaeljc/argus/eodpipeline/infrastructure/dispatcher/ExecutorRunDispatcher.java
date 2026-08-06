@@ -3,6 +3,7 @@ package io.github.rafaeljc.argus.eodpipeline.infrastructure.dispatcher;
 import io.github.rafaeljc.argus.common.domain.RunId;
 import io.github.rafaeljc.argus.eodpipeline.application.RunAllSteps;
 import io.github.rafaeljc.argus.eodpipeline.application.port.RunDispatcher;
+import io.github.rafaeljc.argus.eodpipeline.domain.PipelineStep;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -28,25 +29,34 @@ class ExecutorRunDispatcher implements RunDispatcher {
     // invisible row. Deferring to afterCommit when a transaction is active avoids that race.
     @Override
     public void dispatch(RunId id) {
+        deferToAfterCommit(() -> submit(id, () -> runAllSteps.forRun(id)));
+    }
+
+    @Override
+    public void dispatchFrom(RunId id, PipelineStep entryStep) {
+        deferToAfterCommit(() -> submit(id, () -> runAllSteps.fromStep(id, entryStep)));
+    }
+
+    private void deferToAfterCommit(Runnable action) {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    submit(id);
+                    action.run();
                 }
             });
         } else {
-            submit(id);
+            action.run();
         }
     }
 
     // Mirrors BackfillScheduler/OutboxPollerScheduler: swallow so the pool thread survives, and
     // so a run that fails outside a step's own never-throws contract (e.g. the runs.update write
     // itself) doesn't vanish silently — nothing else is watching this Future.
-    private void submit(RunId id) {
+    private void submit(RunId id, Runnable action) {
         executor.execute(() -> {
             try {
-                runAllSteps.forRun(id);
+                action.run();
             } catch (RuntimeException e) {
                 log.error("eod pipeline run failed unexpectedly: runId={}", id.value(), e);
             }

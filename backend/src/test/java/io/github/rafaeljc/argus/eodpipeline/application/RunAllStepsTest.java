@@ -10,6 +10,7 @@ import io.github.rafaeljc.argus.common.domain.FixedClock;
 import io.github.rafaeljc.argus.common.domain.RunId;
 import io.github.rafaeljc.argus.eodpipeline.application.port.EodPipelineRunRepository;
 import io.github.rafaeljc.argus.eodpipeline.domain.EodPipelineRun;
+import io.github.rafaeljc.argus.eodpipeline.domain.PipelineStep;
 import io.github.rafaeljc.argus.eodpipeline.domain.RunStatus;
 import io.github.rafaeljc.argus.eodpipeline.domain.StepStatus;
 import io.github.rafaeljc.argus.eodpipeline.domain.Trigger;
@@ -106,6 +107,44 @@ class RunAllStepsTest {
         runAllSteps.forRun(RUN_ID);
 
         verify(runEvaluateStep).execute(RUN_ID);
+        verify(runs, never()).update(any());
+    }
+
+    @Test
+    void fromStep_prices_neverInvokesSymbolsAndRunsPricesThenEvaluateThenMarksSucceeded() {
+        when(runPricesStep.execute(RUN_ID)).thenReturn(runWith(RunStatus.IN_PROGRESS));
+        when(runEvaluateStep.execute(RUN_ID)).thenReturn(runWith(RunStatus.IN_PROGRESS));
+
+        runAllSteps.fromStep(RUN_ID, PipelineStep.PRICES);
+
+        verify(runSymbolsStep, never()).execute(any());
+        verify(runPricesStep).execute(RUN_ID);
+        verify(runEvaluateStep).execute(RUN_ID);
+        ArgumentCaptor<EodPipelineRun> captor = ArgumentCaptor.forClass(EodPipelineRun.class);
+        verify(runs).update(captor.capture());
+        assertThat(captor.getValue().status()).isEqualTo(RunStatus.SUCCEEDED);
+    }
+
+    @Test
+    void fromStep_evaluate_runsOnlyEvaluateThenMarksSucceeded() {
+        when(runEvaluateStep.execute(RUN_ID)).thenReturn(runWith(RunStatus.IN_PROGRESS));
+
+        runAllSteps.fromStep(RUN_ID, PipelineStep.EVALUATE);
+
+        verify(runSymbolsStep, never()).execute(any());
+        verify(runPricesStep, never()).execute(any());
+        verify(runEvaluateStep).execute(RUN_ID);
+        verify(runs).update(any());
+    }
+
+    @Test
+    void fromStep_pricesFails_stopsAndSkipsEvaluateAndDoesNotMarkSucceeded() {
+        when(runPricesStep.execute(RUN_ID)).thenReturn(runWith(RunStatus.FAILED));
+
+        runAllSteps.fromStep(RUN_ID, PipelineStep.PRICES);
+
+        verify(runPricesStep).execute(RUN_ID);
+        verify(runEvaluateStep, never()).execute(any());
         verify(runs, never()).update(any());
     }
 }

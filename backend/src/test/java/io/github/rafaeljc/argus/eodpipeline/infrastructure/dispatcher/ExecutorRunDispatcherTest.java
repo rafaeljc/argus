@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 import io.github.rafaeljc.argus.common.domain.RunId;
 import io.github.rafaeljc.argus.eodpipeline.application.RunAllSteps;
+import io.github.rafaeljc.argus.eodpipeline.domain.PipelineStep;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -73,5 +74,27 @@ class ExecutorRunDispatcherTest {
         ExecutorRunDispatcher dispatcher = new ExecutorRunDispatcher(new SyncTaskExecutor(), runAllSteps);
 
         assertThatCode(() -> dispatcher.dispatch(RUN_ID)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void dispatchFrom_noActiveTransaction_submitsImmediately() {
+        ExecutorRunDispatcher dispatcher = new ExecutorRunDispatcher(new SyncTaskExecutor(), runAllSteps);
+
+        dispatcher.dispatchFrom(RUN_ID, PipelineStep.PRICES);
+
+        verify(runAllSteps).fromStep(RUN_ID, PipelineStep.PRICES);
+    }
+
+    @Test
+    void dispatchFrom_activeTransaction_deferSubmitUntilAfterCommit() {
+        ExecutorRunDispatcher dispatcher = new ExecutorRunDispatcher(new SyncTaskExecutor(), runAllSteps);
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        TransactionSynchronizationManager.initSynchronization();
+
+        dispatcher.dispatchFrom(RUN_ID, PipelineStep.PRICES);
+        verifyNoInteractions(runAllSteps);
+
+        TransactionSynchronizationUtils.triggerAfterCommit();
+        verify(runAllSteps).fromStep(RUN_ID, PipelineStep.PRICES);
     }
 }
