@@ -73,21 +73,28 @@ class JdbcEodPipelineRunRepository implements EodPipelineRunRepository {
 
     @Override
     public EodPipelineRun insert(EodPipelineRun run) {
+        executeTranslatingActiveRunConflict(INSERT_SQL, run);
+        return run;
+    }
+
+    @Override
+    public EodPipelineRun update(EodPipelineRun run) {
+        // Postgres re-checks eod_pipeline_runs_in_progress_uidx on UPDATE too: a rerun flips
+        // status back to in_progress, which can collide with another active run for the same
+        // run_date. Same translation as insert() so that collision surfaces as 409, not 500.
+        executeTranslatingActiveRunConflict(UPDATE_SQL, run);
+        return run;
+    }
+
+    private void executeTranslatingActiveRunConflict(String sql, EodPipelineRun run) {
         try {
-            jdbc.update(INSERT_SQL, paramsFor(run));
+            jdbc.update(sql, paramsFor(run));
         } catch (DataIntegrityViolationException e) {
             if (isActiveRunUniqueViolation(e)) {
                 throw new RunAlreadyActiveException(run.runDate());
             }
             throw e;
         }
-        return run;
-    }
-
-    @Override
-    public EodPipelineRun update(EodPipelineRun run) {
-        jdbc.update(UPDATE_SQL, paramsFor(run));
-        return run;
     }
 
     @Override

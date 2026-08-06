@@ -110,6 +110,25 @@ class JdbcEodPipelineRunRepositoryIT {
     }
 
     @Test
+    void update_flippingToInProgressCollidesWithAnotherActiveRunForSameDate_throwsRunAlreadyActiveException() {
+        LocalDate runDate = LocalDate.of(2026, 6, 16);
+        RunId firstId = newRunId();
+        EodPipelineRun first = runs.insert(pendingRun(firstId, runDate));
+        runs.update(withTerminalStatus(first, RunStatus.FAILED, NOW.plusSeconds(60)));
+        RunId secondId = newRunId();
+        runs.insert(pendingRun(secondId, runDate));
+
+        EodPipelineRun reactivatedFirst = new EodPipelineRun(
+                firstId, runDate, Trigger.CRON, RunStatus.IN_PROGRESS, NOW, null,
+                StepStatus.IN_PROGRESS, StepStatus.PENDING, StepStatus.PENDING, null);
+
+        assertThatThrownBy(() -> runs.update(reactivatedFirst))
+                .isInstanceOf(RunAlreadyActiveException.class)
+                .extracting("runDate")
+                .isEqualTo(runDate);
+    }
+
+    @Test
     void findActiveForDate_pendingRun_returnsIt() {
         LocalDate runDate = LocalDate.of(2026, 6, 6);
         EodPipelineRun saved = runs.insert(pendingRun(newRunId(), runDate));

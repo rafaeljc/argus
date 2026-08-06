@@ -3,6 +3,7 @@ package io.github.rafaeljc.argus.eodpipeline.application;
 import io.github.rafaeljc.argus.common.application.PageResult;
 import io.github.rafaeljc.argus.common.domain.RunId;
 import io.github.rafaeljc.argus.eodpipeline.domain.EodPipelineRun;
+import io.github.rafaeljc.argus.eodpipeline.domain.PipelineStep;
 import io.github.rafaeljc.argus.eodpipeline.domain.Trigger;
 import java.time.LocalDate;
 import org.springframework.stereotype.Service;
@@ -15,6 +16,7 @@ public class EodPipelineService {
     private final RunPricesStep runPricesStep;
     private final RunEvaluateStep runEvaluateStep;
     private final TriggerRun triggerRun;
+    private final RerunFromStep rerunFromStep;
     private final ListRuns listRuns;
     private final GetRun getRun;
 
@@ -23,12 +25,14 @@ public class EodPipelineService {
             RunPricesStep runPricesStep,
             RunEvaluateStep runEvaluateStep,
             TriggerRun triggerRun,
+            RerunFromStep rerunFromStep,
             ListRuns listRuns,
             GetRun getRun) {
         this.runSymbolsStep = runSymbolsStep;
         this.runPricesStep = runPricesStep;
         this.runEvaluateStep = runEvaluateStep;
         this.triggerRun = triggerRun;
+        this.rerunFromStep = rerunFromStep;
         this.listRuns = listRuns;
         this.getRun = getRun;
     }
@@ -53,6 +57,12 @@ public class EodPipelineService {
     // transaction here too would be redundant ceremony on top of the boundary TriggerRun already owns.
     public EodPipelineRun triggerPipelineRun(LocalDate runDate, Trigger trigger) {
         return triggerRun.execute(runDate, trigger);
+    }
+
+    // Not @Transactional: RerunFromStep.execute is itself @Transactional, matching the
+    // triggerPipelineRun comment above.
+    public EodPipelineRun rerunFromStep(RunId id, PipelineStep entryStep) {
+        return rerunFromStep.execute(id, entryStep);
     }
 
     @Transactional(readOnly = true)
