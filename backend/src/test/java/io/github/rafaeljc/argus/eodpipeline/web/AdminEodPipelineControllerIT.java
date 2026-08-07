@@ -18,6 +18,7 @@ import io.github.rafaeljc.argus.eodpipeline.domain.StepStatus;
 import io.github.rafaeljc.argus.eodpipeline.domain.Trigger;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
 import io.github.rafaeljc.argus.users.application.UserService;
+import io.github.rafaeljc.argus.users.application.port.UserRepository;
 import io.github.rafaeljc.argus.users.domain.User;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -66,6 +67,9 @@ class AdminEodPipelineControllerIT {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Autowired
     private SessionRepository sessionRepository;
@@ -381,7 +385,11 @@ class AdminEodPipelineControllerIT {
 
     private User seedVerified(String email) {
         User u = userService.createUnverified(email, PASSWORD);
-        return userService.markVerified(u.id());
+        User verified = userService.markVerified(u.id());
+        Instant now = verified.createdAt();
+        return userRepository.save(new User(verified.id(), verified.email(), verified.passwordHash(),
+                verified.isVerified(), verified.isSuspended(), verified.isDeleted(), true,
+                now, now, null));
     }
 
     private String seedSession(User user) {
