@@ -46,6 +46,36 @@ class JdbcEodPipelineRunRepository implements EodPipelineRunRepository {
              WHERE id = :id
             """;
 
+    // The WHERE clause is the concurrency control: whoever's UPDATE reports a row won the race,
+    // and the loser is told so immediately instead of waiting behind a lock. Requires the claim to
+    // commit before the step's work begins, or the in_progress it writes stays invisible to the
+    // next claimant and the guard reads a stale view.
+    private static final String UPDATE_IF_NO_STEP_IN_PROGRESS_SQL = UPDATE_SQL
+            + "   AND step_symbols_status  <> 'in_progress'"
+            + "   AND step_prices_status   <> 'in_progress'"
+            + "   AND step_evaluate_status <> 'in_progress'";
+
+    // Stricter than the per-step guard on purpose. RunAllSteps walks symbols -> prices -> evaluate
+    // as three separate transactions, so between two of them no step is in progress even though the
+    // sequence is still advancing; a rerun landing in that window would run alongside it.
+    private static final String UPDATE_IF_RUN_TERMINAL_SQL =
+            UPDATE_SQL + "   AND status IN ('succeeded', 'failed')";
+
+    private static final String FAIL_NON_TERMINAL_RUNS_SQL =
+            """
+            UPDATE eod_pipeline_runs
+               SET status               = 'failed',
+                   finished_at          = :finishedAt,
+                   error_message        = :errorMessage,
+                   step_symbols_status  = CASE WHEN step_symbols_status  = 'in_progress'
+                                               THEN 'failed' ELSE step_symbols_status  END,
+                   step_prices_status   = CASE WHEN step_prices_status   = 'in_progress'
+                                               THEN 'failed' ELSE step_prices_status   END,
+                   step_evaluate_status = CASE WHEN step_evaluate_status = 'in_progress'
+                                               THEN 'failed' ELSE step_evaluate_status END
+             WHERE status IN ('pending', 'in_progress')
+            """;
+
     private static final String SELECT_COLUMNS =
             """
             SELECT id, run_date, trigger, status, started_at, finished_at,
@@ -86,9 +116,32 @@ class JdbcEodPipelineRunRepository implements EodPipelineRunRepository {
         return run;
     }
 
-    private void executeTranslatingActiveRunConflict(String sql, EodPipelineRun run) {
+    @Override
+    public Optional<EodPipelineRun> updateIfNoStepInProgress(EodPipelineRun desired) {
+        return claim(UPDATE_IF_NO_STEP_IN_PROGRESS_SQL, desired);
+    }
+
+    @Override
+    public Optional<EodPipelineRun> updateIfRunTerminal(EodPipelineRun desired) {
+        return claim(UPDATE_IF_RUN_TERMINAL_SQL, desired);
+    }
+
+    @Override
+    public int failNonTerminalRuns(Instant finishedAt, String errorMessage) {
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("finishedAt", toOffsetDateTime(finishedAt))
+                .addValue("errorMessage", errorMessage);
+        return jdbc.update(FAIL_NON_TERMINAL_RUNS_SQL, params);
+    }
+
+    private Optional<EodPipelineRun> claim(String guardedSql, EodPipelineRun desired) {
+        int rows = executeTranslatingActiveRunConflict(guardedSql, desired);
+        return rows == 0 ? Optional.empty() : Optional.of(desired);
+    }
+
+    private int executeTranslatingActiveRunConflict(String sql, EodPipelineRun run) {
         try {
-            jdbc.update(sql, paramsFor(run));
+            return jdbc.update(sql, paramsFor(run));
         } catch (DataIntegrityViolationException e) {
             if (isActiveRunUniqueViolation(e)) {
                 throw new RunAlreadyActiveException(run.runDate());
