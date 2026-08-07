@@ -9,15 +9,20 @@ import io.github.rafaeljc.argus.users.application.AdminUserSearchCriteria;
 import io.github.rafaeljc.argus.users.application.UserService;
 import io.github.rafaeljc.argus.users.application.port.AdminUserQuery;
 import io.github.rafaeljc.argus.users.domain.User;
+import jakarta.persistence.EntityManagerFactory;
 import java.util.Optional;
 import java.util.UUID;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
 
 @Import(PostgresContainer.class)
+@ActiveProfiles("test")
 @SpringBootTest
 class JpaAdminUserQueryIT {
 
@@ -32,6 +37,9 @@ class JpaAdminUserQueryIT {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private EntityManagerFactory entityManagerFactory;
 
     @Test
     void search_noFilters_returnsAllUsersIncludingSuspendedAndDeleted() {
@@ -145,6 +153,23 @@ class JpaAdminUserQueryIT {
         assertThat(firstPage.items()).extracting(User::id).containsExactly(newest, middle);
         assertThat(firstPage.total()).isEqualTo(3);
         assertThat(secondPage.items()).extracting(User::id).containsExactly(oldest);
+    }
+
+    @Test
+    void search_pageFullyPopulated_issuesExactlyOneSelectAndOneCount() {
+        // Spring Data skips the COUNT query when a page's content is smaller than perPage,
+        // since that alone proves there's no next page. A full page forces the COUNT to run,
+        // which is the scenario this test pins: 1 SELECT + 1 COUNT, never more.
+        newUser("alice@example.com");
+        newUser("bob@example.com");
+        newUser("carol@example.com");
+
+        Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        statistics.clear();
+
+        adminUserQuery.search(new AdminUserSearchCriteria("example", false, false, null), 1, 2);
+
+        assertThat(statistics.getPrepareStatementCount()).isEqualTo(2);
     }
 
     @Test
