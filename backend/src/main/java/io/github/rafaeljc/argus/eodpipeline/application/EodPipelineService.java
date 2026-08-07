@@ -37,9 +37,10 @@ public class EodPipelineService {
         this.getRun = getRun;
     }
 
-    // Not @Transactional: each step's execute() already owns its own transaction boundary,
-    // because RunAllSteps (this step's other caller) invokes it directly, bypassing this facade.
-    // Adding a transaction here too would be redundant ceremony.
+    // Must not be @Transactional, and neither must the three step use cases. A step claims, does
+    // its vendor work, then settles, in three separate transactions; wrapping that in an outer
+    // transaction would put the vendor call back inside one and hide the claim from every other
+    // connection until it committed, which is exactly what made a concurrent rerun block.
     public EodPipelineRun runSymbols(RunId id) {
         return runSymbolsStep.execute(id);
     }

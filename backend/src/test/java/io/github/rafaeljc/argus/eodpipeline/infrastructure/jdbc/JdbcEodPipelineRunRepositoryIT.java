@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.github.rafaeljc.argus.common.domain.RunId;
 import io.github.rafaeljc.argus.eodpipeline.application.port.EodPipelineRunRepository;
 import io.github.rafaeljc.argus.eodpipeline.domain.EodPipelineRun;
+import io.github.rafaeljc.argus.eodpipeline.domain.PipelineStep;
 import io.github.rafaeljc.argus.eodpipeline.domain.RunAlreadyActiveException;
 import io.github.rafaeljc.argus.eodpipeline.domain.RunStatus;
 import io.github.rafaeljc.argus.eodpipeline.domain.StepStatus;
@@ -208,6 +209,139 @@ class JdbcEodPipelineRunRepositoryIT {
         runs.insert(pendingRun(newRunId(), LocalDate.of(2026, 6, 14)));
 
         assertThat(runs.count()).isEqualTo(3);
+    }
+
+    @Test
+    void updateIfNoStepInProgress_noStepRunning_appliesTheUpdate() {
+        RunId id = newRunId();
+        EodPipelineRun saved = runs.insert(pendingRun(id, LocalDate.of(2026, 6, 17)));
+
+        EodPipelineRun claimed = saved.startingStep(PipelineStep.PRICES);
+
+        assertThat(runs.updateIfNoStepInProgress(claimed)).contains(claimed);
+        assertThat(runs.findById(id).orElseThrow().stepPricesStatus()).isEqualTo(StepStatus.IN_PROGRESS);
+    }
+
+    @ParameterizedTest
+    @EnumSource(PipelineStep.class)
+    void updateIfNoStepInProgress_anyStepAlreadyRunning_isRejectedAndLeavesTheRowAlone(PipelineStep holder) {
+        RunId id = newRunId();
+        EodPipelineRun saved = runs.insert(pendingRun(id, LocalDate.of(2026, 6, 18)));
+        runs.update(saved.startingStep(holder));
+
+        EodPipelineRun contender = saved.startingStep(PipelineStep.EVALUATE);
+
+        assertThat(runs.updateIfNoStepInProgress(contender)).isEmpty();
+        assertThat(runs.findById(id).orElseThrow().stepInProgress()).contains(holder);
+    }
+
+    @Test
+    void updateIfNoStepInProgress_unknownRun_isRejected() {
+        EodPipelineRun absent = pendingRun(newRunId(), LocalDate.of(2026, 6, 19));
+
+        assertThat(runs.updateIfNoStepInProgress(absent.startingStep(PipelineStep.SYMBOLS))).isEmpty();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = RunStatus.class, names = {"SUCCEEDED", "FAILED"})
+    void updateIfRunTerminal_settledRun_appliesTheUpdate(RunStatus terminalStatus) {
+        RunId id = newRunId();
+        runs.insert(pendingRun(id, LocalDate.of(2026, 6, 21)));
+        runs.update(withTerminalStatus(runs.findById(id).orElseThrow(), terminalStatus, NOW.plusSeconds(60)));
+
+        EodPipelineRun restarted = runs.findById(id).orElseThrow().restartingFrom(PipelineStep.PRICES);
+
+        assertThat(runs.updateIfRunTerminal(restarted)).contains(restarted);
+        assertThat(runs.findById(id).orElseThrow().status()).isEqualTo(RunStatus.IN_PROGRESS);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = RunStatus.class, names = {"PENDING", "IN_PROGRESS"})
+    void updateIfRunTerminal_runStillAdvancing_isRejectedEvenWithNoStepInProgress(RunStatus activeStatus) {
+        RunId id = newRunId();
+        LocalDate runDate = LocalDate.of(2026, 6, 23);
+        EodPipelineRun saved = runs.insert(pendingRun(id, runDate));
+        runs.update(new EodPipelineRun(
+                id, runDate, saved.trigger(), activeStatus, NOW, null,
+                StepStatus.SUCCEEDED, StepStatus.PENDING, StepStatus.PENDING, null));
+
+        EodPipelineRun restarted = runs.findById(id).orElseThrow().restartingFrom(PipelineStep.SYMBOLS);
+
+        assertThat(runs.updateIfRunTerminal(restarted)).isEmpty();
+        assertThat(runs.findById(id).orElseThrow().stepSymbolsStatus()).isEqualTo(StepStatus.SUCCEEDED);
+    }
+
+    @Test
+    void updateIfRunTerminal_reactivatingCollidesWithAnotherActiveRunForSameDate_throwsRunAlreadyActive() {
+        LocalDate runDate = LocalDate.of(2026, 6, 24);
+        RunId firstId = newRunId();
+        EodPipelineRun first = runs.insert(pendingRun(firstId, runDate));
+        runs.update(withTerminalStatus(first, RunStatus.FAILED, NOW.plusSeconds(60)));
+        runs.insert(pendingRun(newRunId(), runDate));
+
+        EodPipelineRun restarted = runs.findById(firstId).orElseThrow().restartingFrom(PipelineStep.SYMBOLS);
+
+        assertThatThrownBy(() -> runs.updateIfRunTerminal(restarted))
+                .isInstanceOf(RunAlreadyActiveException.class)
+                .extracting("runDate")
+                .isEqualTo(runDate);
+    }
+
+    @Test
+    void failNonTerminalRuns_runStrandedInProgress_failsTheRunAndItsRunningStep() {
+        RunId id = newRunId();
+        LocalDate runDate = LocalDate.of(2026, 6, 25);
+        EodPipelineRun saved = runs.insert(pendingRun(id, runDate));
+        runs.update(saved.startingStep(PipelineStep.PRICES));
+
+        int failed = runs.failNonTerminalRuns(NOW.plusSeconds(300), "interrupted by restart");
+
+        assertThat(failed).isEqualTo(1);
+        EodPipelineRun found = runs.findById(id).orElseThrow();
+        assertThat(found.status()).isEqualTo(RunStatus.FAILED);
+        assertThat(found.stepPricesStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(found.errorMessage()).isEqualTo("interrupted by restart");
+    }
+
+    @Test
+    void failNonTerminalRuns_stepsNotRunning_keepTheirRecordedStatus() {
+        RunId id = newRunId();
+        LocalDate runDate = LocalDate.of(2026, 6, 26);
+        EodPipelineRun saved = runs.insert(pendingRun(id, runDate));
+        runs.update(new EodPipelineRun(
+                id, runDate, saved.trigger(), RunStatus.IN_PROGRESS, NOW, null,
+                StepStatus.SUCCEEDED, StepStatus.IN_PROGRESS, StepStatus.PENDING, null));
+
+        runs.failNonTerminalRuns(NOW.plusSeconds(300), "interrupted by restart");
+
+        EodPipelineRun found = runs.findById(id).orElseThrow();
+        assertThat(found.stepSymbolsStatus()).isEqualTo(StepStatus.SUCCEEDED);
+        assertThat(found.stepEvaluateStatus()).isEqualTo(StepStatus.PENDING);
+    }
+
+    @Test
+    void failNonTerminalRuns_clearingAStrandedRun_freesTheRunDateForANewRun() {
+        LocalDate runDate = LocalDate.of(2026, 6, 27);
+        EodPipelineRun stranded = runs.insert(pendingRun(newRunId(), runDate));
+        runs.update(stranded.startingStep(PipelineStep.SYMBOLS));
+
+        runs.failNonTerminalRuns(NOW.plusSeconds(300), "interrupted by restart");
+
+        EodPipelineRun fresh = runs.insert(pendingRun(newRunId(), runDate));
+        assertThat(runs.findById(fresh.id())).isPresent();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = RunStatus.class, names = {"SUCCEEDED", "FAILED"})
+    void failNonTerminalRuns_alreadySettledRuns_areLeftUntouched(RunStatus terminalStatus) {
+        RunId id = newRunId();
+        runs.insert(pendingRun(id, LocalDate.of(2026, 6, 28)));
+        runs.update(withTerminalStatus(runs.findById(id).orElseThrow(), terminalStatus, NOW.plusSeconds(60)));
+
+        int failed = runs.failNonTerminalRuns(NOW.plusSeconds(300), "interrupted by restart");
+
+        assertThat(failed).isZero();
+        assertThat(runs.findById(id).orElseThrow().status()).isEqualTo(terminalStatus);
     }
 
     private static EodPipelineRun pendingRun(RunId id, LocalDate runDate) {

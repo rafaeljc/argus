@@ -2,6 +2,7 @@ package io.github.rafaeljc.argus.eodpipeline.application.port;
 
 import io.github.rafaeljc.argus.common.domain.RunId;
 import io.github.rafaeljc.argus.eodpipeline.domain.EodPipelineRun;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -11,6 +12,12 @@ public interface EodPipelineRunRepository {
     EodPipelineRun insert(EodPipelineRun run);
 
     EodPipelineRun update(EodPipelineRun run);
+
+    Optional<EodPipelineRun> updateIfNoStepInProgress(EodPipelineRun desired);
+
+    Optional<EodPipelineRun> updateIfRunTerminal(EodPipelineRun desired);
+
+    int failNonTerminalRuns(Instant finishedAt, String errorMessage);
 
     Optional<EodPipelineRun> findById(RunId id);
 

@@ -127,4 +127,128 @@ class EodPipelineRunTest {
                 StepStatus.PENDING, StepStatus.PENDING, null, null))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void stepInProgress_oneStepRunning_namesThatStep() {
+        EodPipelineRun run = run(RunStatus.IN_PROGRESS,
+                StepStatus.SUCCEEDED, StepStatus.IN_PROGRESS, StepStatus.PENDING);
+
+        assertThat(run.stepInProgress()).contains(PipelineStep.PRICES);
+    }
+
+    @Test
+    void stepInProgress_noStepRunning_isEmpty() {
+        EodPipelineRun run = run(RunStatus.SUCCEEDED,
+                StepStatus.SUCCEEDED, StepStatus.SUCCEEDED, StepStatus.SUCCEEDED);
+
+        assertThat(run.stepInProgress()).isEmpty();
+    }
+
+    @Test
+    void startingStep_previouslyFailedRun_clearsFinishedAtAndErrorMessage() {
+        EodPipelineRun failed = new EodPipelineRun(
+                RUN_ID, RUN_DATE, Trigger.CRON, RunStatus.FAILED, NOW, NOW.plusSeconds(60),
+                StepStatus.SUCCEEDED, StepStatus.FAILED, StepStatus.PENDING, "vendor 503");
+
+        EodPipelineRun started = failed.startingStep(PipelineStep.PRICES);
+
+        assertThat(started.status()).isEqualTo(RunStatus.IN_PROGRESS);
+        assertThat(started.stepPricesStatus()).isEqualTo(StepStatus.IN_PROGRESS);
+        assertThat(started.finishedAt()).isNull();
+        assertThat(started.errorMessage()).isNull();
+    }
+
+    @Test
+    void startingStep_otherSteps_areLeftUntouched() {
+        EodPipelineRun run = run(RunStatus.IN_PROGRESS,
+                StepStatus.SUCCEEDED, StepStatus.PENDING, StepStatus.SKIPPED);
+
+        EodPipelineRun started = run.startingStep(PipelineStep.PRICES);
+
+        assertThat(started.stepSymbolsStatus()).isEqualTo(StepStatus.SUCCEEDED);
+        assertThat(started.stepEvaluateStatus()).isEqualTo(StepStatus.SKIPPED);
+    }
+
+    @Test
+    void withStepSucceeded_finalStep_leavesRunInProgress() {
+        EodPipelineRun run = run(RunStatus.IN_PROGRESS,
+                StepStatus.SUCCEEDED, StepStatus.SUCCEEDED, StepStatus.IN_PROGRESS);
+
+        EodPipelineRun settled = run.withStepSucceeded(PipelineStep.EVALUATE);
+
+        assertThat(settled.stepEvaluateStatus()).isEqualTo(StepStatus.SUCCEEDED);
+        assertThat(settled.status()).isEqualTo(RunStatus.IN_PROGRESS);
+        assertThat(settled.finishedAt()).isNull();
+    }
+
+    @Test
+    void withStepFailed_recordsMessageAndFailsTheWholeRun() {
+        Instant finishedAt = NOW.plusSeconds(30);
+        EodPipelineRun run = run(RunStatus.IN_PROGRESS,
+                StepStatus.SUCCEEDED, StepStatus.IN_PROGRESS, StepStatus.PENDING);
+
+        EodPipelineRun settled = run.withStepFailed(PipelineStep.PRICES, finishedAt, "vendor 503");
+
+        assertThat(settled.stepPricesStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(settled.status()).isEqualTo(RunStatus.FAILED);
+        assertThat(settled.finishedAt()).isEqualTo(finishedAt);
+        assertThat(settled.errorMessage()).isEqualTo("vendor 503");
+    }
+
+    @Test
+    void succeeded_allStepsDone_setsTerminalStatusAndKeepsStepStatuses() {
+        Instant finishedAt = NOW.plusSeconds(90);
+        EodPipelineRun run = run(RunStatus.IN_PROGRESS,
+                StepStatus.SUCCEEDED, StepStatus.SKIPPED, StepStatus.SUCCEEDED);
+
+        EodPipelineRun settled = run.succeeded(finishedAt);
+
+        assertThat(settled.status()).isEqualTo(RunStatus.SUCCEEDED);
+        assertThat(settled.finishedAt()).isEqualTo(finishedAt);
+        assertThat(settled.stepPricesStatus()).isEqualTo(StepStatus.SKIPPED);
+    }
+
+    @Test
+    void restartingFrom_middleStep_leavesEarlierStepsUntouchedAndResetsLaterOnes() {
+        EodPipelineRun run = new EodPipelineRun(
+                RUN_ID, RUN_DATE, Trigger.CRON, RunStatus.FAILED, NOW, NOW.plusSeconds(60),
+                StepStatus.SUCCEEDED, StepStatus.FAILED, StepStatus.SUCCEEDED, "vendor 503");
+
+        EodPipelineRun restarted = run.restartingFrom(PipelineStep.PRICES);
+
+        assertThat(restarted.stepSymbolsStatus()).isEqualTo(StepStatus.SUCCEEDED);
+        assertThat(restarted.stepPricesStatus()).isEqualTo(StepStatus.PENDING);
+        assertThat(restarted.stepEvaluateStatus()).isEqualTo(StepStatus.PENDING);
+        assertThat(restarted.status()).isEqualTo(RunStatus.IN_PROGRESS);
+        assertThat(restarted.finishedAt()).isNull();
+        assertThat(restarted.errorMessage()).isNull();
+    }
+
+    @Test
+    void restartingFrom_firstStep_resetsEveryStep() {
+        EodPipelineRun run = run(RunStatus.SUCCEEDED,
+                StepStatus.SUCCEEDED, StepStatus.SUCCEEDED, StepStatus.SUCCEEDED);
+
+        EodPipelineRun restarted = run.restartingFrom(PipelineStep.SYMBOLS);
+
+        assertThat(restarted.stepSymbolsStatus()).isEqualTo(StepStatus.PENDING);
+        assertThat(restarted.stepPricesStatus()).isEqualTo(StepStatus.PENDING);
+        assertThat(restarted.stepEvaluateStatus()).isEqualTo(StepStatus.PENDING);
+    }
+
+    @Test
+    void restartingFrom_entryStep_leavesItPendingSoTheWorkerCanClaimIt() {
+        EodPipelineRun run = run(RunStatus.FAILED,
+                StepStatus.SUCCEEDED, StepStatus.FAILED, StepStatus.PENDING);
+
+        EodPipelineRun restarted = run.restartingFrom(PipelineStep.PRICES);
+
+        assertThat(restarted.stepInProgress()).isEmpty();
+    }
+
+    private static EodPipelineRun run(
+            RunStatus status, StepStatus symbols, StepStatus prices, StepStatus evaluate) {
+        return new EodPipelineRun(
+                RUN_ID, RUN_DATE, Trigger.CRON, status, NOW, null, symbols, prices, evaluate, null);
+    }
 }

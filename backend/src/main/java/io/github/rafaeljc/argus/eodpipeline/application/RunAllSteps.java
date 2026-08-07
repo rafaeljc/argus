@@ -32,12 +32,12 @@ public class RunAllSteps {
         this.clock = clock;
     }
 
-    // Not @Transactional: each step's execute() demarcates its own transaction, as does
-    // markSucceeded below — self-invoking across those calls from a single @Transactional method
-    // here would bypass the Spring proxy and collapse them into one transaction. Depends on the
-    // three step use cases directly, and not on EodPipelineService, to avoid a bean cycle:
-    // ExecutorRunDispatcher (this class's caller) is itself reached from EodPipelineService via
-    // TriggerRun, so this class must not point back at the facade.
+    // Not @Transactional: each step claims and settles in its own short transactions and does its
+    // work outside one, so a transaction here would swallow all of them and put the vendor calls
+    // back under an open transaction. Depends on the three step use cases directly, and not on
+    // EodPipelineService, to avoid a bean cycle: ExecutorRunDispatcher (this class's caller) is
+    // itself reached from EodPipelineService via TriggerRun, so this class must not point back at
+    // the facade.
     public void forRun(RunId id) {
         fromStep(id, PipelineStep.SYMBOLS);
     }
@@ -65,9 +65,6 @@ public class RunAllSteps {
     }
 
     private void markSucceeded(EodPipelineRun run) {
-        EodPipelineRun succeeded = new EodPipelineRun(
-                run.id(), run.runDate(), run.trigger(), RunStatus.SUCCEEDED, run.startedAt(), clock.now(),
-                run.stepSymbolsStatus(), run.stepPricesStatus(), run.stepEvaluateStatus(), run.errorMessage());
-        runs.update(succeeded);
+        runs.update(run.succeeded(clock.now()));
     }
 }
