@@ -474,8 +474,8 @@ paths:
       tags: [admin]
       summary: Search admin users
       description: |
-        POST (not GET) so the only sensitive criterion — `email` — travels in
-        the request body, out of access logs / proxy caches / browser history.
+        POST (not GET) so the only sensitive criterion — `email_contains` — travels
+        in the request body, out of access logs / proxy caches / browser history.
         Non-sensitive filters stay in query params.
       security:
         - sessionCookie: []
@@ -483,6 +483,7 @@ paths:
       parameters:
         - { in: query, name: is_suspended, schema: { type: boolean } }
         - { in: query, name: is_deleted, schema: { type: boolean } }
+        - { in: query, name: is_verified, schema: { type: boolean } }
         - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
         - { in: query, name: per_page, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
       requestBody:
@@ -492,7 +493,11 @@ paths:
             schema:
               type: object
               properties:
-                email: { type: string, format: email }
+                email_contains:
+                  type: string
+                  minLength: 1
+                  maxLength: 254
+                  description: Case-insensitive substring match against email.
       responses:
         "200":
           description: Users collection
