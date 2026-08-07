@@ -84,6 +84,14 @@ class BucketResolverTest {
     }
 
     @Test
+    void resolve_authenticatedAdminUsersSearchPost_returnsReadBucketKeyedByUserId() {
+        BucketSelection selection = resolver.resolve(request("POST", "/api/v1/admin/users"), AUTHENTICATED);
+
+        assertThat(selection.bucketName()).isEqualTo("RL.read");
+        assertThat(selection.key()).isEqualTo(USER_ID);
+    }
+
+    @Test
     void resolve_authenticatedDelete_returnsWriteBucketKeyedByUserId() {
         BucketSelection selection =
                 resolver.resolve(request("DELETE", "/api/v1/alert-rules/abc"), AUTHENTICATED);

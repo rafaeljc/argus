@@ -12,7 +12,6 @@ import io.github.rafaeljc.argus.users.domain.User;
 import java.time.Instant;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CompletePasswordReset {
@@ -39,7 +38,6 @@ public class CompletePasswordReset {
     // lifecycle without a valid token. Single-use is enforced by the read-then-write inside this
     // transaction (see VerifyEmail). No new session is issued — the user re-authenticates via
     // /auth/login, keeping future MFA / device / geo policies attached to one entry point.
-    @Transactional
     public void execute(String plainToken, String newPassword) {
         try {
             User updated = redeem(plainToken, newPassword);

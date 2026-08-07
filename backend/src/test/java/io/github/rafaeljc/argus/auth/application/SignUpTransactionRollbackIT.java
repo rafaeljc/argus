@@ -15,8 +15,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * Proves the SignUp transaction contract: user, verification token and outbox row are
- * written atomically. If the outbox enqueue fails, nothing else survives — no orphan
+ * Proves the AuthService.signUp transaction contract: user, verification token and outbox
+ * row are written atomically. If the outbox enqueue fails, nothing else survives — no orphan
  * user rows, no orphan verification tokens. This is what makes it safe to treat
  * "signup returned 201" as "the verification email will be sent."
  */
@@ -28,7 +28,7 @@ class SignUpTransactionRollbackIT {
     private static final String PASSWORD = "correct horse battery staple";
 
     @Autowired
-    private SignUp signUp;
+    private AuthService authService;
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -37,11 +37,11 @@ class SignUpTransactionRollbackIT {
     private EmailService emailService;
 
     @Test
-    void execute_outboxEnqueueFails_rollsBackUserAndVerificationInsertsAtomically() {
+    void signUp_outboxEnqueueFails_rollsBackUserAndVerificationInsertsAtomically() {
         RuntimeException failure = new RuntimeException("simulated vendor-side enqueue failure");
         doThrow(failure).when(emailService).enqueue(any(), any(), any(), any());
 
-        assertThatThrownBy(() -> signUp.execute(EMAIL, PASSWORD)).isSameAs(failure);
+        assertThatThrownBy(() -> authService.signUp(EMAIL, PASSWORD)).isSameAs(failure);
 
         assertRowCount("users", 0);
         assertRowCount("email_verifications", 0);

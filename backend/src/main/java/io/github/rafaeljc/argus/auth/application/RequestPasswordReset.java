@@ -19,7 +19,6 @@ import java.util.Map;
 import java.util.Optional;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 @Service
@@ -58,7 +57,6 @@ public class RequestPasswordReset {
     // TODO: NFR-Sec7 — the silent branches skip token generation, the DB insert, and the outbox
     // insert, leaving a wall-clock delta an attacker can measure to enumerate registered
     // addresses. Login closes the analogous gap via UserService.verifyPasswordForUnknownUser.
-    @Transactional
     public void execute(String email) {
         String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
         try {
