@@ -1,8 +1,10 @@
 package io.github.rafaeljc.argus.eodpipeline.infrastructure;
 
 import io.github.rafaeljc.argus.common.domain.Clock;
+import io.github.rafaeljc.argus.eodpipeline.application.FailInterruptedRuns;
 import io.github.rafaeljc.argus.eodpipeline.application.TriggerRun;
 import io.github.rafaeljc.argus.eodpipeline.infrastructure.scheduler.EodPipelineScheduler;
+import io.github.rafaeljc.argus.eodpipeline.infrastructure.scheduler.InterruptedRunReaper;
 import io.github.rafaeljc.argus.marketdata.application.port.MarketCalendar;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -33,5 +35,13 @@ public class EodPipelineInfrastructureConfig {
     public EodPipelineScheduler eodPipelineScheduler(
             MarketCalendar marketCalendar, TriggerRun triggerRun, Clock clock) {
         return new EodPipelineScheduler(marketCalendar, triggerRun, clock);
+    }
+
+    // Same profile whitelist as the scheduler: an *IT context starts and stops repeatedly against a
+    // shared database, and this would fail runs other tests had just seeded.
+    @Bean
+    @Profile({"local", "prod"})
+    public InterruptedRunReaper interruptedRunReaper(FailInterruptedRuns failInterruptedRuns) {
+        return new InterruptedRunReaper(failInterruptedRuns);
     }
 }
