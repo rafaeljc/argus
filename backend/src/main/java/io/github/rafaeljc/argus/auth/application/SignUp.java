@@ -19,7 +19,6 @@ import java.util.Map;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 @Service
@@ -54,7 +53,6 @@ public class SignUp {
         this.secureRandom = Tokens.strongSecureRandom();
     }
 
-    @Transactional
     public SignUpResult execute(String email, String password) {
         try {
             User user = createUser(email, password);

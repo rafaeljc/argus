@@ -17,7 +17,6 @@ import java.util.Locale;
 import java.util.Optional;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class Login {
@@ -39,7 +38,6 @@ public class Login {
         this.secureRandom = Tokens.strongSecureRandom();
     }
 
-    @Transactional
     public LoginResult execute(String email, String password, String ipAddress, String userAgent) {
         String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
         try {

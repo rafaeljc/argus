@@ -6,7 +6,6 @@ import io.github.rafaeljc.argus.common.domain.SessionId;
 import io.github.rafaeljc.argus.common.domain.UserId;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class Logout {
@@ -19,7 +18,6 @@ public class Logout {
         this.events = events;
     }
 
-    @Transactional
     public void execute(SessionId sessionId, UserId userId) {
         sessionRepository.deleteById(sessionId);
         events.publishEvent(new AuthAuditEvent.LogoutSucceeded(userId));

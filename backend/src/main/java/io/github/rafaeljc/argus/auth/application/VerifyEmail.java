@@ -11,7 +11,6 @@ import io.github.rafaeljc.argus.users.domain.User;
 import java.time.Instant;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class VerifyEmail {
@@ -35,7 +34,6 @@ public class VerifyEmail {
     // redeems of the same token race on the row; the second either sees verifiedAt already set
     // and throws, or is serialized behind the first commit. Unknown / expired / used all collapse
     // to INVALID_TOKEN so callers cannot probe lifecycle without a valid token.
-    @Transactional
     public void execute(String plainToken) {
         try {
             User verified = redeem(plainToken);

@@ -1,15 +1,9 @@
 package io.github.rafaeljc.argus.auth.web;
 
-import io.github.rafaeljc.argus.auth.application.CompletePasswordReset;
-import io.github.rafaeljc.argus.auth.application.GetSessionStatus;
-import io.github.rafaeljc.argus.auth.application.Login;
+import io.github.rafaeljc.argus.auth.application.AuthService;
 import io.github.rafaeljc.argus.auth.application.LoginResult;
-import io.github.rafaeljc.argus.auth.application.Logout;
-import io.github.rafaeljc.argus.auth.application.RequestPasswordReset;
 import io.github.rafaeljc.argus.auth.application.SessionStatusResult;
-import io.github.rafaeljc.argus.auth.application.SignUp;
 import io.github.rafaeljc.argus.auth.application.SignUpResult;
-import io.github.rafaeljc.argus.auth.application.VerifyEmail;
 import io.github.rafaeljc.argus.common.web.SuccessEnvelope;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -31,39 +25,21 @@ class AuthController {
     private static final int USER_AGENT_MAX_CHARS = 512;
     private static final String USER_AGENT_HEADER = "User-Agent";
 
-    private final SignUp signUp;
-    private final Login login;
-    private final Logout logout;
-    private final GetSessionStatus getSessionStatus;
-    private final VerifyEmail verifyEmail;
-    private final RequestPasswordReset requestPasswordReset;
-    private final CompletePasswordReset completePasswordReset;
+    private final AuthService authService;
     private final SessionCookieFactory sessionCookieFactory;
     private final CsrfCookieFactory csrfCookieFactory;
 
-    AuthController(SignUp signUp,
-                   Login login,
-                   Logout logout,
-                   GetSessionStatus getSessionStatus,
-                   VerifyEmail verifyEmail,
-                   RequestPasswordReset requestPasswordReset,
-                   CompletePasswordReset completePasswordReset,
+    AuthController(AuthService authService,
                    SessionCookieFactory sessionCookieFactory,
                    CsrfCookieFactory csrfCookieFactory) {
-        this.signUp = signUp;
-        this.login = login;
-        this.logout = logout;
-        this.getSessionStatus = getSessionStatus;
-        this.verifyEmail = verifyEmail;
-        this.requestPasswordReset = requestPasswordReset;
-        this.completePasswordReset = completePasswordReset;
+        this.authService = authService;
         this.sessionCookieFactory = sessionCookieFactory;
         this.csrfCookieFactory = csrfCookieFactory;
     }
 
     @PostMapping("/signup")
     ResponseEntity<SuccessEnvelope<SignUpResponse>> signup(@Valid @RequestBody SignUpRequest body) {
-        SignUpResult result = signUp.execute(body.email(), body.password());
+        SignUpResult result = authService.signUp(body.email(), body.password());
         SignUpResponse response = new SignUpResponse(
                 result.userId().value().toString(), result.verificationSent());
         return ResponseEntity.created(ACCOUNT_ME_LOCATION).body(new SuccessEnvelope<>(response));
@@ -71,19 +47,19 @@ class AuthController {
 
     @PostMapping("/verify-email")
     ResponseEntity<Void> verifyEmail(@Valid @RequestBody VerifyEmailRequest body) {
-        verifyEmail.execute(body.token());
+        authService.verifyEmail(body.token());
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/password-reset-requests")
     ResponseEntity<Void> requestPasswordReset(@Valid @RequestBody RequestPasswordResetRequest body) {
-        requestPasswordReset.execute(body.email());
+        authService.requestPasswordReset(body.email());
         return ResponseEntity.accepted().build();
     }
 
     @PostMapping("/password-resets")
     ResponseEntity<Void> completePasswordReset(@Valid @RequestBody CompletePasswordResetRequest body) {
-        completePasswordReset.execute(body.token(), body.newPassword());
+        authService.completePasswordReset(body.token(), body.newPassword());
         return ResponseEntity.noContent().build();
     }
 
@@ -91,7 +67,7 @@ class AuthController {
     ResponseEntity<SuccessEnvelope<SessionResponse>> login(@Valid @RequestBody LoginRequest body,
                                                             HttpServletRequest request,
                                                             HttpServletResponse response) {
-        LoginResult result = login.execute(
+        LoginResult result = authService.login(
                 body.email(),
                 body.password(),
                 request.getRemoteAddr(),
@@ -107,7 +83,7 @@ class AuthController {
     @PostMapping("/logout")
     ResponseEntity<Void> logout(@AuthenticationPrincipal AuthenticatedSession principal,
                                 HttpServletResponse response) {
-        logout.execute(principal.sessionId(), principal.userId());
+        authService.logout(principal.sessionId(), principal.userId());
 
         // SessionResolutionFilter has already added refreshed cookies to this response; append
         // the cleared cookies so the browser applies Max-Age=0 last for both names.
@@ -120,7 +96,7 @@ class AuthController {
     @GetMapping("/status")
     ResponseEntity<SuccessEnvelope<SessionResponse>> status(
             @AuthenticationPrincipal AuthenticatedSession principal) {
-        SessionStatusResult result = getSessionStatus.execute(principal.sessionId());
+        SessionStatusResult result = authService.getSessionStatus(principal.sessionId());
         return ResponseEntity.ok(new SuccessEnvelope<>(new SessionResponse(
                 result.userId().value().toString(), result.expiresAt())));
     }
