@@ -246,9 +246,12 @@ class AdminEodPipelineControllerIT {
         assertThat(data.get("step").asString()).isEqualTo("prices");
         assertThat(data.get("status").asString()).isEqualTo("in_progress");
 
+        // The run is in_progress, but prices is queued rather than running: the worker marks it
+        // in_progress when it claims it, which is what lets a competing rerun be rejected.
         EodPipelineRun updated = runs.findById(saved.id()).orElseThrow();
+        assertThat(updated.status()).isEqualTo(RunStatus.IN_PROGRESS);
         assertThat(updated.stepSymbolsStatus()).isEqualTo(StepStatus.SUCCEEDED);
-        assertThat(updated.stepPricesStatus()).isEqualTo(StepStatus.IN_PROGRESS);
+        assertThat(updated.stepPricesStatus()).isEqualTo(StepStatus.PENDING);
         assertThat(updated.stepEvaluateStatus()).isEqualTo(StepStatus.PENDING);
         assertThat(dispatcher.dispatchedFrom())
                 .contains(new RecordingRunDispatcher.DispatchedFrom(saved.id(), PipelineStep.PRICES));
