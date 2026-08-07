@@ -12,6 +12,7 @@ public class BucketResolver {
     private static final String SIGNUP_PATH = "/api/v1/auth/signup";
     private static final String LOGIN_PATH = "/api/v1/auth/login";
     private static final String PASSWORD_RESET_REQUEST_PATH = "/api/v1/auth/password-reset-requests";
+    private static final String ADMIN_USERS_SEARCH_PATH = "/api/v1/admin/users";
 
     // Public POST endpoints reachable without a session, all bucketed under the shared
     // pre-login global limit and keyed by remote IP.
@@ -44,7 +45,10 @@ public class BucketResolver {
         }
 
         if (userId.isPresent()) {
-            String bucketName = READ_METHODS.contains(method) ? "RL.read" : "RL.write";
+            // POST /admin/users is a search, not a write: the body carries the email filter so
+            // it stays off access logs, but the request is read-only and rated RL.read.
+            boolean isReadPost = "POST".equals(method) && ADMIN_USERS_SEARCH_PATH.equals(uri);
+            String bucketName = READ_METHODS.contains(method) || isReadPost ? "RL.read" : "RL.write";
             return new BucketSelection(bucketName, userId.get());
         }
 
