@@ -5,10 +5,8 @@ import io.github.rafaeljc.argus.users.application.AdminUserSearchCriteria;
 import io.github.rafaeljc.argus.users.application.port.AdminUserQuery;
 import io.github.rafaeljc.argus.users.domain.User;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@Transactional(readOnly = true)
 public class SearchUsers {
 
     private final AdminUserQuery adminUserQuery;

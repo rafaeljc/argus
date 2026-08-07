@@ -5,10 +5,8 @@ import io.github.rafaeljc.argus.common.domain.UserId;
 import io.github.rafaeljc.argus.users.application.port.AdminUserQuery;
 import io.github.rafaeljc.argus.users.domain.User;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@Transactional(readOnly = true)
 public class GetUser {
 
     private final AdminUserQuery adminUserQuery;
