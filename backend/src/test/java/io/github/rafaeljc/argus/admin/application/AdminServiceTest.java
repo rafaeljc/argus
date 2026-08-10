@@ -37,11 +37,14 @@ class AdminServiceTest {
     @Mock
     private DeleteUser deleteUser;
 
+    @Mock
+    private ListAuditLog listAuditLog;
+
     private AdminService service;
 
     @BeforeEach
     void setUp() {
-        service = new AdminService(searchUsers, getUser, suspendUser, unsuspendUser, deleteUser);
+        service = new AdminService(searchUsers, getUser, suspendUser, unsuspendUser, deleteUser, listAuditLog);
     }
 
     @Test
@@ -101,5 +104,16 @@ class AdminServiceTest {
         User result = service.deleteUser(USER_ID, ACTOR_ID, "policy");
 
         assertThat(result).isEqualTo(user);
+    }
+
+    @Test
+    void listAuditLog_delegatesToListAuditLogUseCase() {
+        AuditLogFilter filter = new AuditLogFilter(null, null, null, null, null);
+        PageResult<AuditLogEntryView> expected = new PageResult<>(List.of(), 0, 1, 50);
+        when(listAuditLog.list(filter, 1, 50)).thenReturn(expected);
+
+        PageResult<AuditLogEntryView> result = service.listAuditLog(filter, 1, 50);
+
+        assertThat(result).isSameAs(expected);
     }
 }
