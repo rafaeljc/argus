@@ -48,6 +48,10 @@ public class JdbcAuditLogRepository implements AuditLogRepository {
         Map<String, Object> fields = switch (metadata) {
             case AuditMetadata.UserAction userAction ->
                     Collections.singletonMap("reason", userAction.reason());
+            case AuditMetadata.EodRun eodRun ->
+                    Map.of("run_id", eodRun.runId().value().toString(), "run_date", eodRun.runDate().toString());
+            case AuditMetadata.EodStepRerun eodStepRerun ->
+                    Map.of("run_id", eodStepRerun.runId().value().toString(), "step", eodStepRerun.step());
         };
         return objectMapper.writeValueAsString(fields);
     }

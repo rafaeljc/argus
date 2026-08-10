@@ -1,0 +1,49 @@
+package io.github.rafaeljc.argus.admin.application;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
+
+import com.github.f4b6a3.uuid.UuidCreator;
+import io.github.rafaeljc.argus.admin.application.port.AuditLogRepository;
+import io.github.rafaeljc.argus.admin.domain.AdminAction;
+import io.github.rafaeljc.argus.admin.domain.AuditLogEntry;
+import io.github.rafaeljc.argus.admin.domain.AuditMetadata;
+import io.github.rafaeljc.argus.common.domain.FixedClock;
+import io.github.rafaeljc.argus.common.domain.RunId;
+import io.github.rafaeljc.argus.common.domain.UserId;
+import io.github.rafaeljc.argus.eodpipeline.application.event.EodStepRerunTriggered;
+import io.github.rafaeljc.argus.eodpipeline.domain.PipelineStep;
+import java.time.Instant;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+@ExtendWith(MockitoExtension.class)
+class LogAuditOnEodStepRerunTriggeredTest {
+
+    private static final Instant NOW = Instant.parse("2026-06-22T21:00:00Z");
+
+    @Mock
+    private AuditLogRepository auditLogRepository;
+
+    @Test
+    void on_eodStepRerunTriggered_insertsAuditRowWithStepMetadata() {
+        LogAuditOnEodStepRerunTriggered listener =
+                new LogAuditOnEodStepRerunTriggered(auditLogRepository, new FixedClock(NOW));
+        RunId runId = new RunId(UuidCreator.getTimeOrderedEpoch());
+        UserId actorId = new UserId(UuidCreator.getTimeOrderedEpoch());
+
+        listener.on(new EodStepRerunTriggered(runId, PipelineStep.PRICES, actorId));
+
+        ArgumentCaptor<AuditLogEntry> captor = ArgumentCaptor.forClass(AuditLogEntry.class);
+        verify(auditLogRepository).insert(captor.capture());
+        AuditLogEntry entry = captor.getValue();
+        assertThat(entry.actorId()).isEqualTo(actorId);
+        assertThat(entry.action()).isEqualTo(AdminAction.EOD_STEP_RERUN);
+        assertThat(entry.targetUserId()).isNull();
+        assertThat(entry.metadata()).isEqualTo(new AuditMetadata.EodStepRerun(runId, "prices"));
+        assertThat(entry.createdAt()).isEqualTo(NOW);
+    }
+}
