@@ -33,7 +33,8 @@ public class UserLifecycleService implements UserLifecycle {
         if (current.isSuspended()) {
             return new UserStateChange(current, false);
         }
-        User saved = repository.save(withFlags(current, true, current.isDeleted(), current.deletedAt()));
+        Instant now = clock.now();
+        User saved = repository.save(withFlags(current, true, current.isDeleted(), current.deletedAt(), now));
         events.publishEvent(new UserSuspended(saved.id()));
         return new UserStateChange(saved, true);
     }
@@ -45,7 +46,8 @@ public class UserLifecycleService implements UserLifecycle {
         if (!current.isSuspended()) {
             return new UserStateChange(current, false);
         }
-        User saved = repository.save(withFlags(current, false, current.isDeleted(), current.deletedAt()));
+        Instant now = clock.now();
+        User saved = repository.save(withFlags(current, false, current.isDeleted(), current.deletedAt(), now));
         return new UserStateChange(saved, true);
     }
 
@@ -57,7 +59,7 @@ public class UserLifecycleService implements UserLifecycle {
             return new UserStateChange(current, false);
         }
         Instant now = clock.now();
-        User saved = repository.save(withFlags(current, current.isSuspended(), true, now));
+        User saved = repository.save(withFlags(current, current.isSuspended(), true, now, now));
         events.publishEvent(new UserSoftDeleted(saved.id()));
         return new UserStateChange(saved, true);
     }
@@ -67,7 +69,7 @@ public class UserLifecycleService implements UserLifecycle {
                 .orElseThrow(() -> new ResourceNotFoundException("user not found: " + id.value()));
     }
 
-    private User withFlags(User current, boolean suspended, boolean deleted, Instant deletedAt) {
+    private User withFlags(User current, boolean suspended, boolean deleted, Instant deletedAt, Instant updatedAt) {
         return new User(
                 current.id(),
                 current.email(),
@@ -77,7 +79,7 @@ public class UserLifecycleService implements UserLifecycle {
                 deleted,
                 current.isAdmin(),
                 current.createdAt(),
-                clock.now(),
+                updatedAt,
                 deletedAt);
     }
 }

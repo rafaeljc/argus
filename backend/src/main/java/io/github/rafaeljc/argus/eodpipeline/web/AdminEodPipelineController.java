@@ -6,6 +6,7 @@ import io.github.rafaeljc.argus.common.domain.ResourceNotFoundException;
 import io.github.rafaeljc.argus.common.domain.RunId;
 import io.github.rafaeljc.argus.common.domain.UserId;
 import io.github.rafaeljc.argus.common.web.CollectionEnvelope;
+import io.github.rafaeljc.argus.common.web.CurrentUserId;
 import io.github.rafaeljc.argus.common.web.SuccessEnvelope;
 import io.github.rafaeljc.argus.eodpipeline.application.EodPipelineService;
 import io.github.rafaeljc.argus.eodpipeline.domain.EodPipelineRun;
@@ -17,8 +18,6 @@ import jakarta.validation.constraints.Min;
 import java.time.LocalDate;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -42,9 +41,10 @@ class AdminEodPipelineController {
 
     @PostMapping
     ResponseEntity<SuccessEnvelope<EodPipelineRunResponse>> trigger(
+            @CurrentUserId UserId actorId,
             @Valid @RequestBody(required = false) TriggerRunRequest body) {
         LocalDate runDate = (body != null && body.runDate() != null) ? body.runDate() : clock.today();
-        EodPipelineRun run = eodPipelineService.triggerPipelineRun(runDate, Trigger.ADMIN, currentAdminId());
+        EodPipelineRun run = eodPipelineService.triggerPipelineRun(runDate, Trigger.ADMIN, actorId);
         return ResponseEntity.created(ServletUriComponentsBuilder.fromCurrentRequest()
                         .path("/{id}")
                         .buildAndExpand(run.id().value())
@@ -79,16 +79,11 @@ class AdminEodPipelineController {
 
     @PostMapping("/{runId}/steps/{step}")
     ResponseEntity<SuccessEnvelope<EodStepResponse>> rerunFromStep(
-            @PathVariable UUID runId, @PathVariable String step) {
+            @PathVariable UUID runId, @PathVariable String step, @CurrentUserId UserId actorId) {
         PipelineStep entryStep = PipelineStep.fromWireValue(step)
                 .orElseThrow(() -> new ResourceNotFoundException("unknown eod pipeline step: " + step));
-        EodPipelineRun run = eodPipelineService.rerunFromStep(new RunId(runId), entryStep, currentAdminId());
+        EodPipelineRun run = eodPipelineService.rerunFromStep(new RunId(runId), entryStep, actorId);
         return ResponseEntity.ok(new SuccessEnvelope<>(EodStepResponse.from(run, entryStep)));
-    }
-
-    private static UserId currentAdminId() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        return new UserId(UUID.fromString(auth.getName()));
     }
 
     private static String pageUri(int page, int perPage) {
