@@ -15,17 +15,20 @@ public class AdminService {
     private final SuspendUser suspendUser;
     private final UnsuspendUser unsuspendUser;
     private final DeleteUser deleteUser;
+    private final ListAuditLog listAuditLog;
 
     public AdminService(SearchUsers searchUsers,
                         GetUser getUser,
                         SuspendUser suspendUser,
                         UnsuspendUser unsuspendUser,
-                        DeleteUser deleteUser) {
+                        DeleteUser deleteUser,
+                        ListAuditLog listAuditLog) {
         this.searchUsers = searchUsers;
         this.getUser = getUser;
         this.suspendUser = suspendUser;
         this.unsuspendUser = unsuspendUser;
         this.deleteUser = deleteUser;
+        this.listAuditLog = listAuditLog;
     }
 
     @Transactional(readOnly = true)
@@ -51,5 +54,10 @@ public class AdminService {
     @Transactional
     public User deleteUser(UserId targetId, UserId actorId, String reason) {
         return deleteUser.delete(targetId, actorId, reason);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<AuditLogEntryView> listAuditLog(AuditLogFilter filter, int page, int perPage) {
+        return listAuditLog.list(filter, page, perPage);
     }
 }
