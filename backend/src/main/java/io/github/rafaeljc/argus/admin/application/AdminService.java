@@ -12,10 +12,20 @@ public class AdminService {
 
     private final SearchUsers searchUsers;
     private final GetUser getUser;
+    private final SuspendUser suspendUser;
+    private final UnsuspendUser unsuspendUser;
+    private final DeleteUser deleteUser;
 
-    public AdminService(SearchUsers searchUsers, GetUser getUser) {
+    public AdminService(SearchUsers searchUsers,
+                        GetUser getUser,
+                        SuspendUser suspendUser,
+                        UnsuspendUser unsuspendUser,
+                        DeleteUser deleteUser) {
         this.searchUsers = searchUsers;
         this.getUser = getUser;
+        this.suspendUser = suspendUser;
+        this.unsuspendUser = unsuspendUser;
+        this.deleteUser = deleteUser;
     }
 
     @Transactional(readOnly = true)
@@ -26,5 +36,20 @@ public class AdminService {
     @Transactional(readOnly = true)
     public User getUser(UserId id) {
         return getUser.get(id);
+    }
+
+    @Transactional
+    public User suspendUser(UserId targetId, UserId actorId, String reason) {
+        return suspendUser.suspend(targetId, actorId, reason);
+    }
+
+    @Transactional
+    public User unsuspendUser(UserId targetId, UserId actorId, String reason) {
+        return unsuspendUser.unsuspend(targetId, actorId, reason);
+    }
+
+    @Transactional
+    public User deleteUser(UserId targetId, UserId actorId, String reason) {
+        return deleteUser.delete(targetId, actorId, reason);
     }
 }

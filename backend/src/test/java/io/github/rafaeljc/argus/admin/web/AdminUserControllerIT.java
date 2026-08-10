@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.TestRestTemplate;
@@ -32,6 +33,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -61,6 +63,166 @@ class AdminUserControllerIT {
 
     @Autowired
     private SessionRepository sessionRepository;
+
+    @Autowired
+    private JdbcTemplate jdbc;
+
+    @Test
+    void suspend_activeUser_returns200SuspendsAndPurgesSessions() throws Exception {
+        User admin = seedAdmin("admin-suspend1@example.com");
+        User target = seedPlain("target-suspend1@example.com");
+        seedSession(target);
+
+        ResponseEntity<String> response = action(admin, target.id(), "suspend", "{\"reason\":\"abuse\"}");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        JsonNode data = json.readTree(response.getBody()).get("data");
+        assertThat(data.get("id").asString()).isEqualTo(target.id().value().toString());
+        assertThat(data.get("is_suspended").asBoolean()).isTrue();
+        assertThat(sessionRepository.findByUserId(target.id())).isEmpty();
+    }
+
+    @Test
+    void suspend_repeatedCall_writesExactlyOneAuditRow() throws Exception {
+        User admin = seedAdmin("admin-suspend2@example.com");
+        User target = seedPlain("target-suspend2@example.com");
+
+        action(admin, target.id(), "suspend", "{\"reason\":\"abuse\"}");
+        ResponseEntity<String> second = action(admin, target.id(), "suspend", "{\"reason\":\"abuse\"}");
+
+        assertThat(second.getStatusCode().value()).isEqualTo(200);
+        assertThat(auditRowCount(target.id(), "SUSPEND")).isEqualTo(1);
+    }
+
+    @Test
+    void suspend_reason_landsInAuditMetadata() throws Exception {
+        User admin = seedAdmin("admin-suspend3@example.com");
+        User target = seedPlain("target-suspend3@example.com");
+
+        action(admin, target.id(), "suspend", "{\"reason\":\"repeated abuse reports\"}");
+
+        Map<String, Object> row = jdbc.queryForMap(
+                "SELECT metadata FROM admin_audit_log WHERE target_user_id = ? AND action = 'SUSPEND'",
+                target.id().value());
+        assertThat(row.get("metadata").toString()).contains("repeated abuse reports");
+    }
+
+    @Test
+    void suspend_unknownUser_returns404() throws Exception {
+        User admin = seedAdmin("admin-suspend4@example.com");
+
+        ResponseEntity<String> response =
+                action(admin, new UserId(UuidCreator.getTimeOrderedEpoch()), "suspend", null);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(404);
+    }
+
+    @Test
+    void suspend_nonAdminActor_returns403() throws Exception {
+        User nonAdmin = seedPlain("actor-suspend5@example.com");
+        User target = seedPlain("target-suspend5@example.com");
+
+        ResponseEntity<String> response = action(nonAdmin, target.id(), "suspend", null);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(403);
+    }
+
+    @Test
+    void unsuspend_suspendedUser_returns200AndDoesNotPurgeSessions() throws Exception {
+        User admin = seedAdmin("admin-unsuspend1@example.com");
+        User target = seedPlain("target-unsuspend1@example.com");
+        suspend(target.id());
+        seedSession(target);
+
+        ResponseEntity<String> response = action(admin, target.id(), "unsuspend", "{\"reason\":\"appeal\"}");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        JsonNode data = json.readTree(response.getBody()).get("data");
+        assertThat(data.get("is_suspended").asBoolean()).isFalse();
+        assertThat(sessionRepository.findByUserId(target.id())).isNotEmpty();
+    }
+
+    @Test
+    void unsuspend_repeatedCall_writesExactlyOneAuditRow() throws Exception {
+        User admin = seedAdmin("admin-unsuspend2@example.com");
+        User target = seedPlain("target-unsuspend2@example.com");
+        suspend(target.id());
+
+        action(admin, target.id(), "unsuspend", "{\"reason\":\"appeal\"}");
+        ResponseEntity<String> second = action(admin, target.id(), "unsuspend", "{\"reason\":\"appeal\"}");
+
+        assertThat(second.getStatusCode().value()).isEqualTo(200);
+        assertThat(auditRowCount(target.id(), "UNSUSPEND")).isEqualTo(1);
+    }
+
+    @Test
+    void delete_activeUser_returns200DeletesAndPurgesSessions() throws Exception {
+        User admin = seedAdmin("admin-delete1@example.com");
+        User target = seedPlain("target-delete1@example.com");
+        seedSession(target);
+
+        ResponseEntity<String> response = action(admin, target.id(), "delete", "{\"reason\":\"policy\"}");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        JsonNode data = json.readTree(response.getBody()).get("data");
+        assertThat(data.get("is_deleted").asBoolean()).isTrue();
+        assertThat(data.get("deleted_at").isNull()).isFalse();
+        assertThat(sessionRepository.findByUserId(target.id())).isEmpty();
+    }
+
+    @Test
+    void delete_repeatedCall_writesExactlyOneAuditRowAndDoesNotRestampDeletedAt() throws Exception {
+        User admin = seedAdmin("admin-delete2@example.com");
+        User target = seedPlain("target-delete2@example.com");
+
+        ResponseEntity<String> first = action(admin, target.id(), "delete", "{\"reason\":\"policy\"}");
+        ResponseEntity<String> second = action(admin, target.id(), "delete", "{\"reason\":\"policy\"}");
+
+        assertThat(second.getStatusCode().value()).isEqualTo(200);
+        assertThat(auditRowCount(target.id(), "DELETE")).isEqualTo(1);
+        String firstDeletedAt = json.readTree(first.getBody()).get("data").get("deleted_at").asString();
+        String secondDeletedAt = json.readTree(second.getBody()).get("data").get("deleted_at").asString();
+        assertThat(secondDeletedAt).isEqualTo(firstDeletedAt);
+    }
+
+    @Test
+    void delete_thenLogin_isRejectedByAccountStateGate() throws Exception {
+        User admin = seedAdmin("admin-delete3@example.com");
+        User target = seedPlain("target-delete3@example.com");
+
+        action(admin, target.id(), "delete", null);
+
+        String sessionToken = seedSession(target);
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(HttpHeaders.COOKIE, SessionCookieFactory.COOKIE_NAME + "=" + sessionToken);
+        ResponseEntity<String> gated = http.exchange(
+                "http://localhost:" + port + "/api/v1/portfolio",
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                String.class);
+        assertThat(gated.getStatusCode().value()).isEqualTo(401);
+    }
+
+    private int auditRowCount(UserId targetId, String action) {
+        return jdbc.queryForObject(
+                "SELECT COUNT(*) FROM admin_audit_log WHERE target_user_id = ? AND action = ?",
+                Integer.class, targetId.value(), action);
+    }
+
+    private ResponseEntity<String> action(User authenticatedAs, UserId targetId, String actionName, String jsonBody) {
+        HttpHeaders headers = new HttpHeaders();
+        String sessionToken = seedSession(authenticatedAs);
+        headers.add(HttpHeaders.COOKIE,
+                SessionCookieFactory.COOKIE_NAME + "=" + sessionToken
+                        + "; " + CsrfCookieFactory.COOKIE_NAME + "=" + CSRF_VALUE);
+        headers.add("X-CSRF-Token", CSRF_VALUE);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return http.exchange(
+                "http://localhost:" + port + ENDPOINT + "/" + targetId.value() + "/" + actionName,
+                HttpMethod.POST,
+                new HttpEntity<>(jsonBody, headers),
+                String.class);
+    }
 
     @Test
     void search_noFilters_returnsAllUsersWithEnvelope() throws Exception {

@@ -1064,7 +1064,6 @@ components:
                 is_suspended: { type: boolean }
                 is_deleted: { type: boolean }
                 deleted_at: { type: string, format: date-time, nullable: true }
-                audit_id: { type: string, format: uuid }
 
     AuditLogEntry:
       type: object
