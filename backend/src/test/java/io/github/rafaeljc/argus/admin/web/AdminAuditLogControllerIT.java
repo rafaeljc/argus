@@ -97,6 +97,45 @@ class AdminAuditLogControllerIT {
         assertThat(response.getStatusCode().value()).isEqualTo(403);
     }
 
+    @Test
+    void list_unauthenticated_returns401() {
+        ResponseEntity<String> response = http.exchange(
+                "http://localhost:" + port + ENDPOINT, HttpMethod.GET, HttpEntity.EMPTY, String.class);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(401);
+    }
+
+    @Test
+    void list_invalidAction_returns400() {
+        User admin = seedAdmin("admin2@example.com");
+
+        ResponseEntity<String> response = list(admin, "?action=not_a_real_action");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+    }
+
+    @Test
+    void list_perPageOverMax_returns422() {
+        User admin = seedAdmin("admin3@example.com");
+
+        ResponseEntity<String> response = list(admin, "?per_page=201");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(422);
+    }
+
+    @Test
+    void list_pagination_linksNextIsNullOnLastPage() throws Exception {
+        User admin = seedAdmin("admin4@example.com");
+        User target = seedPlain("target4@example.com");
+        auditLogRepository.insert(new AuditLogEntry(new AuditEntryId(UuidCreator.getTimeOrderedEpoch()),
+                admin.id(), AdminAction.SUSPEND, target.id(), null, CREATED_AT));
+
+        ResponseEntity<String> response = list(admin, "?page=1&per_page=50");
+
+        JsonNode links = json.readTree(response.getBody()).get("links");
+        assertThat(links.get("next").isNull()).isTrue();
+    }
+
     private ResponseEntity<String> list(User authenticatedAs, String query) {
         HttpHeaders headers = new HttpHeaders();
         String sessionToken = seedSession(authenticatedAs);
