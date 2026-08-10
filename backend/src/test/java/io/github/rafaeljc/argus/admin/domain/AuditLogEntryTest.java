@@ -18,16 +18,18 @@ class AuditLogEntryTest {
     private static final UserId TARGET_ID = new UserId(UUID.fromString("33333333-3333-3333-3333-333333333333"));
     private static final Instant CREATED_AT = Instant.parse("2026-06-15T21:00:00Z");
 
+    private static final AuditMetadata METADATA = new AuditMetadata.UserAction("abuse");
+
     @ParameterizedTest
     @EnumSource(value = AdminAction.class, names = {"SUSPEND", "UNSUSPEND", "DELETE"})
     void constructor_userTargetedActionWithTargetUser_isAllowed(AdminAction action) {
-        AuditLogEntry entry = new AuditLogEntry(ID, ACTOR_ID, action, TARGET_ID, "{\"reason\":\"abuse\"}", CREATED_AT);
+        AuditLogEntry entry = new AuditLogEntry(ID, ACTOR_ID, action, TARGET_ID, METADATA, CREATED_AT);
 
         assertThat(entry.id()).isEqualTo(ID);
         assertThat(entry.actorId()).isEqualTo(ACTOR_ID);
         assertThat(entry.action()).isEqualTo(action);
         assertThat(entry.targetUserId()).isEqualTo(TARGET_ID);
-        assertThat(entry.metadataJson()).isEqualTo("{\"reason\":\"abuse\"}");
+        assertThat(entry.metadata()).isEqualTo(METADATA);
         assertThat(entry.createdAt()).isEqualTo(CREATED_AT);
     }
 
@@ -42,7 +44,7 @@ class AuditLogEntryTest {
     @ParameterizedTest
     @EnumSource(value = AdminAction.class, names = {"EOD_RUN", "EOD_STEP_RERUN"})
     void constructor_pipelineActionWithoutTargetUser_isAllowed(AdminAction action) {
-        AuditLogEntry entry = new AuditLogEntry(ID, ACTOR_ID, action, null, "{\"run_id\":\"abc\"}", CREATED_AT);
+        AuditLogEntry entry = new AuditLogEntry(ID, ACTOR_ID, action, null, null, CREATED_AT);
 
         assertThat(entry.targetUserId()).isNull();
     }
@@ -59,7 +61,7 @@ class AuditLogEntryTest {
     void constructor_nullMetadata_isAllowed() {
         AuditLogEntry entry = new AuditLogEntry(ID, ACTOR_ID, AdminAction.EOD_RUN, null, null, CREATED_AT);
 
-        assertThat(entry.metadataJson()).isNull();
+        assertThat(entry.metadata()).isNull();
     }
 
     @Test
