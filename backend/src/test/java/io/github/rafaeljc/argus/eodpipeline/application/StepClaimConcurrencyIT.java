@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.rafaeljc.argus.common.domain.RunId;
+import io.github.rafaeljc.argus.common.domain.UserId;
 import io.github.rafaeljc.argus.eodpipeline.application.port.EodPipelineRunRepository;
 import io.github.rafaeljc.argus.eodpipeline.application.port.RunDispatcher;
 import io.github.rafaeljc.argus.eodpipeline.domain.EodPipelineRun;
@@ -119,7 +120,7 @@ class StepClaimConcurrencyIT {
             assertThat(workStarted.await(MUST_NOT_BLOCK.toSeconds(), TimeUnit.SECONDS)).isTrue();
 
             // Fails against the advisory-lock version, which blocks here until releaseWork fires.
-            assertThatThrownBy(() -> service.rerunFromStep(id, PipelineStep.PRICES))
+            assertThatThrownBy(() -> service.rerunFromStep(id, PipelineStep.PRICES, new UserId(UUID.randomUUID())))
                     .isInstanceOf(RunNotSettledException.class);
 
             releaseWork.countDown();

@@ -4,7 +4,9 @@ import io.github.rafaeljc.argus.common.application.PageResult;
 import io.github.rafaeljc.argus.common.domain.Clock;
 import io.github.rafaeljc.argus.common.domain.ResourceNotFoundException;
 import io.github.rafaeljc.argus.common.domain.RunId;
+import io.github.rafaeljc.argus.common.domain.UserId;
 import io.github.rafaeljc.argus.common.web.CollectionEnvelope;
+import io.github.rafaeljc.argus.common.web.CurrentUserId;
 import io.github.rafaeljc.argus.common.web.SuccessEnvelope;
 import io.github.rafaeljc.argus.eodpipeline.application.EodPipelineService;
 import io.github.rafaeljc.argus.eodpipeline.domain.EodPipelineRun;
@@ -39,9 +41,10 @@ class AdminEodPipelineController {
 
     @PostMapping
     ResponseEntity<SuccessEnvelope<EodPipelineRunResponse>> trigger(
+            @CurrentUserId UserId actorId,
             @Valid @RequestBody(required = false) TriggerRunRequest body) {
         LocalDate runDate = (body != null && body.runDate() != null) ? body.runDate() : clock.today();
-        EodPipelineRun run = eodPipelineService.triggerPipelineRun(runDate, Trigger.ADMIN);
+        EodPipelineRun run = eodPipelineService.triggerPipelineRun(runDate, Trigger.ADMIN, actorId);
         return ResponseEntity.created(ServletUriComponentsBuilder.fromCurrentRequest()
                         .path("/{id}")
                         .buildAndExpand(run.id().value())
@@ -76,10 +79,10 @@ class AdminEodPipelineController {
 
     @PostMapping("/{runId}/steps/{step}")
     ResponseEntity<SuccessEnvelope<EodStepResponse>> rerunFromStep(
-            @PathVariable UUID runId, @PathVariable String step) {
+            @PathVariable UUID runId, @PathVariable String step, @CurrentUserId UserId actorId) {
         PipelineStep entryStep = PipelineStep.fromWireValue(step)
                 .orElseThrow(() -> new ResourceNotFoundException("unknown eod pipeline step: " + step));
-        EodPipelineRun run = eodPipelineService.rerunFromStep(new RunId(runId), entryStep);
+        EodPipelineRun run = eodPipelineService.rerunFromStep(new RunId(runId), entryStep, actorId);
         return ResponseEntity.ok(new SuccessEnvelope<>(EodStepResponse.from(run, entryStep)));
     }
 

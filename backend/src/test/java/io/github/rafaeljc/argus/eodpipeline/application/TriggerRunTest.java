@@ -10,6 +10,8 @@ import static org.mockito.Mockito.when;
 
 import io.github.rafaeljc.argus.common.domain.FixedClock;
 import io.github.rafaeljc.argus.common.domain.RunId;
+import io.github.rafaeljc.argus.common.domain.UserId;
+import io.github.rafaeljc.argus.eodpipeline.application.event.EodRunTriggered;
 import io.github.rafaeljc.argus.eodpipeline.application.port.EodPipelineRunRepository;
 import io.github.rafaeljc.argus.eodpipeline.application.port.RunDispatcher;
 import io.github.rafaeljc.argus.eodpipeline.domain.EodPipelineRun;
@@ -26,13 +28,16 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class TriggerRunTest {
 
     private static final Instant NOW = Instant.parse("2026-06-22T21:30:00Z");
     private static final LocalDate RUN_DATE = LocalDate.of(2026, 6, 22);
+    private static final UserId ACTOR_ID = new UserId(UUID.randomUUID());
 
     @Mock
     private EodPipelineRunRepository runs;
@@ -40,11 +45,14 @@ class TriggerRunTest {
     @Mock
     private RunDispatcher dispatcher;
 
+    private ApplicationEventPublisher events;
+
     private TriggerRun triggerRun;
 
     @BeforeEach
     void setUp() {
-        triggerRun = new TriggerRun(runs, dispatcher, new FixedClock(NOW));
+        events = Mockito.mock(ApplicationEventPublisher.class);
+        triggerRun = new TriggerRun(runs, dispatcher, new FixedClock(NOW), events);
     }
 
     @Test
@@ -52,7 +60,7 @@ class TriggerRunTest {
         when(runs.findActiveForDate(RUN_DATE)).thenReturn(Optional.empty());
         when(runs.insert(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        EodPipelineRun result = triggerRun.execute(RUN_DATE, Trigger.ADMIN);
+        EodPipelineRun result = triggerRun.execute(RUN_DATE, Trigger.ADMIN, ACTOR_ID);
 
         assertThat(result.runDate()).isEqualTo(RUN_DATE);
         assertThat(result.trigger()).isEqualTo(Trigger.ADMIN);
@@ -78,12 +86,37 @@ class TriggerRunTest {
                 StepStatus.IN_PROGRESS, StepStatus.PENDING, StepStatus.PENDING, null);
         when(runs.findActiveForDate(RUN_DATE)).thenReturn(Optional.of(active));
 
-        assertThatThrownBy(() -> triggerRun.execute(RUN_DATE, Trigger.ADMIN))
+        assertThatThrownBy(() -> triggerRun.execute(RUN_DATE, Trigger.ADMIN, ACTOR_ID))
                 .isInstanceOf(RunAlreadyActiveException.class)
                 .extracting("runDate")
                 .isEqualTo(RUN_DATE);
 
         verify(runs, never()).insert(any());
         verifyNoInteractions(dispatcher);
+        verifyNoInteractions(events);
+    }
+
+    @Test
+    void execute_actorIdPresent_publishesEodRunTriggeredEvent() {
+        when(runs.findActiveForDate(RUN_DATE)).thenReturn(Optional.empty());
+        when(runs.insert(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        EodPipelineRun result = triggerRun.execute(RUN_DATE, Trigger.ADMIN, ACTOR_ID);
+
+        ArgumentCaptor<EodRunTriggered> captor = ArgumentCaptor.forClass(EodRunTriggered.class);
+        verify(events).publishEvent(captor.capture());
+        assertThat(captor.getValue().runId()).isEqualTo(result.id());
+        assertThat(captor.getValue().runDate()).isEqualTo(RUN_DATE);
+        assertThat(captor.getValue().actorId()).isEqualTo(ACTOR_ID);
+    }
+
+    @Test
+    void execute_actorIdAbsent_doesNotPublishEvent() {
+        when(runs.findActiveForDate(RUN_DATE)).thenReturn(Optional.empty());
+        when(runs.insert(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        triggerRun.execute(RUN_DATE, Trigger.CRON, null);
+
+        verifyNoInteractions(events);
     }
 }

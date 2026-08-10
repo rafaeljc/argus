@@ -10,6 +10,8 @@ import static org.mockito.Mockito.when;
 
 import io.github.rafaeljc.argus.common.domain.ResourceNotFoundException;
 import io.github.rafaeljc.argus.common.domain.RunId;
+import io.github.rafaeljc.argus.common.domain.UserId;
+import io.github.rafaeljc.argus.eodpipeline.application.event.EodStepRerunTriggered;
 import io.github.rafaeljc.argus.eodpipeline.application.port.EodPipelineRunRepository;
 import io.github.rafaeljc.argus.eodpipeline.application.port.RunDispatcher;
 import io.github.rafaeljc.argus.eodpipeline.domain.EodPipelineRun;
@@ -28,6 +30,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 @ExtendWith(MockitoExtension.class)
 class RerunFromStepTest {
@@ -36,6 +39,7 @@ class RerunFromStepTest {
     private static final Instant FINISHED_AT = Instant.parse("2026-06-22T21:45:00Z");
     private static final RunId RUN_ID = new RunId(UUID.randomUUID());
     private static final LocalDate RUN_DATE = LocalDate.of(2026, 6, 22);
+    private static final UserId ACTOR_ID = new UserId(UUID.randomUUID());
 
     @Mock
     private EodPipelineRunRepository runs;
@@ -43,11 +47,14 @@ class RerunFromStepTest {
     @Mock
     private RunDispatcher dispatcher;
 
+    @Mock
+    private ApplicationEventPublisher events;
+
     private RerunFromStep rerunFromStep;
 
     @BeforeEach
     void setUp() {
-        rerunFromStep = new RerunFromStep(runs, dispatcher);
+        rerunFromStep = new RerunFromStep(runs, dispatcher, events);
     }
 
     private static EodPipelineRun failedRun(StepStatus symbols, StepStatus prices, StepStatus evaluate) {
@@ -64,7 +71,7 @@ class RerunFromStepTest {
     void execute_unknownRun_throwsResourceNotFound() {
         when(runs.findById(RUN_ID)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> rerunFromStep.execute(RUN_ID, PipelineStep.PRICES))
+        assertThatThrownBy(() -> rerunFromStep.execute(RUN_ID, PipelineStep.PRICES, ACTOR_ID))
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verify(runs, never()).updateIfRunTerminal(any());
@@ -79,7 +86,7 @@ class RerunFromStepTest {
         when(runs.findById(RUN_ID)).thenReturn(Optional.of(active));
         when(runs.updateIfRunTerminal(any())).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> rerunFromStep.execute(RUN_ID, PipelineStep.PRICES))
+        assertThatThrownBy(() -> rerunFromStep.execute(RUN_ID, PipelineStep.PRICES, ACTOR_ID))
                 .isInstanceOf(RunNotSettledException.class)
                 .extracting("runId", "runStatus")
                 .containsExactly(RUN_ID, RunStatus.IN_PROGRESS);
@@ -98,7 +105,7 @@ class RerunFromStepTest {
                 .thenReturn(Optional.of(reclaimedByAnother));
         when(runs.updateIfRunTerminal(any())).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> rerunFromStep.execute(RUN_ID, PipelineStep.PRICES))
+        assertThatThrownBy(() -> rerunFromStep.execute(RUN_ID, PipelineStep.PRICES, ACTOR_ID))
                 .isInstanceOf(RunNotSettledException.class)
                 .extracting("runStatus")
                 .isEqualTo(RunStatus.IN_PROGRESS);
@@ -110,7 +117,7 @@ class RerunFromStepTest {
                 .thenReturn(Optional.of(failedRun(StepStatus.SUCCEEDED, StepStatus.FAILED, StepStatus.SKIPPED)));
         guardAccepts();
 
-        EodPipelineRun result = rerunFromStep.execute(RUN_ID, PipelineStep.PRICES);
+        EodPipelineRun result = rerunFromStep.execute(RUN_ID, PipelineStep.PRICES, ACTOR_ID);
 
         assertThat(result.status()).isEqualTo(RunStatus.IN_PROGRESS);
         assertThat(result.finishedAt()).isNull();
@@ -131,7 +138,7 @@ class RerunFromStepTest {
                 .thenReturn(Optional.of(failedRun(StepStatus.SUCCEEDED, StepStatus.SUCCEEDED, StepStatus.FAILED)));
         guardAccepts();
 
-        EodPipelineRun result = rerunFromStep.execute(RUN_ID, PipelineStep.EVALUATE);
+        EodPipelineRun result = rerunFromStep.execute(RUN_ID, PipelineStep.EVALUATE, ACTOR_ID);
 
         assertThat(result.stepSymbolsStatus()).isEqualTo(StepStatus.SUCCEEDED);
         assertThat(result.stepPricesStatus()).isEqualTo(StepStatus.SUCCEEDED);
@@ -145,11 +152,26 @@ class RerunFromStepTest {
                 .thenReturn(Optional.of(failedRun(StepStatus.FAILED, StepStatus.SKIPPED, StepStatus.SKIPPED)));
         guardAccepts();
 
-        EodPipelineRun result = rerunFromStep.execute(RUN_ID, PipelineStep.SYMBOLS);
+        EodPipelineRun result = rerunFromStep.execute(RUN_ID, PipelineStep.SYMBOLS, ACTOR_ID);
 
         assertThat(result.stepSymbolsStatus()).isEqualTo(StepStatus.PENDING);
         assertThat(result.stepPricesStatus()).isEqualTo(StepStatus.PENDING);
         assertThat(result.stepEvaluateStatus()).isEqualTo(StepStatus.PENDING);
         verify(dispatcher).dispatchFrom(RUN_ID, PipelineStep.SYMBOLS);
+    }
+
+    @Test
+    void execute_stateChanged_publishesEodStepRerunTriggeredEvent() {
+        when(runs.findById(RUN_ID))
+                .thenReturn(Optional.of(failedRun(StepStatus.SUCCEEDED, StepStatus.FAILED, StepStatus.SKIPPED)));
+        guardAccepts();
+
+        rerunFromStep.execute(RUN_ID, PipelineStep.PRICES, ACTOR_ID);
+
+        ArgumentCaptor<EodStepRerunTriggered> captor = ArgumentCaptor.forClass(EodStepRerunTriggered.class);
+        verify(events).publishEvent(captor.capture());
+        assertThat(captor.getValue().runId()).isEqualTo(RUN_ID);
+        assertThat(captor.getValue().step()).isEqualTo(PipelineStep.PRICES);
+        assertThat(captor.getValue().actorId()).isEqualTo(ACTOR_ID);
     }
 }

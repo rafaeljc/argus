@@ -7,6 +7,7 @@ import com.github.f4b6a3.uuid.UuidCreator;
 import io.github.rafaeljc.argus.admin.application.port.AuditLogRepository;
 import io.github.rafaeljc.argus.admin.domain.AdminAction;
 import io.github.rafaeljc.argus.admin.domain.AuditLogEntry;
+import io.github.rafaeljc.argus.admin.domain.AuditMetadata;
 import io.github.rafaeljc.argus.common.domain.AuditEntryId;
 import io.github.rafaeljc.argus.common.domain.UserId;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
@@ -42,7 +43,7 @@ class JdbcAuditLogRepositoryIT {
         AuditEntryId id = new AuditEntryId(UuidCreator.getTimeOrderedEpoch());
 
         repository.insert(new AuditLogEntry(
-                id, actorId, AdminAction.SUSPEND, targetId, "{\"reason\":\"abuse\"}", CREATED_AT));
+                id, actorId, AdminAction.SUSPEND, targetId, new AuditMetadata.UserAction("abuse"), CREATED_AT));
 
         Map<String, Object> row = jdbc.queryForMap("SELECT * FROM admin_audit_log WHERE id = ?", id.value());
         assertThat(row.get("actor_id")).isEqualTo(actorId.value());
@@ -58,7 +59,7 @@ class JdbcAuditLogRepositoryIT {
         AuditEntryId id = new AuditEntryId(UuidCreator.getTimeOrderedEpoch());
 
         repository.insert(new AuditLogEntry(
-                id, actorId, AdminAction.EOD_RUN, null, "{\"run_id\":\"abc\"}", CREATED_AT));
+                id, actorId, AdminAction.EOD_RUN, null, null, CREATED_AT));
 
         Map<String, Object> row = jdbc.queryForMap("SELECT * FROM admin_audit_log WHERE id = ?", id.value());
         assertThat(row.get("target_user_id")).isNull();

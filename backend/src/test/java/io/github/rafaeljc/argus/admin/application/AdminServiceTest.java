@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class AdminServiceTest {
 
     private static final UserId USER_ID = new UserId(UUID.randomUUID());
+    private static final UserId ACTOR_ID = new UserId(UUID.randomUUID());
 
     @Mock
     private SearchUsers searchUsers;
@@ -27,11 +28,20 @@ class AdminServiceTest {
     @Mock
     private GetUser getUser;
 
+    @Mock
+    private SuspendUser suspendUser;
+
+    @Mock
+    private UnsuspendUser unsuspendUser;
+
+    @Mock
+    private DeleteUser deleteUser;
+
     private AdminService service;
 
     @BeforeEach
     void setUp() {
-        service = new AdminService(searchUsers, getUser);
+        service = new AdminService(searchUsers, getUser, suspendUser, unsuspendUser, deleteUser);
     }
 
     @Test
@@ -53,6 +63,42 @@ class AdminServiceTest {
         when(getUser.get(USER_ID)).thenReturn(user);
 
         User result = service.getUser(USER_ID);
+
+        assertThat(result).isEqualTo(user);
+    }
+
+    @Test
+    void suspendUser_delegatesToSuspendUserUseCase() {
+        Instant now = Instant.parse("2026-08-07T00:00:00Z");
+        User user = new User(USER_ID, "alice@example.com", "hash",
+                true, true, false, false, now, now, null);
+        when(suspendUser.suspend(USER_ID, ACTOR_ID, "abuse")).thenReturn(user);
+
+        User result = service.suspendUser(USER_ID, ACTOR_ID, "abuse");
+
+        assertThat(result).isEqualTo(user);
+    }
+
+    @Test
+    void unsuspendUser_delegatesToUnsuspendUserUseCase() {
+        Instant now = Instant.parse("2026-08-07T00:00:00Z");
+        User user = new User(USER_ID, "alice@example.com", "hash",
+                true, false, false, false, now, now, null);
+        when(unsuspendUser.unsuspend(USER_ID, ACTOR_ID, "appeal")).thenReturn(user);
+
+        User result = service.unsuspendUser(USER_ID, ACTOR_ID, "appeal");
+
+        assertThat(result).isEqualTo(user);
+    }
+
+    @Test
+    void deleteUser_delegatesToDeleteUserUseCase() {
+        User user = new User(USER_ID, "alice@example.com", "hash",
+                true, false, true, false, Instant.parse("2026-08-07T00:00:00Z"),
+                Instant.parse("2026-08-07T00:00:00Z"), Instant.parse("2026-08-07T00:00:00Z"));
+        when(deleteUser.delete(USER_ID, ACTOR_ID, "policy")).thenReturn(user);
+
+        User result = service.deleteUser(USER_ID, ACTOR_ID, "policy");
 
         assertThat(result).isEqualTo(user);
     }

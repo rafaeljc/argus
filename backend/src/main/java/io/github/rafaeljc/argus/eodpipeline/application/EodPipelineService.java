@@ -2,6 +2,7 @@ package io.github.rafaeljc.argus.eodpipeline.application;
 
 import io.github.rafaeljc.argus.common.application.PageResult;
 import io.github.rafaeljc.argus.common.domain.RunId;
+import io.github.rafaeljc.argus.common.domain.UserId;
 import io.github.rafaeljc.argus.eodpipeline.domain.EodPipelineRun;
 import io.github.rafaeljc.argus.eodpipeline.domain.PipelineStep;
 import io.github.rafaeljc.argus.eodpipeline.domain.Trigger;
@@ -56,14 +57,14 @@ public class EodPipelineService {
     // Not @Transactional: TriggerRun.execute is itself @Transactional because
     // EodPipelineScheduler (infrastructure) calls it directly, bypassing this facade. Adding a
     // transaction here too would be redundant ceremony on top of the boundary TriggerRun already owns.
-    public EodPipelineRun triggerPipelineRun(LocalDate runDate, Trigger trigger) {
-        return triggerRun.execute(runDate, trigger);
+    public EodPipelineRun triggerPipelineRun(LocalDate runDate, Trigger trigger, UserId actorId) {
+        return triggerRun.execute(runDate, trigger, actorId);
     }
 
     // Not @Transactional: RerunFromStep.execute is itself @Transactional, matching the
     // triggerPipelineRun comment above.
-    public EodPipelineRun rerunFromStep(RunId id, PipelineStep entryStep) {
-        return rerunFromStep.execute(id, entryStep);
+    public EodPipelineRun rerunFromStep(RunId id, PipelineStep entryStep, UserId actorId) {
+        return rerunFromStep.execute(id, entryStep, actorId);
     }
 
     @Transactional(readOnly = true)

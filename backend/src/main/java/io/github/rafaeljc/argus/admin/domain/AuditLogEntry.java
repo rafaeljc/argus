@@ -9,7 +9,7 @@ public record AuditLogEntry(
         UserId actorId,
         AdminAction action,
         UserId targetUserId,
-        String metadataJson,
+        AuditMetadata metadata,
         Instant createdAt) {
 
     public AuditLogEntry {

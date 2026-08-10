@@ -27,6 +27,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.HexFormat;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.Test;
@@ -44,6 +45,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -79,6 +81,40 @@ class AdminEodPipelineControllerIT {
 
     @Autowired
     private RecordingRunDispatcher dispatcher;
+
+    @Autowired
+    private JdbcTemplate jdbc;
+
+    @Test
+    void postRuns_validRequest_writesEodRunAuditRow() throws Exception {
+        User admin = seedVerified("admin-audit1@example.com");
+
+        ResponseEntity<String> response = post(admin, "{\"run_date\":\"2026-06-22\"}");
+
+        String runId = json.readTree(response.getBody()).get("data").get("run_id").asString();
+        Map<String, Object> row = jdbc.queryForMap(
+                "SELECT * FROM admin_audit_log WHERE action = 'EOD_RUN' AND actor_id = ?", admin.id().value());
+        assertThat(row.get("target_user_id")).isNull();
+        assertThat(row.get("metadata").toString()).contains(runId).contains("2026-06-22");
+    }
+
+    @Test
+    void postStep_prices_writesEodStepRerunAuditRow() throws Exception {
+        User admin = seedVerified("admin-audit2@example.com");
+        LocalDate runDate = LocalDate.of(2026, 7, 5);
+        EodPipelineRun saved = runs.insert(failedRun(
+                runDate, StepStatus.SUCCEEDED, StepStatus.FAILED, StepStatus.SKIPPED));
+
+        postStep(admin, saved.id(), "prices");
+
+        Map<String, Object> row = jdbc.queryForMap(
+                "SELECT * FROM admin_audit_log WHERE action = 'EOD_STEP_RERUN' AND actor_id = ?",
+                admin.id().value());
+        assertThat(row.get("target_user_id")).isNull();
+        assertThat(row.get("metadata").toString())
+                .contains(saved.id().value().toString())
+                .contains("prices");
+    }
 
     @Test
     void postRuns_validRequest_returns201WithLocationAndEnvelope() throws Exception {
