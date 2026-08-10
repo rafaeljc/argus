@@ -39,7 +39,7 @@ public class EodPipelineScheduler {
         }
 
         try {
-            triggerRun.execute(today, Trigger.CRON);
+            triggerRun.execute(today, Trigger.CRON, null);
         } catch (RunAlreadyActiveException e) {
             // A manual admin trigger beat the cron to it for today — expected, not an error.
             log.info("eod pipeline cron skipped: run already active for {}", today);

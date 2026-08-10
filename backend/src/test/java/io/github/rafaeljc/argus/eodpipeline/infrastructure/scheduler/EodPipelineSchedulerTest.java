@@ -53,13 +53,13 @@ class EodPipelineSchedulerTest {
 
         scheduler.triggerDailyRun();
 
-        verify(triggerRun).execute(TODAY, Trigger.CRON);
+        verify(triggerRun).execute(TODAY, Trigger.CRON, null);
     }
 
     @Test
     void triggerDailyRun_runAlreadyActive_doesNotPropagate() {
         when(marketCalendar.isTradingDay(TODAY)).thenReturn(true);
-        doThrow(new RunAlreadyActiveException(TODAY)).when(triggerRun).execute(TODAY, Trigger.CRON);
+        doThrow(new RunAlreadyActiveException(TODAY)).when(triggerRun).execute(TODAY, Trigger.CRON, null);
 
         assertThatCode(() -> scheduler.triggerDailyRun()).doesNotThrowAnyException();
     }
@@ -67,7 +67,7 @@ class EodPipelineSchedulerTest {
     @Test
     void triggerDailyRun_unexpectedRuntimeException_doesNotPropagate() {
         when(marketCalendar.isTradingDay(TODAY)).thenReturn(true);
-        doThrow(new RuntimeException("db down")).when(triggerRun).execute(TODAY, Trigger.CRON);
+        doThrow(new RuntimeException("db down")).when(triggerRun).execute(TODAY, Trigger.CRON, null);
 
         assertThatCode(() -> scheduler.triggerDailyRun()).doesNotThrowAnyException();
     }

@@ -5,6 +5,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.rafaeljc.argus.common.application.PageResult;
 import io.github.rafaeljc.argus.common.domain.RunId;
+import io.github.rafaeljc.argus.common.domain.UserId;
 import io.github.rafaeljc.argus.eodpipeline.domain.EodPipelineRun;
 import io.github.rafaeljc.argus.eodpipeline.domain.PipelineStep;
 import io.github.rafaeljc.argus.eodpipeline.domain.RunStatus;
@@ -25,6 +26,7 @@ class EodPipelineServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-06-22T21:00:00Z");
     private static final RunId RUN_ID = new RunId(UUID.fromString("11111111-1111-1111-1111-111111111111"));
+    private static final UserId ACTOR_ID = new UserId(UUID.fromString("22222222-2222-2222-2222-222222222222"));
 
     @Mock
     private RunSymbolsStep runSymbolsStep;
@@ -94,9 +96,9 @@ class EodPipelineServiceTest {
     @Test
     void triggerPipelineRun_delegatesToTriggerRun() {
         EodPipelineRun run = pendingRun();
-        when(triggerRun.execute(run.runDate(), Trigger.ADMIN)).thenReturn(run);
+        when(triggerRun.execute(run.runDate(), Trigger.ADMIN, ACTOR_ID)).thenReturn(run);
 
-        EodPipelineRun result = service.triggerPipelineRun(run.runDate(), Trigger.ADMIN);
+        EodPipelineRun result = service.triggerPipelineRun(run.runDate(), Trigger.ADMIN, ACTOR_ID);
 
         assertThat(result).isEqualTo(run);
     }
@@ -104,9 +106,9 @@ class EodPipelineServiceTest {
     @Test
     void rerunFromStep_delegatesToRerunFromStepUseCase() {
         EodPipelineRun run = pendingRun();
-        when(rerunFromStep.execute(RUN_ID, PipelineStep.PRICES)).thenReturn(run);
+        when(rerunFromStep.execute(RUN_ID, PipelineStep.PRICES, ACTOR_ID)).thenReturn(run);
 
-        EodPipelineRun result = service.rerunFromStep(RUN_ID, PipelineStep.PRICES);
+        EodPipelineRun result = service.rerunFromStep(RUN_ID, PipelineStep.PRICES, ACTOR_ID);
 
         assertThat(result).isEqualTo(run);
     }
