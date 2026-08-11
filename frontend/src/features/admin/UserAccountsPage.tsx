@@ -15,7 +15,7 @@ import type { UserAccount } from './types';
 
 const PAGE_SIZE_STORAGE_KEY = 'argus.pageSize.userAccounts';
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
-const DEFAULT_PAGE_SIZE = 50;
+const DEFAULT_PAGE_SIZE = 25;
 const SKELETON_ROW_COUNT = 5;
 
 const PAGE_SIZE_SELECT_OPTIONS: SelectOption[] = PAGE_SIZE_OPTIONS.map((size) => ({

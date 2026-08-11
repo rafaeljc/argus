@@ -238,7 +238,7 @@ describe('UserAccountsPage', () => {
     await screen.findByRole('table');
     expect(spy).toHaveBeenCalledWith({
       body: {},
-      params: { page: '1', per_page: '50' },
+      params: { page: '1', per_page: '25' },
     });
   });
 
@@ -261,7 +261,7 @@ describe('UserAccountsPage', () => {
         body: { email_contains: 'user@' },
         params: {
           page: '1',
-          per_page: '50',
+          per_page: '25',
           is_suspended: 'false',
           is_deleted: 'false',
           is_verified: 'true',
@@ -295,7 +295,7 @@ describe('UserAccountsPage', () => {
     await waitFor(() =>
       expect(spy).toHaveBeenCalledWith({
         body: { email_contains: 'carol' },
-        params: { page: '2', per_page: '50', is_suspended: 'true' },
+        params: { page: '2', per_page: '25', is_suspended: 'true' },
       }),
     );
   });
@@ -311,7 +311,7 @@ describe('UserAccountsPage', () => {
     await user.click(screen.getByRole('button', { name: /clear filters/i }));
 
     await waitFor(() =>
-      expect(spy).toHaveBeenCalledWith({ body: {}, params: { page: '1', per_page: '50' } }),
+      expect(spy).toHaveBeenCalledWith({ body: {}, params: { page: '1', per_page: '25' } }),
     );
   });
 
