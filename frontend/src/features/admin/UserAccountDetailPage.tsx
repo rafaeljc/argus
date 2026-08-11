@@ -7,6 +7,7 @@ import { Button } from '../../shared/components/ui/Button';
 import { Card } from '../../shared/components/ui/Card';
 import { EmptyState } from '../../shared/components/ui/EmptyState';
 import { Spinner } from '../../shared/components/ui/Spinner';
+import { formatDate } from './formatDate';
 import { getUserAccount } from './service';
 import { StateBadge } from './StateBadge';
 import type { UserAccount } from './types';
@@ -113,8 +114,10 @@ function UserAccountDetail({ account }: UserAccountDetailProps) {
           <DetailRow label="Admin">
             <StateBadge value={account.is_admin} />
           </DetailRow>
-          <DetailRow label="Created">{account.created_at}</DetailRow>
-          <DetailRow label="Deleted at">{account.deleted_at ?? NOT_SET}</DetailRow>
+          <DetailRow label="Created">{formatDate(account.created_at)}</DetailRow>
+          <DetailRow label="Deleted at">
+            {account.deleted_at === null ? NOT_SET : formatDate(account.deleted_at)}
+          </DetailRow>
           <DetailRow label="User ID">
             <span className="font-mono text-xs">{account.id}</span>
           </DetailRow>

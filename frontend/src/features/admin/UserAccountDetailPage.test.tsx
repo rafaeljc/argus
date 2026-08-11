@@ -114,6 +114,24 @@ describe('UserAccountDetailPage', () => {
     expect(detailValue('Created')).toHaveTextContent('2026-01-04');
   });
 
+  it('renders timestamps as calendar dates', async () => {
+    server.use(
+      userMe(ADMIN_USER),
+      accountOk(
+        buildAccount({
+          created_at: '2026-01-04T08:15:30Z',
+          is_deleted: true,
+          deleted_at: '2026-05-20T11:02:00Z',
+        }),
+      ),
+    );
+    renderAppAt(DETAIL_PATH);
+
+    await screen.findByRole('heading', { name: 'user@example.com' });
+    expect(detailValue('Created').textContent).toBe('2026-01-04');
+    expect(detailValue('Deleted at').textContent).toBe('2026-05-20');
+  });
+
   it('shows a dash for the deletion date when the account is not deleted', async () => {
     server.use(
       userMe(ADMIN_USER),

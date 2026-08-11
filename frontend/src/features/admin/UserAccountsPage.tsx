@@ -9,6 +9,7 @@ import { SelectField, type SelectOption } from '../../shared/components/ui/Selec
 import { Skeleton } from '../../shared/components/ui/Skeleton';
 import { TextField } from '../../shared/components/ui/TextField';
 import type { Paginated } from '../../shared/types/envelopes';
+import { formatDate } from './formatDate';
 import { searchUserAccounts } from './service';
 import { StateBadge } from './StateBadge';
 import type { UserAccount } from './types';
@@ -52,10 +53,6 @@ function parseTriState(value: string): boolean | undefined {
   if (value === 'true') return true;
   if (value === 'false') return false;
   return undefined;
-}
-
-function formatCreatedAt(createdAt: string): string {
-  return createdAt.slice(0, 10);
 }
 
 type LoadStatus = 'loading' | 'ready' | 'error';
@@ -330,7 +327,7 @@ function UserAccountsTable({ accounts }: UserAccountsTableProps) {
               <td className="px-4 py-3">
                 <StateBadge value={account.is_admin} />
               </td>
-              <td className="px-4 py-3">{formatCreatedAt(account.created_at)}</td>
+              <td className="px-4 py-3">{formatDate(account.created_at)}</td>
               <td className="px-4 py-3 text-right">
                 <Link
                   to={`/admin/users/${account.id}`}
