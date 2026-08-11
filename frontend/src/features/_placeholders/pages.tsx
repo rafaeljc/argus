@@ -11,10 +11,6 @@ function Placeholder({ title }: PlaceholderProps) {
   );
 }
 
-export function AdminUserDetailPage() {
-  return <Placeholder title="Admin User Detail" />;
-}
-
 export function AdminAuditLogPage() {
   return <Placeholder title="Admin Audit Log" />;
 }
