@@ -89,12 +89,21 @@ describe('App route table', () => {
     );
   });
 
-  it('renders the admin users placeholder for admin users', async () => {
+  it('renders the admin users page for admin users', async () => {
     respondAsUser(ADMIN_USER);
+    server.use(
+      http.post(`${BASE_URL}/admin/users`, () =>
+        HttpResponse.json({
+          data: [],
+          meta: { total: 0, page: 1, per_page: 50, total_pages: 0 },
+          links: { self: '/admin/users', next: null, prev: null, last: '/admin/users' },
+        }),
+      ),
+    );
     renderAppAt('/admin/users');
     await waitFor(
       () => {
-        expect(screen.getByRole('heading', { name: /admin users/i })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: /^users$/i })).toBeInTheDocument();
       },
       { timeout: 3000 },
     );

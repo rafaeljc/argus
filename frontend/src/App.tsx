@@ -13,9 +13,9 @@ import {
   AdminAuditLogPage,
   AdminEodPipelinePage,
   AdminEodPipelineRunPage,
-  AdminUserDetailPage,
-  AdminUsersPage,
 } from './features/_placeholders/pages';
+import { UserAccountDetailPage } from './features/admin/UserAccountDetailPage';
+import { UserAccountsPage } from './features/admin/UserAccountsPage';
 import { AlertFiringsPage } from './features/alerts/AlertFiringsPage';
 import { AlertRulesPage } from './features/alerts/AlertRulesPage';
 import { PortfolioPage } from './features/portfolio/PortfolioPage';
@@ -55,8 +55,8 @@ function App() {
             <Route path="/alerts/firings" element={<AlertFiringsPage />} />
 
             <Route element={<RequireAdmin />}>
-              <Route path="/admin/users" element={<AdminUsersPage />} />
-              <Route path="/admin/users/:id" element={<AdminUserDetailPage />} />
+              <Route path="/admin/users" element={<UserAccountsPage />} />
+              <Route path="/admin/users/:id" element={<UserAccountDetailPage />} />
               <Route path="/admin/audit-log" element={<AdminAuditLogPage />} />
               <Route path="/admin/eod-pipeline" element={<AdminEodPipelinePage />} />
               <Route path="/admin/eod-pipeline/:runId" element={<AdminEodPipelineRunPage />} />

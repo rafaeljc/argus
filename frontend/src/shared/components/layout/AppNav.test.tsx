@@ -73,18 +73,11 @@ describe('AppNav', () => {
     ]);
   });
 
-  it('adds Admin for verified admin users', () => {
+  it('shows Admin instead of the investor surfaces for verified admin users', () => {
     setAuth(ADMIN_USER, 'authenticated');
     renderNav();
     const desktop = screen.getByTestId('app-nav-desktop');
-    expect(navLabels(desktop)).toEqual([
-      'Portfolio',
-      'Transactions',
-      'Alerts',
-      'Admin',
-      'Account',
-      'Logout',
-    ]);
+    expect(navLabels(desktop)).toEqual(['Admin', 'Account', 'Logout']);
   });
 
   it('marks the active route with aria-current="page"', () => {
