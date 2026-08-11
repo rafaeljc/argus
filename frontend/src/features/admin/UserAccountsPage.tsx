@@ -18,6 +18,8 @@ const PAGE_SIZE_STORAGE_KEY = 'argus.pageSize.userAccounts';
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
 const DEFAULT_PAGE_SIZE = 25;
 const SKELETON_ROW_COUNT = 5;
+const EMAIL_CONTAINS_MAX_LENGTH = 254;
+const EMAIL_CONTAINS_TOO_LONG = `Maximum ${EMAIL_CONTAINS_MAX_LENGTH} characters.`;
 
 const PAGE_SIZE_SELECT_OPTIONS: SelectOption[] = PAGE_SIZE_OPTIONS.map((size) => ({
   value: String(size),
@@ -76,6 +78,8 @@ export function UserAccountsPage() {
   const [deletedInput, setDeletedInput] = useState(deletedParam);
   const [verifiedInput, setVerifiedInput] = useState(verifiedParam);
 
+  const [emailError, setEmailError] = useState('');
+
   const [status, setStatus] = useState<LoadStatus>('loading');
   const [result, setResult] = useState<Paginated<UserAccount> | null>(null);
   const [retryToken, setRetryToken] = useState(0);
@@ -115,11 +119,22 @@ export function UserAccountsPage() {
     })();
   }, [page, perPage, emailParam, suspendedParam, deletedParam, verifiedParam, retryToken]);
 
+  function handleEmailChange(event: ChangeEvent<HTMLInputElement>): void {
+    setEmailInput(event.target.value);
+    setEmailError('');
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
+    const emailContains = emailInput.trim();
+    if (emailContains.length > EMAIL_CONTAINS_MAX_LENGTH) {
+      setEmailError(EMAIL_CONTAINS_TOO_LONG);
+      return;
+    }
+
     const next = new URLSearchParams(searchParams);
     const applied: Record<string, string> = {
-      email_contains: emailInput.trim(),
+      email_contains: emailContains,
       is_suspended: suspendedInput,
       is_deleted: deletedInput,
       is_verified: verifiedInput,
@@ -136,6 +151,7 @@ export function UserAccountsPage() {
     // Reset the inputs directly: unsubmitted edits leave the URL untouched, so the sync
     // effect above would not fire and the typed values would survive the click.
     setEmailInput('');
+    setEmailError('');
     setSuspendedInput('');
     setDeletedInput('');
     setVerifiedInput('');
@@ -184,14 +200,15 @@ export function UserAccountsPage() {
         <form
           onSubmit={handleSubmit}
           aria-label="Search users"
-          className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:flex-row sm:flex-wrap sm:items-end"
+          className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-4 sm:flex-row sm:flex-wrap sm:items-start"
         >
           <div className="min-w-56 flex-1">
             <TextField
               label="Email contains"
               type="search"
+              error={emailError}
               value={emailInput}
-              onChange={(event) => setEmailInput(event.target.value)}
+              onChange={handleEmailChange}
             />
           </div>
           <div className="w-28">
@@ -218,12 +235,17 @@ export function UserAccountsPage() {
               onChange={(event) => setVerifiedInput(event.target.value)}
             />
           </div>
-          {/* Always mounted so toggling it never reflows the fields beside it. */}
-          <div className="flex items-center gap-3">
-            <Button type="submit">Search</Button>
-            <Button type="button" variant="ghost" onClick={handleClearFilters}>
-              Clear filters
-            </Button>
+          {/* Mirrors a field's label + control stack so the buttons line up with the inputs. */}
+          <div className="flex flex-col gap-1">
+            <span aria-hidden="true" className="hidden text-sm font-medium sm:block">
+              &nbsp;
+            </span>
+            <div className="flex items-center gap-3">
+              <Button type="submit">Search</Button>
+              <Button type="button" variant="ghost" onClick={handleClearFilters}>
+                Clear filters
+              </Button>
+            </div>
           </div>
         </form>
 

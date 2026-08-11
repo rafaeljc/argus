@@ -300,6 +300,64 @@ describe('UserAccountsPage', () => {
     );
   });
 
+  it('rejects an email criterion longer than the API accepts', async () => {
+    const spy = vi.fn();
+    server.use(userMe(ADMIN_USER), searchSpy(spy, [buildAccount()]));
+    const user = userEvent.setup();
+    renderAppAt('/admin/users');
+    await screen.findByRole('table');
+    spy.mockClear();
+
+    const field = screen.getByLabelText(/email contains/i);
+    await user.click(field);
+    await user.paste('a'.repeat(255));
+    expect(field).not.toHaveAccessibleDescription('Maximum 254 characters.');
+
+    await user.click(screen.getByRole('button', { name: /^search$/i }));
+
+    expect(field).toHaveValue('a'.repeat(255));
+    expect(field).toHaveAccessibleDescription('Maximum 254 characters.');
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('drops the length complaint once the criterion is edited', async () => {
+    server.use(userMe(ADMIN_USER), searchOk([buildAccount()]));
+    const user = userEvent.setup();
+    renderAppAt('/admin/users');
+    await screen.findByRole('table');
+
+    const field = screen.getByLabelText(/email contains/i);
+    await user.click(field);
+    await user.paste('a'.repeat(255));
+    await user.click(screen.getByRole('button', { name: /^search$/i }));
+    expect(field).toHaveAccessibleDescription('Maximum 254 characters.');
+
+    await user.type(field, '{backspace}');
+
+    expect(field).not.toHaveAccessibleDescription('Maximum 254 characters.');
+  });
+
+  it('accepts an email criterion at the maximum length', async () => {
+    const spy = vi.fn();
+    server.use(userMe(ADMIN_USER), searchSpy(spy, [buildAccount()]));
+    const user = userEvent.setup();
+    renderAppAt('/admin/users');
+    await screen.findByRole('table');
+    spy.mockClear();
+
+    const criterion = 'a'.repeat(254);
+    await user.click(screen.getByLabelText(/email contains/i));
+    await user.paste(criterion);
+    await user.click(screen.getByRole('button', { name: /^search$/i }));
+
+    await waitFor(() =>
+      expect(spy).toHaveBeenCalledWith({
+        body: { email_contains: criterion },
+        params: { page: '1', per_page: '25' },
+      }),
+    );
+  });
+
   it('keeps Clear filters mounted and usable when no filter is applied', async () => {
     server.use(userMe(ADMIN_USER), searchOk([buildAccount()]));
     renderAppAt('/admin/users');
