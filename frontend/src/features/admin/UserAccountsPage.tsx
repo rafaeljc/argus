@@ -136,6 +136,13 @@ export function UserAccountsPage() {
   }
 
   function handleClearFilters(): void {
+    // Reset the inputs directly: unsubmitted edits leave the URL untouched, so the sync
+    // effect above would not fire and the typed values would survive the click.
+    setEmailInput('');
+    setSuspendedInput('');
+    setDeletedInput('');
+    setVerifiedInput('');
+
     const next = new URLSearchParams(searchParams);
     next.delete('email_contains');
     for (const key of FLAG_PARAMS) next.delete(key);
@@ -214,13 +221,12 @@ export function UserAccountsPage() {
               onChange={(event) => setVerifiedInput(event.target.value)}
             />
           </div>
+          {/* Always mounted so toggling it never reflows the fields beside it. */}
           <div className="flex items-center gap-3">
             <Button type="submit">Search</Button>
-            {hasActiveFilters && (
-              <Button type="button" variant="ghost" onClick={handleClearFilters}>
-                Clear filters
-              </Button>
-            )}
+            <Button type="button" variant="ghost" onClick={handleClearFilters}>
+              Clear filters
+            </Button>
           </div>
         </form>
 
@@ -245,13 +251,6 @@ export function UserAccountsPage() {
               hasActiveFilters
                 ? 'No user matches the current filters.'
                 : 'There are no user accounts yet.'
-            }
-            action={
-              hasActiveFilters ? (
-                <Button type="button" variant="secondary" onClick={handleClearFilters}>
-                  Clear filters
-                </Button>
-              ) : undefined
             }
           />
         )}

@@ -300,6 +300,49 @@ describe('UserAccountsPage', () => {
     );
   });
 
+  it('keeps Clear filters mounted and usable when no filter is applied', async () => {
+    server.use(userMe(ADMIN_USER), searchOk([buildAccount()]));
+    renderAppAt('/admin/users');
+    await screen.findByRole('table');
+
+    expect(screen.getByRole('button', { name: /clear filters/i })).toBeEnabled();
+  });
+
+  it('clears filter inputs that were typed but never submitted', async () => {
+    server.use(userMe(ADMIN_USER), searchOk([buildAccount()]));
+    const user = userEvent.setup();
+    renderAppAt('/admin/users');
+    await screen.findByRole('table');
+
+    await user.type(screen.getByLabelText(/email contains/i), 'draft@');
+    await user.selectOptions(screen.getByLabelText(/^suspended$/i), 'true');
+    await user.click(screen.getByRole('button', { name: /clear filters/i }));
+
+    expect(screen.getByLabelText(/email contains/i)).toHaveValue('');
+    expect(screen.getByLabelText(/^suspended$/i)).toHaveValue('');
+  });
+
+  it('resets the filter inputs when clearing applied filters', async () => {
+    server.use(userMe(ADMIN_USER), searchOk([buildAccount()]));
+    const user = userEvent.setup();
+    renderAppAt('/admin/users?email_contains=carol&is_suspended=true');
+    await screen.findByRole('table');
+    expect(screen.getByLabelText(/email contains/i)).toHaveValue('carol');
+
+    await user.click(screen.getByRole('button', { name: /clear filters/i }));
+
+    expect(screen.getByLabelText(/email contains/i)).toHaveValue('');
+    expect(screen.getByLabelText(/^suspended$/i)).toHaveValue('');
+  });
+
+  it('keeps Clear filters usable once a filter is applied', async () => {
+    server.use(userMe(ADMIN_USER), searchOk([buildAccount()]));
+    renderAppAt('/admin/users?is_suspended=true');
+    await screen.findByRole('table');
+
+    expect(screen.getByRole('button', { name: /clear filters/i })).toBeEnabled();
+  });
+
   it('clears every filter when Clear filters is used', async () => {
     const spy = vi.fn();
     server.use(userMe(ADMIN_USER), searchSpy(spy, [buildAccount()]));
