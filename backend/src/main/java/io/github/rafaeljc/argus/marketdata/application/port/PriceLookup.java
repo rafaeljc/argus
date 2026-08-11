@@ -33,6 +33,11 @@ public interface PriceLookup {
     // Tickers with no close on that date are absent from the returned map (never null-valued).
     Map<Ticker, BigDecimal> closesOn(Set<Ticker> tickers, LocalDate date);
 
+    // Batched closesOn across a date range: one round trip regardless of span. Dates with no
+    // close for a ticker are absent from that date's inner map; dates with no closes at all are
+    // absent from the outer map.
+    Map<LocalDate, Map<Ticker, BigDecimal>> closesBetween(Set<Ticker> tickers, LocalDate from, LocalDate to);
+
     // Batched latestClose: one round trip regardless of ticker count. Tickers with no
     // price_history row at all are absent from the returned map.
     Map<Ticker, Close> latestCloses(Set<Ticker> tickers);

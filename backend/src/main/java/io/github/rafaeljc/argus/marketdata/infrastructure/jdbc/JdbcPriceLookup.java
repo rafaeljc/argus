@@ -44,6 +44,14 @@ class JdbcPriceLookup implements PriceLookup {
                AND trade_date = :tradeDate
             """;
 
+    private static final String SELECT_CLOSES_BETWEEN_DATES_IN =
+            """
+            SELECT ticker, trade_date, close_price
+              FROM price_history
+             WHERE ticker IN (:tickers)
+               AND trade_date BETWEEN :from AND :to
+            """;
+
     // Rides price_history_ticker_date_desc_idx: DISTINCT ON (ticker) keeps one row per ticker —
     // the newest, given the ORDER BY — in a single round trip regardless of ticker count.
     private static final String SELECT_LATEST_CLOSES_IN =
@@ -100,6 +108,23 @@ class JdbcPriceLookup implements PriceLookup {
                 closes.put(new Ticker(rs.getString("ticker")), rs.getBigDecimal("close_price"));
         jdbc.query(SELECT_CLOSES_ON_DATE_IN, params, collectRow);
         return closes;
+    }
+
+    @Override
+    public Map<LocalDate, Map<Ticker, BigDecimal>> closesBetween(Set<Ticker> tickers, LocalDate from, LocalDate to) {
+        if (tickers.isEmpty()) {
+            return Map.of();
+        }
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("tickers", tickers.stream().map(Ticker::value).toList())
+                .addValue("from", from)
+                .addValue("to", to);
+        Map<LocalDate, Map<Ticker, BigDecimal>> closesByDate = new HashMap<>();
+        RowCallbackHandler collectRow = rs -> closesByDate
+                .computeIfAbsent(rs.getObject("trade_date", LocalDate.class), d -> new HashMap<>())
+                .put(new Ticker(rs.getString("ticker")), rs.getBigDecimal("close_price"));
+        jdbc.query(SELECT_CLOSES_BETWEEN_DATES_IN, params, collectRow);
+        return closesByDate;
     }
 
     @Override

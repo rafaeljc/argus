@@ -10,6 +10,10 @@ public interface PortfolioSnapshotRepository {
 
     void insertIfAbsent(PortfolioSnapshot snapshot);
 
+    void insertAll(List<PortfolioSnapshot> snapshots);
+
+    void deleteByUser(UserId userId);
+
     Optional<PortfolioSnapshot> findByUserAndDate(UserId userId, LocalDate snapshotDate);
 
     List<PortfolioSnapshot> listByUserAndRange(UserId userId, LocalDate from, LocalDate to);

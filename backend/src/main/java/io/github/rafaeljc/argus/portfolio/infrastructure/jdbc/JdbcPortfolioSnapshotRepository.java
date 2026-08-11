@@ -24,6 +24,18 @@ class JdbcPortfolioSnapshotRepository implements PortfolioSnapshotRepository {
             ON CONFLICT (user_id, snapshot_date) DO NOTHING
             """;
 
+    private static final String INSERT_SQL =
+            """
+            INSERT INTO portfolio_snapshots (user_id, snapshot_date, total_value)
+            VALUES (:userId, :snapshotDate, :totalValue)
+            """;
+
+    private static final String DELETE_BY_USER_SQL =
+            """
+            DELETE FROM portfolio_snapshots
+             WHERE user_id = :userId
+            """;
+
     private static final String FIND_BY_USER_AND_DATE_SQL =
             """
             SELECT user_id, snapshot_date, total_value
@@ -55,6 +67,25 @@ class JdbcPortfolioSnapshotRepository implements PortfolioSnapshotRepository {
                 .addValue("snapshotDate", snapshot.snapshotDate())
                 .addValue("totalValue", snapshot.totalValue().value());
         jdbc.update(INSERT_IF_ABSENT_SQL, params);
+    }
+
+    @Override
+    public void insertAll(List<PortfolioSnapshot> snapshots) {
+        if (snapshots.isEmpty()) {
+            return;
+        }
+        MapSqlParameterSource[] batchParams = snapshots.stream()
+                .map(snapshot -> new MapSqlParameterSource()
+                        .addValue("userId", snapshot.userId().value())
+                        .addValue("snapshotDate", snapshot.snapshotDate())
+                        .addValue("totalValue", snapshot.totalValue().value()))
+                .toArray(MapSqlParameterSource[]::new);
+        jdbc.batchUpdate(INSERT_SQL, batchParams);
+    }
+
+    @Override
+    public void deleteByUser(UserId userId) {
+        jdbc.update(DELETE_BY_USER_SQL, new MapSqlParameterSource("userId", userId.value()));
     }
 
     @Override
