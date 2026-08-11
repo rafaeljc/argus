@@ -15,6 +15,7 @@ import io.github.rafaeljc.argus.common.domain.ResourceNotFoundException;
 import io.github.rafaeljc.argus.common.domain.Ticker;
 import io.github.rafaeljc.argus.common.domain.TransactionId;
 import io.github.rafaeljc.argus.common.domain.UserId;
+import io.github.rafaeljc.argus.portfolio.application.EnqueueSnapshotRebuild;
 import io.github.rafaeljc.argus.portfolio.application.HoldingRebuild;
 import io.github.rafaeljc.argus.transactions.application.port.TransactionRepository;
 import io.github.rafaeljc.argus.transactions.domain.Operation;
@@ -52,6 +53,9 @@ class DeleteTransactionTest {
     private HoldingRebuild holdingRebuild;
 
     @Mock
+    private EnqueueSnapshotRebuild enqueueSnapshotRebuild;
+
+    @Mock
     private ForwardValidator forwardValidator;
 
     private FixedClock clock;
@@ -60,7 +64,8 @@ class DeleteTransactionTest {
     @BeforeEach
     void setUp() {
         clock = new FixedClock(FIXED_NOW);
-        deleteTransaction = new DeleteTransaction(repository, lock, holdingRebuild, forwardValidator, clock);
+        deleteTransaction = new DeleteTransaction(
+                repository, lock, holdingRebuild, enqueueSnapshotRebuild, forwardValidator, clock);
     }
 
     @Test
@@ -73,6 +78,7 @@ class DeleteTransactionTest {
 
         verify(repository).deleteByIdAndUserId(ID, USER_ID);
         verify(holdingRebuild).apply(USER_ID, TICKER, BigDecimal.ZERO);
+        verify(enqueueSnapshotRebuild).apply(USER_ID);
     }
 
     @Test
@@ -92,7 +98,7 @@ class DeleteTransactionTest {
                 });
 
         verify(repository).deleteByIdAndUserId(ID, USER_ID);
-        verifyNoInteractions(holdingRebuild);
+        verifyNoInteractions(holdingRebuild, enqueueSnapshotRebuild);
     }
 
     @Test
@@ -103,7 +109,7 @@ class DeleteTransactionTest {
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verify(repository, never()).deleteByIdAndUserId(ID, USER_ID);
-        verifyNoInteractions(holdingRebuild, forwardValidator);
+        verifyNoInteractions(holdingRebuild, enqueueSnapshotRebuild, forwardValidator);
     }
 
     @Test

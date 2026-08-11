@@ -110,6 +110,50 @@ class JdbcPortfolioSnapshotRepositoryIT {
         assertThat(result).extracting(PortfolioSnapshot::userId).containsExactly(owner);
     }
 
+    @Test
+    void insertAll_multipleSnapshots_persistsAll() {
+        UserId userId = newUser();
+
+        repository.insertAll(List.of(
+                new PortfolioSnapshot(userId, D1, new Money(new BigDecimal("100.00"))),
+                new PortfolioSnapshot(userId, D2, new Money(new BigDecimal("200.00")))));
+
+        List<PortfolioSnapshot> result = repository.listByUserAndRange(userId, null, null);
+        assertThat(result).extracting(PortfolioSnapshot::snapshotDate).containsExactly(D1, D2);
+    }
+
+    @Test
+    void insertAll_emptyList_isNoOp() {
+        UserId userId = newUser();
+
+        repository.insertAll(List.of());
+
+        assertThat(repository.listByUserAndRange(userId, null, null)).isEmpty();
+    }
+
+    @Test
+    void deleteByUser_removesAllSnapshotsForThatUser() {
+        UserId userId = newUser();
+        repository.insertIfAbsent(new PortfolioSnapshot(userId, D1, new Money(new BigDecimal("100.00"))));
+        repository.insertIfAbsent(new PortfolioSnapshot(userId, D2, new Money(new BigDecimal("200.00"))));
+
+        repository.deleteByUser(userId);
+
+        assertThat(repository.listByUserAndRange(userId, null, null)).isEmpty();
+    }
+
+    @Test
+    void deleteByUser_scopedToOwner_leavesOtherUsersRowsIntact() {
+        UserId owner = newUser();
+        UserId otherUser = newUser();
+        repository.insertIfAbsent(new PortfolioSnapshot(owner, D1, new Money(new BigDecimal("100.00"))));
+        repository.insertIfAbsent(new PortfolioSnapshot(otherUser, D1, new Money(new BigDecimal("500.00"))));
+
+        repository.deleteByUser(owner);
+
+        assertThat(repository.listByUserAndRange(otherUser, null, null)).hasSize(1);
+    }
+
     private UserId newUser() {
         return userService.createUnverified(
                 "user-" + UuidCreator.getTimeOrderedEpoch() + "@example.com",

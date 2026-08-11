@@ -185,6 +185,40 @@ class JdbcPriceLookupIT {
         assertThat(result).doesNotContainKey(MSFT);
     }
 
+    @Test
+    void closesBetween_emptyInput_returnsEmptyMap() {
+        assertThat(lookup.closesBetween(Set.of(), D1, D3)).isEmpty();
+    }
+
+    @Test
+    void closesBetween_multipleTickersAndDates_groupsByDate() {
+        seed(AAPL);
+        seed(MSFT);
+        prices.upsertBatch(List.of(
+                priceOn(AAPL, D1, "148.00"),
+                priceOn(AAPL, D2, "150.00"),
+                priceOn(MSFT, D2, "420.75")));
+
+        Map<LocalDate, Map<Ticker, BigDecimal>> result = lookup.closesBetween(Set.of(AAPL, MSFT), D1, D2);
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(D1)).hasSize(1);
+        assertThat(result.get(D1).get(AAPL)).isEqualByComparingTo("148.00");
+        assertThat(result.get(D2)).hasSize(2);
+        assertThat(result.get(D2).get(AAPL)).isEqualByComparingTo("150.00");
+        assertThat(result.get(D2).get(MSFT)).isEqualByComparingTo("420.75");
+    }
+
+    @Test
+    void closesBetween_dateOutsideRange_excludedFromResult() {
+        seed(AAPL);
+        prices.upsertBatch(List.of(priceOn(AAPL, D1, "148.00"), priceOn(AAPL, D3, "152.50")));
+
+        Map<LocalDate, Map<Ticker, BigDecimal>> result = lookup.closesBetween(Set.of(AAPL), D1, D2);
+
+        assertThat(result).containsOnlyKeys(D1);
+    }
+
     private void seed(Ticker ticker) {
         symbols.save(new Symbol(ticker, Exchange.NASDAQ, ticker.value() + " Inc.", false, NOW, NOW, NOW));
     }

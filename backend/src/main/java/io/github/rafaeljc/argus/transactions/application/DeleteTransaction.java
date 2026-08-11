@@ -6,6 +6,7 @@ import io.github.rafaeljc.argus.common.domain.FieldError;
 import io.github.rafaeljc.argus.common.domain.ResourceNotFoundException;
 import io.github.rafaeljc.argus.common.domain.TransactionId;
 import io.github.rafaeljc.argus.common.domain.UserId;
+import io.github.rafaeljc.argus.portfolio.application.EnqueueSnapshotRebuild;
 import io.github.rafaeljc.argus.portfolio.application.HoldingRebuild;
 import io.github.rafaeljc.argus.transactions.application.port.TransactionRepository;
 import io.github.rafaeljc.argus.transactions.domain.Transaction;
@@ -18,6 +19,7 @@ public class DeleteTransaction {
     private final TransactionRepository repository;
     private final TransactionalMutationLock lock;
     private final HoldingRebuild holdingRebuild;
+    private final EnqueueSnapshotRebuild enqueueSnapshotRebuild;
     private final ForwardValidator forwardValidator;
     private final Clock clock;
 
@@ -25,11 +27,13 @@ public class DeleteTransaction {
             TransactionRepository repository,
             TransactionalMutationLock lock,
             HoldingRebuild holdingRebuild,
+            EnqueueSnapshotRebuild enqueueSnapshotRebuild,
             ForwardValidator forwardValidator,
             Clock clock) {
         this.repository = repository;
         this.lock = lock;
         this.holdingRebuild = holdingRebuild;
+        this.enqueueSnapshotRebuild = enqueueSnapshotRebuild;
         this.forwardValidator = forwardValidator;
         this.clock = clock;
     }
@@ -52,5 +56,6 @@ public class DeleteTransaction {
 
         holdingRebuild.apply(
                 userId, current.ticker(), repository.holdingsAsOf(userId, current.ticker(), clock.today()));
+        enqueueSnapshotRebuild.apply(userId);
     }
 }

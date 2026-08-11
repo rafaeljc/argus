@@ -79,6 +79,9 @@ argus:
   marketdata:
     backfill:
       interval-ms: 60000
+  portfolio:
+    snapshot-rebuild:
+      interval-ms: 60000
   eodpipeline:
     cron: "0 0 17 * * MON-FRI"
   auth:

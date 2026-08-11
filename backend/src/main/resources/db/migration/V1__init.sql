@@ -157,6 +157,26 @@ CREATE TABLE portfolio_snapshots (
     CONSTRAINT portfolio_snapshots_total_value_chk CHECK (total_value >= 0)
 );
 
+CREATE TABLE snapshot_rebuild_jobs (
+    id             UUID         PRIMARY KEY,
+    user_id        UUID         NOT NULL REFERENCES users (id) ON DELETE RESTRICT,
+    status         TEXT         NOT NULL DEFAULT 'pending',
+    requested_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    started_at     TIMESTAMPTZ,
+    completed_at   TIMESTAMPTZ,
+    error_message  TEXT,
+    CONSTRAINT snapshot_rebuild_jobs_status_chk CHECK (status IN ('pending', 'in_progress', 'completed', 'failed'))
+);
+
+-- Worker polls "what's next?". A partial index on the small active set keeps the lookup cheap
+-- as completed/failed rows accumulate.
+CREATE        INDEX snapshot_rebuild_jobs_pending_idx      ON snapshot_rebuild_jobs (requested_at) WHERE status = 'pending';
+-- One active (pending or in-progress) rebuild per user. Unlike backfill_jobs_ticker_active_uidx
+-- this coalesces a duplicate request into the existing job rather than trusting it's redundant:
+-- a rebuild reads mutable ledger state, so a mutation that commits mid-rebuild is not redundant
+-- and must still be able to enqueue a follow-up once the in-progress job clears.
+CREATE UNIQUE INDEX snapshot_rebuild_jobs_user_active_uidx ON snapshot_rebuild_jobs (user_id)      WHERE status IN ('pending', 'in_progress');
+
 CREATE TABLE alert_rules (
     id           UUID           PRIMARY KEY,
     user_id      UUID           NOT NULL REFERENCES users (id) ON DELETE RESTRICT,
