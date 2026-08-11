@@ -54,6 +54,14 @@ class JdbcSnapshotRebuildJobClaimer implements SnapshotRebuildJobClaimer {
              WHERE id = :id
             """;
 
+    private static final String REVERT_INTERRUPTED_JOBS_TO_PENDING_SQL =
+            """
+            UPDATE snapshot_rebuild_jobs
+               SET status = 'pending',
+                   started_at = NULL
+             WHERE status = 'in_progress'
+            """;
+
     private static final RowMapper<SnapshotRebuildJob> ROW_MAPPER = JdbcSnapshotRebuildJobClaimer::mapRow;
 
     private final NamedParameterJdbcTemplate jdbc;
@@ -85,6 +93,11 @@ class JdbcSnapshotRebuildJobClaimer implements SnapshotRebuildJobClaimer {
                 .addValue("error_message", errorMessage)
                 .addValue("completed_at", toOffsetDateTime(completedAt));
         jdbc.update(MARK_FAILED_SQL, params);
+    }
+
+    @Override
+    public int revertInterruptedJobsToPending() {
+        return jdbc.update(REVERT_INTERRUPTED_JOBS_TO_PENDING_SQL, new MapSqlParameterSource());
     }
 
     private static SnapshotRebuildJob mapRow(ResultSet rs, int rowNum) throws SQLException {

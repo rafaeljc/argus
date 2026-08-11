@@ -12,4 +12,6 @@ public interface SnapshotRebuildJobClaimer {
     void markCompleted(JobId id, Instant completedAt);
 
     void markFailed(JobId id, String errorMessage, Instant completedAt);
+
+    int revertInterruptedJobsToPending();
 }

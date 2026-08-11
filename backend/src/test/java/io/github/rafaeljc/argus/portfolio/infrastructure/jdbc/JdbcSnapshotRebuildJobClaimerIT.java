@@ -105,6 +105,50 @@ class JdbcSnapshotRebuildJobClaimerIT {
         assertThat(errorMessage).isEqualTo("db down");
     }
 
+    @Test
+    void revertInterruptedJobsToPending_inProgressJob_revertsStatusAndClearsStartedAt() {
+        UserId userId = insertUser();
+        JobId id = newJobId();
+        jobs.enqueueIfNoActiveJob(pendingJob(id, userId, NOW));
+        claimer.claimNextPending(NOW);
+
+        int reverted = claimer.revertInterruptedJobsToPending();
+
+        assertThat(reverted).isEqualTo(1);
+        assertThat(statusOf(id)).isEqualTo("pending");
+        Object startedAt = jdbcTemplate.queryForObject(
+                "SELECT started_at FROM snapshot_rebuild_jobs WHERE id = ?", Object.class, id.value());
+        assertThat(startedAt).isNull();
+    }
+
+    @Test
+    void revertInterruptedJobsToPending_thenClaimNextPending_returnsItAgain() {
+        UserId userId = insertUser();
+        JobId id = newJobId();
+        jobs.enqueueIfNoActiveJob(pendingJob(id, userId, NOW));
+        claimer.claimNextPending(NOW);
+        claimer.revertInterruptedJobsToPending();
+
+        assertThat(claimer.claimNextPending(NOW.plusSeconds(60))).isPresent();
+    }
+
+    @Test
+    void revertInterruptedJobsToPending_pendingJob_isLeftUntouched() {
+        UserId userId = insertUser();
+        JobId id = newJobId();
+        jobs.enqueueIfNoActiveJob(pendingJob(id, userId, NOW));
+
+        int reverted = claimer.revertInterruptedJobsToPending();
+
+        assertThat(reverted).isZero();
+        assertThat(statusOf(id)).isEqualTo("pending");
+    }
+
+    @Test
+    void revertInterruptedJobsToPending_noInterruptedJobs_reportsZero() {
+        assertThat(claimer.revertInterruptedJobsToPending()).isZero();
+    }
+
     private SnapshotRebuildJob pendingJob(JobId id, UserId userId, Instant requestedAt) {
         return new SnapshotRebuildJob(id, userId, RebuildJobStatus.PENDING, requestedAt, null, null, null);
     }
