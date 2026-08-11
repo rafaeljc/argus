@@ -40,10 +40,18 @@ describe('visibleNavItems', () => {
     expect(seen).toEqual(['Portfolio', 'Transactions', 'Alerts', 'Account', 'Logout']);
   });
 
-  it('exposes admin nav in addition to primary for verified admin users', () => {
+  it('replaces the primary items with admin nav for verified admin users', () => {
     const user = makeUser({ is_verified: true, is_admin: true });
     const seen = labels(visibleNavItems(user, 'authenticated'));
-    expect(seen).toEqual(['Portfolio', 'Transactions', 'Alerts', 'Admin', 'Account', 'Logout']);
+    expect(seen).toEqual(['Admin', 'Account', 'Logout']);
+  });
+
+  it('hides the investor surfaces from admins', () => {
+    const user = makeUser({ is_verified: true, is_admin: true });
+    const seen = labels(visibleNavItems(user, 'authenticated'));
+    expect(seen).not.toContain('Portfolio');
+    expect(seen).not.toContain('Transactions');
+    expect(seen).not.toContain('Alerts');
   });
 
   it('applies the unverified rule even for admins whose email is still unverified', () => {

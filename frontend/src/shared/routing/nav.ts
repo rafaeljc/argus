@@ -43,8 +43,8 @@ export function visibleNavItems(user: CurrentUser | null, status: AuthStatus): r
   if (!user.is_verified) {
     return ACCOUNT_ITEMS;
   }
-  const items = [...PRIMARY_ITEMS];
-  if (user.is_admin) items.push(...ADMIN_ITEMS);
+  // Admins are staff, not investors: they get the admin surfaces instead of the portfolio ones.
+  const items = user.is_admin ? [...ADMIN_ITEMS] : [...PRIMARY_ITEMS];
   items.push(...ACCOUNT_ITEMS);
   return items;
 }
