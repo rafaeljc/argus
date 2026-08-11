@@ -270,7 +270,7 @@ describe('UserAccountsPage', () => {
     );
   });
 
-  it('keeps the applied filters in the URL so the search is shareable', async () => {
+  it('keeps the state filters in the URL so the search is shareable', async () => {
     server.use(userMe(ADMIN_USER), searchOk([buildAccount()]));
     const user = userEvent.setup();
     renderAppAt('/admin/users');
@@ -281,21 +281,47 @@ describe('UserAccountsPage', () => {
     await user.click(screen.getByRole('button', { name: /^search$/i }));
 
     await waitFor(() =>
-      expect(screen.getByTestId('search')).toHaveTextContent('email_contains=user%40'),
+      expect(screen.getByTestId('search')).toHaveTextContent('is_suspended=true'),
     );
-    expect(screen.getByTestId('search')).toHaveTextContent('is_suspended=true');
     expect(screen.getByTestId('search')).toHaveTextContent('page=1');
   });
 
-  it('applies filters taken from the URL on first load', async () => {
+  it('keeps the email criterion out of the URL', async () => {
+    server.use(userMe(ADMIN_USER), searchOk([buildAccount()]));
+    const user = userEvent.setup();
+    renderAppAt('/admin/users');
+    await screen.findByRole('table');
+
+    await user.type(screen.getByLabelText(/email contains/i), 'user@');
+    await user.click(screen.getByRole('button', { name: /^search$/i }));
+
+    await waitFor(() => expect(screen.getByTestId('search')).toHaveTextContent('page=1'));
+    expect(screen.getByTestId('search')).not.toHaveTextContent('user');
+  });
+
+  it('ignores an email criterion planted in the URL', async () => {
     const spy = vi.fn();
     server.use(userMe(ADMIN_USER), searchSpy(spy, [buildAccount()]));
     renderAppAt('/admin/users?email_contains=carol&is_suspended=true&page=2');
 
     await waitFor(() =>
       expect(spy).toHaveBeenCalledWith({
-        body: { email_contains: 'carol' },
+        body: {},
         params: { page: '2', per_page: '25', is_suspended: 'true' },
+      }),
+    );
+    expect(screen.getByLabelText(/email contains/i)).toHaveValue('');
+  });
+
+  it('applies the state filters taken from the URL on first load', async () => {
+    const spy = vi.fn();
+    server.use(userMe(ADMIN_USER), searchSpy(spy, [buildAccount()]));
+    renderAppAt('/admin/users?is_suspended=true&is_verified=false&page=2');
+
+    await waitFor(() =>
+      expect(spy).toHaveBeenCalledWith({
+        body: {},
+        params: { page: '2', per_page: '25', is_suspended: 'true', is_verified: 'false' },
       }),
     );
   });
@@ -383,8 +409,11 @@ describe('UserAccountsPage', () => {
   it('resets the filter inputs when clearing applied filters', async () => {
     server.use(userMe(ADMIN_USER), searchOk([buildAccount()]));
     const user = userEvent.setup();
-    renderAppAt('/admin/users?email_contains=carol&is_suspended=true');
+    renderAppAt('/admin/users?is_suspended=true');
     await screen.findByRole('table');
+
+    await user.type(screen.getByLabelText(/email contains/i), 'carol');
+    await user.click(screen.getByRole('button', { name: /^search$/i }));
     expect(screen.getByLabelText(/email contains/i)).toHaveValue('carol');
 
     await user.click(screen.getByRole('button', { name: /clear filters/i }));
@@ -405,8 +434,11 @@ describe('UserAccountsPage', () => {
     const spy = vi.fn();
     server.use(userMe(ADMIN_USER), searchSpy(spy, [buildAccount()]));
     const user = userEvent.setup();
-    renderAppAt('/admin/users?email_contains=carol&is_suspended=true');
+    renderAppAt('/admin/users?is_suspended=true');
     await screen.findByRole('table');
+    await user.type(screen.getByLabelText(/email contains/i), 'carol');
+    await user.click(screen.getByRole('button', { name: /^search$/i }));
+    await waitFor(() => expect(spy).toHaveBeenCalled());
     spy.mockClear();
 
     await user.click(screen.getByRole('button', { name: /clear filters/i }));

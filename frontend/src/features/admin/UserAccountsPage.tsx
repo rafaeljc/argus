@@ -66,14 +66,15 @@ export function UserAccountsPage() {
   const perPage =
     perPageParam !== null && isPageSize(perPageParam) ? perPageParam : readStoredPageSize();
 
-  const emailParam = searchParams.get('email_contains') ?? '';
   const suspendedParam = searchParams.get('is_suspended') ?? '';
   const deletedParam = searchParams.get('is_deleted') ?? '';
   const verifiedParam = searchParams.get('is_verified') ?? '';
-  const hasActiveFilters =
-    emailParam !== '' || suspendedParam !== '' || deletedParam !== '' || verifiedParam !== '';
 
-  const [emailInput, setEmailInput] = useState(emailParam);
+  const [emailCriterion, setEmailCriterion] = useState('');
+  const hasActiveFilters =
+    emailCriterion !== '' || suspendedParam !== '' || deletedParam !== '' || verifiedParam !== '';
+
+  const [emailInput, setEmailInput] = useState('');
   const [suspendedInput, setSuspendedInput] = useState(suspendedParam);
   const [deletedInput, setDeletedInput] = useState(deletedParam);
   const [verifiedInput, setVerifiedInput] = useState(verifiedParam);
@@ -87,11 +88,10 @@ export function UserAccountsPage() {
 
   // Keep the form in step with the URL so Clear filters and browser history are reflected.
   useEffect(() => {
-    setEmailInput(emailParam);
     setSuspendedInput(suspendedParam);
     setDeletedInput(deletedParam);
     setVerifiedInput(verifiedParam);
-  }, [emailParam, suspendedParam, deletedParam, verifiedParam]);
+  }, [suspendedParam, deletedParam, verifiedParam]);
 
   useEffect(() => {
     const requestId = requestIdRef.current + 1;
@@ -103,7 +103,7 @@ export function UserAccountsPage() {
         const data = await searchUserAccounts({
           page,
           perPage,
-          emailContains: emailParam === '' ? undefined : emailParam,
+          emailContains: emailCriterion === '' ? undefined : emailCriterion,
           isSuspended: parseTriState(suspendedParam),
           isDeleted: parseTriState(deletedParam),
           isVerified: parseTriState(verifiedParam),
@@ -117,7 +117,7 @@ export function UserAccountsPage() {
         setStatus('error');
       }
     })();
-  }, [page, perPage, emailParam, suspendedParam, deletedParam, verifiedParam, retryToken]);
+  }, [page, perPage, emailCriterion, suspendedParam, deletedParam, verifiedParam, retryToken]);
 
   function handleEmailChange(event: ChangeEvent<HTMLInputElement>): void {
     setEmailInput(event.target.value);
@@ -132,9 +132,10 @@ export function UserAccountsPage() {
       return;
     }
 
+    setEmailCriterion(emailContains);
+
     const next = new URLSearchParams(searchParams);
     const applied: Record<string, string> = {
-      email_contains: emailContains,
       is_suspended: suspendedInput,
       is_deleted: deletedInput,
       is_verified: verifiedInput,
@@ -151,13 +152,13 @@ export function UserAccountsPage() {
     // Reset the inputs directly: unsubmitted edits leave the URL untouched, so the sync
     // effect above would not fire and the typed values would survive the click.
     setEmailInput('');
+    setEmailCriterion('');
     setEmailError('');
     setSuspendedInput('');
     setDeletedInput('');
     setVerifiedInput('');
 
     const next = new URLSearchParams(searchParams);
-    next.delete('email_contains');
     for (const key of FLAG_PARAMS) next.delete(key);
     next.set('page', '1');
     setSearchParams(next);
