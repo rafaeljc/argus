@@ -19,6 +19,7 @@ import io.github.rafaeljc.argus.common.domain.UserId;
 import io.github.rafaeljc.argus.marketdata.application.EnqueueBackfillJob;
 import io.github.rafaeljc.argus.marketdata.application.port.SymbolLookup;
 import io.github.rafaeljc.argus.marketdata.domain.TickerDelistedException;
+import io.github.rafaeljc.argus.portfolio.application.EnqueueSnapshotRebuild;
 import io.github.rafaeljc.argus.portfolio.application.HoldingRebuild;
 import io.github.rafaeljc.argus.transactions.application.port.TransactionRepository;
 import io.github.rafaeljc.argus.transactions.domain.InsufficientHoldingsException;
@@ -65,6 +66,9 @@ class EditTransactionTest {
     private EnqueueBackfillJob enqueueBackfillJob;
 
     @Mock
+    private EnqueueSnapshotRebuild enqueueSnapshotRebuild;
+
+    @Mock
     private ForwardValidator forwardValidator;
 
     private FixedClock clock;
@@ -73,8 +77,8 @@ class EditTransactionTest {
     @BeforeEach
     void setUp() {
         clock = new FixedClock(FIXED_NOW);
-        editTransaction = new EditTransaction(
-                repository, lock, symbolLookup, holdingRebuild, enqueueBackfillJob, forwardValidator, clock);
+        editTransaction = new EditTransaction(repository, lock, symbolLookup, holdingRebuild,
+                enqueueBackfillJob, enqueueSnapshotRebuild, forwardValidator, clock);
     }
 
     @Test
@@ -96,10 +100,11 @@ class EditTransactionTest {
         assertThat(result.updatedAt()).isEqualTo(FIXED_NOW);
         verify(repository).update(any());
         verify(holdingRebuild).apply(USER_ID, TICKER, new BigDecimal("7"));
+        verify(enqueueSnapshotRebuild).apply(USER_ID);
     }
 
     @Test
-    void edit_tradeDateOnlyMovedLater_updatesTradeDateAndSkipsBackfill() {
+    void edit_tradeDateOnlyMovedLater_updatesTradeDateAndSkipsBackfillButEnqueuesRebuild() {
         LocalDate laterDate = ORIGINAL_TRADE_DATE.plusDays(9);
         when(repository.findByIdAndUserId(ID, USER_ID)).thenReturn(Optional.of(originalBuy()));
         when(symbolLookup.isDelisted(TICKER)).thenReturn(false);
@@ -112,6 +117,7 @@ class EditTransactionTest {
         assertThat(result.tradeDate()).isEqualTo(laterDate);
         assertThat(result.quantity()).isEqualTo(ORIGINAL_QUANTITY);
         verifyNoInteractions(enqueueBackfillJob);
+        verify(enqueueSnapshotRebuild).apply(USER_ID);
     }
 
     @Test
@@ -125,7 +131,7 @@ class EditTransactionTest {
                 .isEqualTo(TICKER);
 
         verify(repository, never()).update(any());
-        verifyNoInteractions(holdingRebuild, enqueueBackfillJob, forwardValidator);
+        verifyNoInteractions(holdingRebuild, enqueueBackfillJob, enqueueSnapshotRebuild, forwardValidator);
     }
 
     @Test
@@ -171,7 +177,7 @@ class EditTransactionTest {
                 .containsExactly(TICKER, new BigDecimal("12"), increasedQuantity);
 
         verify(repository).update(any());
-        verifyNoInteractions(holdingRebuild, enqueueBackfillJob);
+        verifyNoInteractions(holdingRebuild, enqueueBackfillJob, enqueueSnapshotRebuild);
     }
 
     @Test
@@ -194,7 +200,7 @@ class EditTransactionTest {
                 });
 
         verify(repository).update(any());
-        verifyNoInteractions(holdingRebuild, enqueueBackfillJob);
+        verifyNoInteractions(holdingRebuild, enqueueBackfillJob, enqueueSnapshotRebuild);
     }
 
     @Test
@@ -205,7 +211,7 @@ class EditTransactionTest {
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verify(repository, never()).update(any());
-        verifyNoInteractions(holdingRebuild, enqueueBackfillJob, forwardValidator);
+        verifyNoInteractions(holdingRebuild, enqueueBackfillJob, enqueueSnapshotRebuild, forwardValidator);
     }
 
     @Test
@@ -219,7 +225,7 @@ class EditTransactionTest {
                 .isEqualTo(futureDate);
 
         verify(repository, never()).update(any());
-        verifyNoInteractions(holdingRebuild, enqueueBackfillJob, forwardValidator);
+        verifyNoInteractions(holdingRebuild, enqueueBackfillJob, enqueueSnapshotRebuild, forwardValidator);
     }
 
     @Test

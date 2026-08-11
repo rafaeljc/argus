@@ -12,6 +12,7 @@ import io.github.rafaeljc.argus.marketdata.application.EnqueueBackfillJob;
 import io.github.rafaeljc.argus.marketdata.application.port.SymbolLookup;
 import io.github.rafaeljc.argus.marketdata.domain.TickerDelistedException;
 import io.github.rafaeljc.argus.marketdata.domain.TickerNotFoundException;
+import io.github.rafaeljc.argus.portfolio.application.EnqueueSnapshotRebuild;
 import io.github.rafaeljc.argus.portfolio.application.HoldingRebuild;
 import io.github.rafaeljc.argus.transactions.application.port.TransactionRepository;
 import io.github.rafaeljc.argus.transactions.domain.InsufficientHoldingsException;
@@ -33,6 +34,7 @@ public class RecordTransaction {
     private final SymbolLookup symbolLookup;
     private final HoldingRebuild holdingRebuild;
     private final EnqueueBackfillJob enqueueBackfillJob;
+    private final EnqueueSnapshotRebuild enqueueSnapshotRebuild;
     private final ForwardValidator forwardValidator;
     private final Clock clock;
 
@@ -42,6 +44,7 @@ public class RecordTransaction {
             SymbolLookup symbolLookup,
             HoldingRebuild holdingRebuild,
             EnqueueBackfillJob enqueueBackfillJob,
+            EnqueueSnapshotRebuild enqueueSnapshotRebuild,
             ForwardValidator forwardValidator,
             Clock clock) {
         this.repository = repository;
@@ -49,6 +52,7 @@ public class RecordTransaction {
         this.symbolLookup = symbolLookup;
         this.holdingRebuild = holdingRebuild;
         this.enqueueBackfillJob = enqueueBackfillJob;
+        this.enqueueSnapshotRebuild = enqueueSnapshotRebuild;
         this.forwardValidator = forwardValidator;
         this.clock = clock;
     }
@@ -80,6 +84,7 @@ public class RecordTransaction {
         holdingRebuild.apply(userId, ticker, ledgerNetQuantity);
 
         enqueueBackfillJob.apply(userId, ticker, tradeDate.minusYears(BACKFILL_LOOKBACK_YEARS), today);
+        enqueueSnapshotRebuild.apply(userId);
 
         return saved;
     }

@@ -20,6 +20,7 @@ import io.github.rafaeljc.argus.marketdata.application.EnqueueBackfillJob;
 import io.github.rafaeljc.argus.marketdata.application.port.SymbolLookup;
 import io.github.rafaeljc.argus.marketdata.domain.TickerDelistedException;
 import io.github.rafaeljc.argus.marketdata.domain.TickerNotFoundException;
+import io.github.rafaeljc.argus.portfolio.application.EnqueueSnapshotRebuild;
 import io.github.rafaeljc.argus.portfolio.application.HoldingRebuild;
 import io.github.rafaeljc.argus.transactions.application.port.TransactionRepository;
 import io.github.rafaeljc.argus.transactions.domain.InsufficientHoldingsException;
@@ -64,6 +65,9 @@ class RecordTransactionTest {
     private EnqueueBackfillJob enqueueBackfillJob;
 
     @Mock
+    private EnqueueSnapshotRebuild enqueueSnapshotRebuild;
+
+    @Mock
     private ForwardValidator forwardValidator;
 
     private FixedClock clock;
@@ -72,8 +76,8 @@ class RecordTransactionTest {
     @BeforeEach
     void setUp() {
         clock = new FixedClock(FIXED_NOW);
-        recordTransaction = new RecordTransaction(
-                repository, lock, symbolLookup, holdingRebuild, enqueueBackfillJob, forwardValidator, clock);
+        recordTransaction = new RecordTransaction(repository, lock, symbolLookup, holdingRebuild,
+                enqueueBackfillJob, enqueueSnapshotRebuild, forwardValidator, clock);
     }
 
     @Test
@@ -93,7 +97,8 @@ class RecordTransactionTest {
         assertThat(saved.createdAt()).isEqualTo(FIXED_NOW);
         assertThat(saved.updatedAt()).isEqualTo(FIXED_NOW);
 
-        InOrder order = Mockito.inOrder(lock, symbolLookup, repository, holdingRebuild, enqueueBackfillJob);
+        InOrder order = Mockito.inOrder(
+                lock, symbolLookup, repository, holdingRebuild, enqueueBackfillJob, enqueueSnapshotRebuild);
         order.verify(lock).acquireResourceById("transaction", USER_ID.value());
         order.verify(symbolLookup).exists(TICKER);
         order.verify(symbolLookup).isDelisted(TICKER);
@@ -102,6 +107,7 @@ class RecordTransactionTest {
         order.verify(holdingRebuild).apply(USER_ID, TICKER, new BigDecimal("10"));
         order.verify(enqueueBackfillJob).apply(
                 eq(USER_ID), eq(TICKER), eq(TRADE_DATE.minusYears(5)), eq(TODAY));
+        order.verify(enqueueSnapshotRebuild).apply(USER_ID);
         verifyNoInteractions(forwardValidator);
     }
 
@@ -145,7 +151,7 @@ class RecordTransactionTest {
                 .containsExactly(TICKER, new BigDecimal("5"), QUANTITY);
 
         verify(repository).save(any());
-        verifyNoInteractions(holdingRebuild, enqueueBackfillJob);
+        verifyNoInteractions(holdingRebuild, enqueueBackfillJob, enqueueSnapshotRebuild);
     }
 
     @Test
@@ -165,7 +171,7 @@ class RecordTransactionTest {
                 });
 
         verify(repository).save(any());
-        verifyNoInteractions(holdingRebuild, enqueueBackfillJob);
+        verifyNoInteractions(holdingRebuild, enqueueBackfillJob, enqueueSnapshotRebuild);
     }
 
     @Test
@@ -178,7 +184,7 @@ class RecordTransactionTest {
                 .isEqualTo(TICKER);
 
         verify(repository, never()).save(any());
-        verifyNoInteractions(holdingRebuild, enqueueBackfillJob, forwardValidator);
+        verifyNoInteractions(holdingRebuild, enqueueBackfillJob, enqueueSnapshotRebuild, forwardValidator);
     }
 
     @Test
@@ -192,7 +198,7 @@ class RecordTransactionTest {
                 .isEqualTo(TICKER);
 
         verify(repository, never()).save(any());
-        verifyNoInteractions(holdingRebuild, enqueueBackfillJob, forwardValidator);
+        verifyNoInteractions(holdingRebuild, enqueueBackfillJob, enqueueSnapshotRebuild, forwardValidator);
     }
 
     @Test
@@ -207,7 +213,7 @@ class RecordTransactionTest {
                 .isEqualTo(futureDate);
 
         verify(repository, never()).save(any());
-        verifyNoInteractions(holdingRebuild, enqueueBackfillJob, forwardValidator);
+        verifyNoInteractions(holdingRebuild, enqueueBackfillJob, enqueueSnapshotRebuild, forwardValidator);
     }
 
     @Test
