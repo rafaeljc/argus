@@ -25,6 +25,7 @@ class FlywayMigrationIT {
             "transactions",
             "holdings",
             "portfolio_snapshots",
+            "snapshot_rebuild_jobs",
             "alert_rules",
             "alert_firings",
             "outbox",
