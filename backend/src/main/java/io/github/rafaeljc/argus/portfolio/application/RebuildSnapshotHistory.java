@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RebuildSnapshotHistory {
@@ -37,6 +38,7 @@ public class RebuildSnapshotHistory {
         this.clock = clock;
     }
 
+    @Transactional
     public void rebuild(UserId userId) {
         LocalDate today = clock.today();
         List<NetQuantityPoint> timeline = ledgerHoldings.timeline(userId, today);
