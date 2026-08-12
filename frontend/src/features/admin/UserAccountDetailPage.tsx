@@ -10,7 +10,8 @@ import { Spinner } from '../../shared/components/ui/Spinner';
 import { formatDate } from './formatDate';
 import { getUserAccount } from './service';
 import { StateBadge } from './StateBadge';
-import type { UserAccount } from './types';
+import { UserAccountActionModal } from './UserAccountActionModal';
+import type { UserAccount, UserAccountAction, UserAccountActionResult } from './types';
 
 const USERS_PATH = '/admin/users';
 const NOT_SET = '—';
@@ -85,7 +86,9 @@ export function UserAccountDetailPage() {
           />
         )}
 
-        {status === 'ready' && account && <UserAccountDetail account={account} />}
+        {status === 'ready' && account && (
+          <UserAccountDetail account={account} onAccountChange={setAccount} />
+        )}
       </div>
     </PageContainer>
   );
@@ -93,12 +96,27 @@ export function UserAccountDetailPage() {
 
 interface UserAccountDetailProps {
   account: UserAccount;
+  onAccountChange: (account: UserAccount) => void;
 }
 
-function UserAccountDetail({ account }: UserAccountDetailProps) {
+function UserAccountDetail({ account, onAccountChange }: UserAccountDetailProps) {
+  const [openAction, setOpenAction] = useState<UserAccountAction | null>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+
+  function handleApplied(result: UserAccountActionResult): void {
+    onAccountChange({ ...account, ...result });
+    headingRef.current?.focus();
+  }
+
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold text-slate-900">{account.email}</h1>
+      <h1
+        ref={headingRef}
+        tabIndex={-1}
+        className="rounded text-2xl font-semibold text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+      >
+        {account.email}
+      </h1>
 
       <Card>
         <dl className="grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2">
@@ -123,6 +141,34 @@ function UserAccountDetail({ account }: UserAccountDetailProps) {
           </DetailRow>
         </dl>
       </Card>
+
+      {!account.is_deleted && (
+        <div className="flex flex-wrap gap-2">
+          {!account.is_suspended && (
+            <Button type="button" variant="danger" onClick={() => setOpenAction('suspend')}>
+              Suspend
+            </Button>
+          )}
+          {account.is_suspended && (
+            <Button type="button" variant="primary" onClick={() => setOpenAction('unsuspend')}>
+              Unsuspend
+            </Button>
+          )}
+          <Button type="button" variant="danger" onClick={() => setOpenAction('delete')}>
+            Delete
+          </Button>
+        </div>
+      )}
+
+      {openAction && (
+        <UserAccountActionModal
+          open
+          action={openAction}
+          account={account}
+          onClose={() => setOpenAction(null)}
+          onApplied={handleApplied}
+        />
+      )}
     </div>
   );
 }
