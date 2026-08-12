@@ -14,7 +14,9 @@ describe('TextAreaField', () => {
   });
 
   it('renders the hint text with aria-describedby wiring', () => {
-    render(<TextAreaField label="Reason" name="reason" hint="Optional context for the audit log." />);
+    render(
+      <TextAreaField label="Reason" name="reason" hint="Optional context for the audit log." />,
+    );
     const textarea = screen.getByLabelText('Reason');
     const describedBy = textarea.getAttribute('aria-describedby');
     expect(describedBy).toBeTruthy();
@@ -22,7 +24,13 @@ describe('TextAreaField', () => {
   });
 
   it('marks aria-invalid and points aria-describedby at the error message', () => {
-    render(<TextAreaField label="Reason" name="reason" error="Reason must be 1000 characters or fewer." />);
+    render(
+      <TextAreaField
+        label="Reason"
+        name="reason"
+        error="Reason must be 1000 characters or fewer."
+      />,
+    );
     const textarea = screen.getByLabelText('Reason');
     expect(textarea).toHaveAttribute('aria-invalid', 'true');
     const describedBy = textarea.getAttribute('aria-describedby');

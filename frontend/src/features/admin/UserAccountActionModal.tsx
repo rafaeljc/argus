@@ -111,7 +111,8 @@ export function UserAccountActionModal({
         noValidate
       >
         <p className="text-sm text-slate-700">
-          {descriptor.bodyPrefix} <span className="font-semibold text-slate-900">{account.email}</span>{' '}
+          {descriptor.bodyPrefix}{' '}
+          <span className="font-semibold text-slate-900">{account.email}</span>{' '}
           {descriptor.bodySuffix}
         </p>
 

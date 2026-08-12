@@ -4,8 +4,10 @@ import { clsx } from 'clsx';
 import { Field } from './Field';
 import { INPUT_BORDER, TEXTAREA_BASE } from './fieldStyles';
 
-export interface TextAreaFieldProps
-  extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'id'> {
+export interface TextAreaFieldProps extends Omit<
+  TextareaHTMLAttributes<HTMLTextAreaElement>,
+  'id'
+> {
   label: string;
   hint?: string;
   error?: string;
@@ -13,7 +15,10 @@ export interface TextAreaFieldProps
 }
 
 export const TextAreaField = forwardRef<HTMLTextAreaElement, TextAreaFieldProps>(
-  function TextAreaField({ label, hint, error, required = false, className, id, rows = 4, ...rest }, ref) {
+  function TextAreaField(
+    { label, hint, error, required = false, className, id, rows = 4, ...rest },
+    ref,
+  ) {
     const generatedId = useId();
     const inputId = id ?? generatedId;
 
@@ -28,7 +33,11 @@ export const TextAreaField = forwardRef<HTMLTextAreaElement, TextAreaFieldProps>
             required={required}
             aria-invalid={invalid || undefined}
             aria-describedby={describedBy}
-            className={clsx(TEXTAREA_BASE, invalid ? INPUT_BORDER.invalid : INPUT_BORDER.ok, className)}
+            className={clsx(
+              TEXTAREA_BASE,
+              invalid ? INPUT_BORDER.invalid : INPUT_BORDER.ok,
+              className,
+            )}
           />
         )}
       </Field>

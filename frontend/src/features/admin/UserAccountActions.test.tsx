@@ -306,7 +306,12 @@ describe('UserAccountActions', () => {
     server.use(
       userMe(ADMIN_USER),
       accountOk(buildAccount()),
-      actionOk('suspend', { id: ACCOUNT_ID, is_suspended: true, is_deleted: false, deleted_at: null }),
+      actionOk('suspend', {
+        id: ACCOUNT_ID,
+        is_suspended: true,
+        is_deleted: false,
+        deleted_at: null,
+      }),
     );
     const user = userEvent.setup();
     renderAppAt(DETAIL_PATH);
@@ -399,7 +404,11 @@ describe('UserAccountActions', () => {
   });
 
   it('surfaces a form-level error and keeps the modal open on 404 NOT_FOUND', async () => {
-    server.use(userMe(ADMIN_USER), accountOk(buildAccount()), actionFails('suspend', 404, 'NOT_FOUND'));
+    server.use(
+      userMe(ADMIN_USER),
+      accountOk(buildAccount()),
+      actionFails('suspend', 404, 'NOT_FOUND'),
+    );
     const user = userEvent.setup();
     renderAppAt(DETAIL_PATH);
     await screen.findByRole('heading', { name: 'user@example.com' });
@@ -477,7 +486,12 @@ describe('UserAccountActions', () => {
     server.use(
       userMe(ADMIN_USER),
       accountOk(buildAccount()),
-      actionOk('suspend', { id: ACCOUNT_ID, is_suspended: true, is_deleted: false, deleted_at: null }),
+      actionOk('suspend', {
+        id: ACCOUNT_ID,
+        is_suspended: true,
+        is_deleted: false,
+        deleted_at: null,
+      }),
     );
     const user = userEvent.setup();
     renderAppAt(DETAIL_PATH);

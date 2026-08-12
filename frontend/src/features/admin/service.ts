@@ -30,7 +30,10 @@ async function performUserAccountAction(
 ): Promise<UserAccountActionResult> {
   const trimmed = reason.trim();
   const body = trimmed === '' ? {} : { reason: trimmed };
-  const response = await apiClient.post<UserAccountActionResult>(`/admin/users/${id}/${action}`, body);
+  const response = await apiClient.post<UserAccountActionResult>(
+    `/admin/users/${id}/${action}`,
+    body,
+  );
   return response.data;
 }
 
