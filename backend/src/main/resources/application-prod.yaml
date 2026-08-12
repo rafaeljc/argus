@@ -6,6 +6,19 @@ spring:
     hikari:
       pool-name: argus-pool
 
+argus:
+  marketdata:
+    massive:
+      # No defaults: a prod boot without vendor credentials or endpoint must fail rather than
+      # start up and discover the gap on the first end-of-day run.
+      api-key: ${MARKETDATA_API_KEY}
+      base-url: ${MARKETDATA_BASE_URL}
+      connect-timeout: 5s
+      read-timeout: 30s
+      # The symbol sweep is the only paginated call. Bounded so a runaway cursor cannot spin
+      # against the vendor indefinitely.
+      max-universe-pages: 20
+
 server:
   # Prod runs behind a TLS-terminating LB. `framework` installs ForwardedHeaderFilter so
   # getRemoteAddr() / getScheme() reflect the original client via X-Forwarded-* headers.
