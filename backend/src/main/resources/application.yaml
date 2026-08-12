@@ -86,13 +86,14 @@ resilience4j:
         randomizedWaitFactor: 0.5
         # Whitelist, deliberately: anything absent is terminal. 401/403 (bad key) and 404 (no such
         # ticker) never become true by trying again, and retrying them only burns vendor quota.
-        # Do NOT add ignoreExceptions here — Resilience4j applies it as `retry AND NOT ignore`, so
-        # listing HttpClientErrorException would also suppress the 429 retry below.
+        # 429 is deliberately absent too: the vendor rate-limits the whole account, so a 429 is
+        # throttling, not failure — it's retried on vendor-marketdata-throttle's own schedule
+        # (MarketdataInfrastructureConfig), not here, so a burst of throttling can't burn this
+        # retry's budget and trip the circuit breaker for no reason.
         retryExceptions:
           - org.springframework.web.client.HttpServerErrorException
           - org.springframework.web.client.ResourceAccessException
           - java.io.IOException
-          - org.springframework.web.client.HttpClientErrorException$TooManyRequests
 
 argus:
   email:

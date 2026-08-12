@@ -31,6 +31,9 @@ class MarketdataVendorWiringIT {
     @Autowired
     private Retry vendorMarketdataRetry;
 
+    @Autowired
+    private Retry vendorMarketdataThrottleRetry;
+
     // The no-op is the default everywhere. Only an explicitly `prod` deployment talks to a real
     // vendor, so no test run and no local run can spend the account's quota by accident.
     @Test
@@ -66,20 +69,39 @@ class MarketdataVendorWiringIT {
         assertThat(shouldRetry.test(new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR))).isTrue();
         assertThat(shouldRetry.test(new ResourceAccessException("connection reset"))).isTrue();
         assertThat(shouldRetry.test(new IOException("broken pipe"))).isTrue();
-        assertThat(shouldRetry.test(
-                        HttpClientErrorException.create(
-                                HttpStatus.TOO_MANY_REQUESTS, "rate limited", HttpHeaders.EMPTY, null, null)))
-                .isTrue();
     }
 
-    // Retrying a rejected key or a missing resource only delays the failure and burns quota.
+    // Retrying a rejected key or a missing resource only delays the failure and burns quota. 429 is
+    // absent too — it's throttling, not a transient failure, and is handled by the separate
+    // vendor-marketdata-throttle instance so it can't burn this retry's budget.
     @Test
-    void vendorMarketdataRetry_doesNotRetryTerminalClientErrors() {
+    void vendorMarketdataRetry_doesNotRetryTerminalClientErrorsOrRateLimiting() {
         Predicate<Throwable> shouldRetry = vendorMarketdataRetry.getRetryConfig().getExceptionPredicate();
 
         assertThat(shouldRetry.test(new HttpClientErrorException(HttpStatus.UNAUTHORIZED))).isFalse();
         assertThat(shouldRetry.test(new HttpClientErrorException(HttpStatus.FORBIDDEN))).isFalse();
         assertThat(shouldRetry.test(new HttpClientErrorException(HttpStatus.NOT_FOUND))).isFalse();
+        assertThat(shouldRetry.test(
+                        HttpClientErrorException.create(
+                                HttpStatus.TOO_MANY_REQUESTS, "rate limited", HttpHeaders.EMPTY, null, null)))
+                .isFalse();
+    }
+
+    @Test
+    void vendorMarketdataThrottleRetry_isConfiguredForSixAttempts() {
+        assertThat(vendorMarketdataThrottleRetry.getRetryConfig().getMaxAttempts()).isEqualTo(6);
+    }
+
+    @Test
+    void vendorMarketdataThrottleRetry_retriesOnlyRateLimiting() {
+        Predicate<Throwable> shouldRetry = vendorMarketdataThrottleRetry.getRetryConfig().getExceptionPredicate();
+
+        assertThat(shouldRetry.test(
+                        HttpClientErrorException.create(
+                                HttpStatus.TOO_MANY_REQUESTS, "rate limited", HttpHeaders.EMPTY, null, null)))
+                .isTrue();
+        assertThat(shouldRetry.test(new HttpServerErrorException(HttpStatus.INTERNAL_SERVER_ERROR))).isFalse();
+        assertThat(shouldRetry.test(new IOException("broken pipe"))).isFalse();
     }
 
     private long waitAfterAttempt(int attempt) {

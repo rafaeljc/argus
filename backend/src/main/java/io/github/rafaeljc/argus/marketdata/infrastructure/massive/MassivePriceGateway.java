@@ -27,6 +27,13 @@ import org.springframework.web.client.RestClientException;
 // are exhausted here, so the breaker's sliding window records one outcome per logical call. The
 // other way round, every retry attempt would count as its own failure and trip the breaker after a
 // third of the calls it should take.
+//
+// Two Retry instances are composed around every call, not one: the vendor rate-limits the whole
+// account (not per endpoint), so a 429 is throttling, not failure. It waits out the real window on
+// its own dedicated retry/backoff schedule (vendorMarketdataThrottleRetry) instead of eating the
+// transient-error retry's budget (vendorMarketdataRetry) — a burst of throttling would otherwise
+// trip the circuit breaker for no reason. The two retries' predicates are disjoint by construction
+// (see application.yaml), so nesting order between them doesn't change behavior.
 public class MassivePriceGateway implements VendorPriceGateway {
 
     private static final Logger log = LoggerFactory.getLogger(MassivePriceGateway.class);
@@ -38,6 +45,7 @@ public class MassivePriceGateway implements VendorPriceGateway {
     private final RestClient client;
     private final MassiveResponseMapper mapper;
     private final Retry retry;
+    private final Retry throttleRetry;
     private final Clock clock;
     private final int maxUniversePages;
 
@@ -46,6 +54,7 @@ public class MassivePriceGateway implements VendorPriceGateway {
             MassiveProperties properties,
             MassiveResponseMapper mapper,
             Retry vendorMarketdataRetry,
+            Retry vendorMarketdataThrottleRetry,
             Clock clock) {
         // Bearer header rather than the vendor's apiKey query parameter: query strings land in
         // access logs on every hop between here and the vendor. Transport settings (timeouts) are
@@ -55,6 +64,7 @@ public class MassivePriceGateway implements VendorPriceGateway {
                 .build();
         this.mapper = mapper;
         this.retry = vendorMarketdataRetry;
+        this.throttleRetry = vendorMarketdataThrottleRetry;
         this.clock = clock;
         this.maxUniversePages = properties.maxUniversePages();
     }
@@ -114,8 +124,9 @@ public class MassivePriceGateway implements VendorPriceGateway {
     // Returns null when the vendor has nothing for the request; throws when the call genuinely
     // failed, so the caller's circuit breaker sees it.
     private <T> T call(String operation, Supplier<T> request) {
+        Supplier<T> resilient = Retry.decorateSupplier(throttleRetry, Retry.decorateSupplier(retry, request));
         try {
-            return retry.executeSupplier(request);
+            return resilient.get();
         } catch (HttpClientErrorException.NotFound ex) {
             log.info("vendor marketdata {}: no data for request", operation);
             return null;

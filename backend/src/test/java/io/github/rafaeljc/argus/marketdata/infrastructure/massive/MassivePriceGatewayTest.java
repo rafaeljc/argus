@@ -63,20 +63,28 @@ class MassivePriceGatewayTest {
         MassiveProperties properties = new MassiveProperties(
                 API_KEY, BASE_URL, Duration.ofSeconds(5), Duration.ofSeconds(30), maxUniversePages);
         // Mirrors the `vendor-marketdata` instance in application.yaml, minus the multi-second
-        // backoff. MassiveRetryInstanceIT pins the real configuration.
+        // backoff. 429 is deliberately absent: MarketdataVendorWiringIT pins the real config, where
+        // rate limiting is routed to the separate throttle retry below instead.
         Retry retry = Retry.of(
                 "test",
                 RetryConfig.custom()
                         .maxAttempts(3)
                         .waitDuration(Duration.ofMillis(1))
                         .retryExceptions(
-                                HttpServerErrorException.class,
-                                ResourceAccessException.class,
-                                IOException.class,
-                                HttpClientErrorException.TooManyRequests.class)
+                                HttpServerErrorException.class, ResourceAccessException.class, IOException.class)
+                        .build());
+        // Mirrors `vendor-marketdata-throttle` (MarketdataInfrastructureConfig), minus the real
+        // wait. RetryAfterIntervalFunctionTest covers the Retry-After parsing in isolation;
+        // MarketdataVendorWiringIT pins the production interval function and attempt count.
+        Retry throttleRetry = Retry.of(
+                "test-throttle",
+                RetryConfig.custom()
+                        .maxAttempts(3)
+                        .waitDuration(Duration.ofMillis(1))
+                        .retryExceptions(HttpClientErrorException.TooManyRequests.class)
                         .build());
         gateway = new MassivePriceGateway(
-                builder, properties, new MassiveResponseMapper(), retry, new FixedClock(NOW));
+                builder, properties, new MassiveResponseMapper(), retry, throttleRetry, new FixedClock(NOW));
     }
 
     private static String aggregatesBody(String results) {
@@ -131,8 +139,11 @@ class MassivePriceGatewayTest {
         server.verify();
     }
 
+    // 429 is throttling, not failure: the account-wide free-tier ceiling is shared across every
+    // vendor call, so it must be retried on its own dedicated schedule, separate from the transient-
+    // error retry above. See RetryAfterIntervalFunction for the actual wait-duration logic.
     @Test
-    void fetchPriceHistory_rateLimited_isRetried() {
+    void fetchPriceHistory_rateLimited_isRetriedViaThrottleRetryUntilSuccess() {
         server.expect(ExpectedCount.times(2), requestTo(HISTORY_URL))
                 .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
         server.expect(requestTo(HISTORY_URL))
@@ -143,6 +154,21 @@ class MassivePriceGatewayTest {
                 gateway.fetchPriceHistory(new Ticker("AAPL"), LocalDate.of(2026, 3, 9), LocalDate.of(2026, 3, 10));
 
         assertThat(result).hasSize(1);
+        server.verify();
+    }
+
+    // A safety valve, not the expected case: if the account stays throttled far longer than a
+    // normal window (revoked key, plan downgrade), the call must eventually give up rather than
+    // block a background worker thread forever.
+    @Test
+    void fetchPriceHistory_persistentlyRateLimited_throwsServiceUnavailableAfterThrottleBudgetExhausted() {
+        server.expect(ExpectedCount.times(3), requestTo(HISTORY_URL))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
+
+        assertThatThrownBy(() -> gateway.fetchPriceHistory(
+                        new Ticker("AAPL"), LocalDate.of(2026, 3, 9), LocalDate.of(2026, 3, 10)))
+                .isInstanceOf(ServiceUnavailableException.class);
+
         server.verify();
     }
 
