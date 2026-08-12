@@ -15,6 +15,11 @@ public final class RetryAfterIntervalFunction implements IntervalBiFunction<Obje
 
     static final Duration DEFAULT_WAIT = Duration.ofSeconds(60);
 
+    // A ceiling on a value we don't control: the vendor (or anything between us and it) could send
+    // a header far outside a sane throttle window, and honoring it verbatim would pin the calling
+    // thread for an unreasonable duration.
+    static final Duration MAX_WAIT = Duration.ofMinutes(5);
+
     @Override
     public Long apply(Integer attempt, Either<Throwable, Object> outcome) {
         if (outcome.isRight() || !(outcome.getLeft() instanceof HttpClientErrorException ex)) {
@@ -26,7 +31,11 @@ public final class RetryAfterIntervalFunction implements IntervalBiFunction<Obje
             return DEFAULT_WAIT.toMillis();
         }
         try {
-            return Duration.ofSeconds(Long.parseLong(header.trim())).toMillis();
+            long seconds = Long.parseLong(header.trim());
+            if (seconds <= 0) {
+                return DEFAULT_WAIT.toMillis();
+            }
+            return Math.min(Duration.ofSeconds(seconds).toMillis(), MAX_WAIT.toMillis());
         } catch (NumberFormatException ex2) {
             return DEFAULT_WAIT.toMillis();
         }

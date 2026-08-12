@@ -52,4 +52,28 @@ class RetryAfterIntervalFunctionTest {
 
         assertThat(waitMillis).isEqualTo(RetryAfterIntervalFunction.DEFAULT_WAIT.toMillis());
     }
+
+    @Test
+    void apply_retryAfterHeaderNegative_fallsBackToDefaultWait() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(HttpHeaders.RETRY_AFTER, "-5");
+        HttpClientErrorException ex = HttpClientErrorException.create(
+                HttpStatus.TOO_MANY_REQUESTS, "rate limited", headers, null, null);
+
+        Long waitMillis = function.apply(1, Either.left(ex));
+
+        assertThat(waitMillis).isEqualTo(RetryAfterIntervalFunction.DEFAULT_WAIT.toMillis());
+    }
+
+    @Test
+    void apply_retryAfterHeaderExceedsCeiling_isClampedToMaxWait() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(HttpHeaders.RETRY_AFTER, "999999999");
+        HttpClientErrorException ex = HttpClientErrorException.create(
+                HttpStatus.TOO_MANY_REQUESTS, "rate limited", headers, null, null);
+
+        Long waitMillis = function.apply(1, Either.left(ex));
+
+        assertThat(waitMillis).isEqualTo(RetryAfterIntervalFunction.MAX_WAIT.toMillis());
+    }
 }
