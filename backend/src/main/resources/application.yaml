@@ -71,6 +71,29 @@ resilience4j:
         waitDurationInOpenState: 60s
         permittedNumberOfCallsInHalfOpenState: 3
         automaticTransitionFromOpenToHalfOpenEnabled: true
+  retry:
+    instances:
+      vendor-marketdata:
+        maxAttempts: 3
+        # 5s then 10s. The vendor's free tier admits roughly one call every 12s, so a sub-second
+        # ladder would spend both retries inside the window that rejected the first attempt.
+        waitDuration: 5s
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        # Spreads retries so the backfill worker and the EOD step don't resynchronise onto the
+        # same second after an outage.
+        enableRandomizedWait: true
+        randomizedWaitFactor: 0.5
+        # Whitelist, deliberately: anything absent is terminal. 401/403 (bad key) and 404 (no such
+        # ticker) never become true by trying again, and retrying them only burns vendor quota.
+        # 429 is deliberately absent too: the vendor rate-limits the whole account, so a 429 is
+        # throttling, not failure — it's retried on vendor-marketdata-throttle's own schedule
+        # (MarketdataInfrastructureConfig), not here, so a burst of throttling can't burn this
+        # retry's budget and trip the circuit breaker for no reason.
+        retryExceptions:
+          - org.springframework.web.client.HttpServerErrorException
+          - org.springframework.web.client.ResourceAccessException
+          - java.io.IOException
 
 argus:
   email:
