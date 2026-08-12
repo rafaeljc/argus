@@ -1,6 +1,6 @@
 import type { ChangeEvent } from 'react';
 
-import { Button } from '../../shared/components/ui/Button';
+import { Button, type ButtonVariant } from '../../shared/components/ui/Button';
 import { Modal } from '../../shared/components/ui/Modal';
 import { TextAreaField } from '../../shared/components/ui/TextAreaField';
 import { useForm } from '../../shared/hooks/useForm';
@@ -19,7 +19,9 @@ const INITIAL_VALUES: ActionFormValues = { reason: '' };
 interface ActionDescriptor {
   title: string;
   confirmLabel: string;
-  body: (email: string) => string;
+  variant: ButtonVariant;
+  bodyPrefix: string;
+  bodySuffix: string;
   successMessage: string;
   submit: (id: string, reason: string) => Promise<UserAccountActionResult>;
 }
@@ -28,23 +30,27 @@ const ACTIONS: Record<UserAccountAction, ActionDescriptor> = {
   suspend: {
     title: 'Suspend user',
     confirmLabel: 'Confirm suspend',
-    body: (email) =>
-      `This signs ${email} out of every session and blocks further access until unsuspended.`,
+    variant: 'danger',
+    bodyPrefix: 'This will suspend',
+    bodySuffix: 'and sign them out of every session.',
     successMessage: 'User suspended.',
     submit: suspendUserAccount,
   },
   unsuspend: {
     title: 'Unsuspend user',
     confirmLabel: 'Confirm unsuspend',
-    body: (email) =>
-      `This restores ${email}'s access. Sessions ended by the earlier suspension stay signed out.`,
+    variant: 'primary',
+    bodyPrefix: 'This will unsuspend',
+    bodySuffix: 'and restore their access.',
     successMessage: 'User unsuspended.',
     submit: unsuspendUserAccount,
   },
   delete: {
     title: 'Delete user',
     confirmLabel: 'Confirm delete',
-    body: (email) => `This soft-deletes ${email} and signs them out of every session.`,
+    variant: 'danger',
+    bodyPrefix: 'This will delete',
+    bodySuffix: 'and sign them out of every session.',
     successMessage: 'User deleted.',
     submit: deleteUserAccount,
   },
@@ -104,7 +110,10 @@ export function UserAccountActionModal({
         }}
         noValidate
       >
-        <p className="text-sm text-slate-700">{descriptor.body(account.email)}</p>
+        <p className="text-sm text-slate-700">
+          {descriptor.bodyPrefix} <span className="font-semibold text-slate-900">{account.email}</span>{' '}
+          {descriptor.bodySuffix}
+        </p>
 
         {form.formError && (
           <p
@@ -117,7 +126,6 @@ export function UserAccountActionModal({
 
         <TextAreaField
           label="Reason (optional)"
-          hint="Recorded on the audit log."
           value={form.values.reason}
           onChange={handleReasonChange}
           error={form.fieldErrors.reason ?? ''}
@@ -127,7 +135,7 @@ export function UserAccountActionModal({
           <Button type="button" variant="secondary" onClick={handleClose}>
             Cancel
           </Button>
-          <Button type="submit" variant="danger" isLoading={form.isSubmitting}>
+          <Button type="submit" variant={descriptor.variant} isLoading={form.isSubmitting}>
             {descriptor.confirmLabel}
           </Button>
         </div>
