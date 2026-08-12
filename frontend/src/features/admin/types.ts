@@ -17,3 +17,12 @@ export interface UserAccountSearchParams {
   isDeleted?: boolean | undefined;
   isVerified?: boolean | undefined;
 }
+
+export type UserAccountAction = 'suspend' | 'unsuspend' | 'delete';
+
+export interface UserAccountActionResult {
+  id: string;
+  is_suspended: boolean;
+  is_deleted: boolean;
+  deleted_at: string | null;
+}
