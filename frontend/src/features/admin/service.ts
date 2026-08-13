@@ -1,6 +1,12 @@
 import { apiClient } from '../../shared/api/client';
 import type { Paginated } from '../../shared/types/envelopes';
-import type { UserAccount, UserAccountActionResult, UserAccountSearchParams } from './types';
+import type {
+  AuditLogEntry,
+  AuditLogSearchParams,
+  UserAccount,
+  UserAccountActionResult,
+  UserAccountSearchParams,
+} from './types';
 
 export async function searchUserAccounts(
   params: UserAccountSearchParams,
@@ -47,4 +53,21 @@ export function unsuspendUserAccount(id: string, reason: string): Promise<UserAc
 
 export function deleteUserAccount(id: string, reason: string): Promise<UserAccountActionResult> {
   return performUserAccountAction(id, 'delete', reason);
+}
+
+export async function searchAuditLog(
+  params: AuditLogSearchParams,
+): Promise<Paginated<AuditLogEntry>> {
+  const response = await apiClient.get<Paginated<AuditLogEntry>>('/admin/audit-log', {
+    params: {
+      page: params.page,
+      per_page: params.perPage,
+      actor_id: params.actorId,
+      target_user_id: params.targetUserId,
+      action: params.action,
+      from: params.from,
+      to: params.to,
+    },
+  });
+  return response.data;
 }

@@ -9,11 +9,8 @@ import { PasswordResetConfirmPage } from './features/auth/PasswordResetConfirmPa
 import { PasswordResetPage } from './features/auth/PasswordResetPage';
 import { SignupPage } from './features/auth/SignupPage';
 import { VerifyEmailPage } from './features/auth/VerifyEmailPage';
-import {
-  AdminAuditLogPage,
-  AdminEodPipelinePage,
-  AdminEodPipelineRunPage,
-} from './features/_placeholders/pages';
+import { AdminEodPipelinePage, AdminEodPipelineRunPage } from './features/_placeholders/pages';
+import { AuditLogPage } from './features/admin/AuditLogPage';
 import { UserAccountDetailPage } from './features/admin/UserAccountDetailPage';
 import { UserAccountsPage } from './features/admin/UserAccountsPage';
 import { AlertFiringsPage } from './features/alerts/AlertFiringsPage';
@@ -57,7 +54,7 @@ function App() {
             <Route element={<RequireAdmin />}>
               <Route path="/admin/users" element={<UserAccountsPage />} />
               <Route path="/admin/users/:id" element={<UserAccountDetailPage />} />
-              <Route path="/admin/audit-log" element={<AdminAuditLogPage />} />
+              <Route path="/admin/audit-log" element={<AuditLogPage />} />
               <Route path="/admin/eod-pipeline" element={<AdminEodPipelinePage />} />
               <Route path="/admin/eod-pipeline/:runId" element={<AdminEodPipelineRunPage />} />
             </Route>
