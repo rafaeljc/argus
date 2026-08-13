@@ -9,10 +9,7 @@ import { PasswordResetConfirmPage } from './features/auth/PasswordResetConfirmPa
 import { PasswordResetPage } from './features/auth/PasswordResetPage';
 import { SignupPage } from './features/auth/SignupPage';
 import { VerifyEmailPage } from './features/auth/VerifyEmailPage';
-import {
-  AdminEodPipelinePage,
-  AdminEodPipelineRunPage,
-} from './features/_placeholders/pages';
+import { AdminEodPipelinePage, AdminEodPipelineRunPage } from './features/_placeholders/pages';
 import { AuditLogPage } from './features/admin/AuditLogPage';
 import { UserAccountDetailPage } from './features/admin/UserAccountDetailPage';
 import { UserAccountsPage } from './features/admin/UserAccountsPage';

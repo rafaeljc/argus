@@ -92,7 +92,11 @@ export function AuditLogPage() {
   const fromParam = searchParams.get('from') ?? '';
   const toParam = searchParams.get('to') ?? '';
   const hasActiveFilters =
-    actorParam !== '' || targetParam !== '' || actionParam !== '' || fromParam !== '' || toParam !== '';
+    actorParam !== '' ||
+    targetParam !== '' ||
+    actionParam !== '' ||
+    fromParam !== '' ||
+    toParam !== '';
 
   const [actorInput, setActorInput] = useState(actorParam);
   const [targetInput, setTargetInput] = useState(targetParam);
@@ -376,15 +380,12 @@ function AuditLogTable({ entries }: AuditLogTableProps) {
         </thead>
         <tbody className="divide-y divide-slate-200">
           {entries.map((entry) => {
-            const hasMetadata =
-              entry.metadata !== null && Object.keys(entry.metadata).length > 0;
+            const hasMetadata = entry.metadata !== null && Object.keys(entry.metadata).length > 0;
             const isOpen = hasMetadata && expandedIds.has(entry.id);
             return (
               <Fragment key={entry.id}>
                 <tr>
-                  <td className="px-4 py-3 text-slate-900">
-                    {formatDateTime(entry.created_at)}
-                  </td>
+                  <td className="px-4 py-3 text-slate-900">{formatDateTime(entry.created_at)}</td>
                   <td className="px-4 py-3 font-mono text-xs" title={entry.actor_id}>
                     {truncateId(entry.actor_id)}
                   </td>
