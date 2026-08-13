@@ -32,8 +32,14 @@ management:
         enabled: true
       show-details: when-authorized
       group:
+        # Deliberately excludes the vendor breakers, which still report on /actuator/health.
+        # Readiness gates the load balancer, so it must answer "can this instance serve traffic?" —
+        # this process and the database. A vendor outage degrades a background capability: email
+        # stays queued in the outbox for a later poll, and market data falls back to the last cached
+        # close. Gating on either would convert that into a total outage across every instance at
+        # once, since they all share the same vendor.
         readiness:
-          include: readinessState,db,vendorEmail,vendorMarketdata
+          include: readinessState,db
   info:
     env:
       enabled: true
@@ -73,6 +79,21 @@ resilience4j:
         automaticTransitionFromOpenToHalfOpenEnabled: true
   retry:
     instances:
+      vendor-email:
+        maxAttempts: 3
+        # 2s then 4s. The poller sends one message at a time on a 30s tick, so the ladder only has
+        # to outlast a brief blip; anything longer is better served by the next tick.
+        waitDuration: 2s
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2
+        # Whitelist, deliberately: anything absent is terminal. 4xx is about the message — a
+        # suppressed or malformed recipient, a rejected key — and never becomes valid by trying
+        # again. 429 is absent too: the next poll tick is already the retry, so burning this
+        # budget on a rate limit we are respecting would only trip the circuit breaker.
+        retryExceptions:
+          - org.springframework.web.client.HttpServerErrorException
+          - org.springframework.web.client.ResourceAccessException
+          - java.io.IOException
       vendor-marketdata:
         maxAttempts: 3
         # 5s then 10s. The vendor's free tier admits roughly one call every 12s, so a sub-second
@@ -97,8 +118,17 @@ resilience4j:
 
 argus:
   email:
+    # `noop` logs instead of sending. Set to `resend` — with the credentials below — to reach a real
+    # inbox; anything else fails the boot rather than silently swallowing mail.
+    vendor: ${EMAIL_VENDOR:noop}
     poll:
       interval-ms: 30000
+    resend:
+      # Credentials and endpoint are deliberately absent — they are supplied per environment. These
+      # two are transport limits, not secrets, so they carry the same value everywhere: without
+      # them a stalled vendor connection pins the poller and nothing behind it goes out.
+      connect-timeout: 5s
+      read-timeout: 30s
   marketdata:
     backfill:
       interval-ms: 60000

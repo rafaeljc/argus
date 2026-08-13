@@ -7,6 +7,15 @@ spring:
       pool-name: argus-pool
 
 argus:
+  email:
+    vendor: resend
+    # No defaults: a prod boot without vendor credentials, a sender address, or the public host the
+    # links point at must fail rather than start up and mail dead links to real users.
+    from-address: ${EMAIL_FROM_ADDRESS}
+    app-base-url: ${APP_BASE_URL}
+    resend:
+      api-key: ${EMAIL_API_KEY}
+      base-url: ${EMAIL_API_BASE_URL}
   marketdata:
     massive:
       # No defaults: a prod boot without vendor credentials or endpoint must fail rather than
