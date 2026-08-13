@@ -21,7 +21,8 @@ const PRIMARY_ITEMS: readonly NavItem[] = [
 ] as const;
 
 const ADMIN_ITEMS: readonly NavItem[] = [
-  { label: 'Admin', to: '/admin/users', section: 'admin' },
+  { label: 'Users', to: '/admin/users', section: 'admin' },
+  { label: 'Audit log', to: '/admin/audit-log', section: 'admin' },
 ] as const;
 
 const ACCOUNT_ITEMS: readonly NavItem[] = [
