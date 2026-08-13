@@ -107,27 +107,44 @@ class EmailTemplateRendererTest {
         assertThat(email.html()).contains(APP_BASE_URL + "/alerts/firings");
     }
 
+    // EvaluateAlerts returns early on an empty firing list, so this payload should never exist. If
+    // one ever does it is our bug, and the digest has nothing to say — "0 of your alert rules
+    // fired" is not an email anyone should receive.
     @Test
-    void render_digest_noFirings_stillRendersWithoutFiringLines() {
+    void render_digestWithNoFirings_throwsIllegalArgument() {
         String payload =
                 """
                 {"user_id":"7c1e...","email":"carol@example.com","run_date":"2026-03-11","firings":[]}
                 """;
 
-        RenderedEmail email = renderer.render(message(EventType.DIGEST, payload));
-
-        assertThat(email.to()).isEqualTo("carol@example.com");
-        assertThat(email.html()).contains(APP_BASE_URL + "/alerts/firings");
+        assertThatThrownBy(() -> renderer.render(message(EventType.DIGEST, payload)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("firings");
     }
 
     // The payload is our own JSON, not user input, but the email address inside it is user-supplied
-    // and lands in an HTML document.
+    // and the password-reset body interpolates it into an HTML document.
     @Test
-    void render_payloadFieldContainingMarkup_isEscapedInTheHtmlBody() {
+    void render_recipientContainingMarkup_isEscapedInTheHtmlBody() {
         RenderedEmail email = renderer.render(message(
-                EventType.VERIFICATION, verificationPayload("<script>x</script>@example.com", "tok-abc")));
+                EventType.PASSWORD_RESET, verificationPayload("<script>x</script>@example.com", "tok-abc")));
 
         assertThat(email.html()).doesNotContain("<script>");
+    }
+
+    // The link is interpolated into an href and into the plain-text fallback line. Tokens are
+    // percent-encoded so they cannot carry markup, but the configured base URL is not, and an
+    // unescaped '&' in an attribute is the start of an entity rather than a separator.
+    @Test
+    void render_baseUrlContainingMarkupCharacters_isEscapedInTheHtmlBody() {
+        EmailTemplateRenderer rawBaseUrl =
+                new EmailTemplateRenderer(new ObjectMapper(), "https://app.argus.example/x?a=1&b=2");
+
+        RenderedEmail email =
+                rawBaseUrl.render(message(EventType.VERIFICATION, verificationPayload("alice@example.com", "tok-abc")));
+
+        assertThat(email.html()).doesNotContain("&b=2").contains("&amp;b=2");
+        assertThat(email.text()).contains("&b=2");
     }
 
     @Test

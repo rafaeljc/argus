@@ -77,7 +77,7 @@ public class EmailTemplateRenderer {
                 request a new one.</p>
                 <p>If you did not sign up for Argus, no account was created and you can ignore this message.</p>
                 """
-                        .formatted(url, HtmlUtils.htmlEscape(expiry));
+                        .formatted(HtmlUtils.htmlEscape(url), HtmlUtils.htmlEscape(expiry));
         return new RenderedEmail(recipient, "Confirm your email to finish setting up Argus", page(body, url), text);
     }
 
@@ -108,7 +108,10 @@ public class EmailTemplateRenderer {
                 <p>If this was not you, ignore this message. Your current password stays active and \
                 nobody can use the link without access to this mailbox.</p>
                 """
-                        .formatted(HtmlUtils.htmlEscape(recipient), url, HtmlUtils.htmlEscape(expiry));
+                        .formatted(
+                                HtmlUtils.htmlEscape(recipient),
+                                HtmlUtils.htmlEscape(url),
+                                HtmlUtils.htmlEscape(expiry));
         return new RenderedEmail(recipient, "Reset your Argus password", page(body, url), text);
     }
 
@@ -141,7 +144,7 @@ public class EmailTemplateRenderer {
                 <p><a href="%s">Review the full firing history</a></p>
                 <p>Each rule fires once. Re-arm the ones you still want to watch from the same page.</p>
                 """
-                        .formatted(HtmlUtils.htmlEscape(headline), htmlLines(firings), url);
+                        .formatted(HtmlUtils.htmlEscape(headline), htmlLines(firings), HtmlUtils.htmlEscape(url));
         return new RenderedEmail(recipient, "Argus alerts for " + runDate, page(body, url), text);
     }
 
@@ -165,7 +168,7 @@ public class EmailTemplateRenderer {
                 Argus &middot; end-of-day portfolio monitoring</p>
                 </div></body></html>
                 """;
-        return template.formatted(body, url);
+        return template.formatted(body, HtmlUtils.htmlEscape(url));
     }
 
     private static String textLines(List<Firing> firings) {
@@ -187,6 +190,12 @@ public class EmailTemplateRenderer {
                     required(node, "window_end_date"),
                     required(node, "portfolio_value_start"),
                     required(node, "portfolio_value_end")));
+        }
+        // A digest with nothing in it is the same class of bug as a missing field: the enqueueing
+        // module returns early on an empty firing list, so reaching here means the payload is wrong.
+        // Better to fail than to mail someone "0 of your alert rules fired".
+        if (firings.isEmpty()) {
+            throw new IllegalArgumentException("outbox payload has no firings to report");
         }
         return List.copyOf(firings);
     }
