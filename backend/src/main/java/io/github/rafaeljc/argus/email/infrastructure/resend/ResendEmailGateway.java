@@ -12,6 +12,8 @@ import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -92,16 +94,30 @@ public class ResendEmailGateway implements EmailGateway {
                     message.idempotenceKey());
             return new SendResult(true, null);
         } catch (HttpClientErrorException ex) {
-            // 4xx is about this request, not the vendor's health: a suppressed or malformed
-            // recipient, or a rejected key. 429 lands here too — throttling is not failure, and the
-            // next poll tick is already the retry, so opening the breaker over it would stall the
-            // whole queue for a limit we are respecting.
+            // 401/403 are the exception to the rule below: they are scoped to the account, not to
+            // this message, so every message fails identically. Returned as a terminal failure they
+            // would spend one error_count per message per poll and render the whole queue
+            // unclaimable within minutes, with the breaker closed and readiness green throughout.
+            // Thrown, the breaker opens and the queue is preserved until the key is fixed.
+            if (isCredentialFailure(ex)) {
+                log.error("vendor email credentials rejected: {}", ex.getStatusCode());
+                throw new ServiceUnavailableException("vendor email credentials rejected", ex);
+            }
+            // Everything else in 4xx is about this request, not the vendor's health: a suppressed
+            // or malformed recipient. 429 lands here too — throttling is not failure, and the next
+            // poll tick is already the retry, so opening the breaker over it would stall the whole
+            // queue for a limit we are respecting.
             log.warn("vendor email rejected message {}: {}", message.id().value(), ex.getStatusCode());
             return new SendResult(false, truncate(ex.getStatusCode() + " " + ex.getResponseBodyAsString()));
         } catch (RestClientException ex) {
             log.warn("vendor email send failed for message {}", message.id().value(), ex);
             throw new ServiceUnavailableException("vendor email send failed", ex);
         }
+    }
+
+    private static boolean isCredentialFailure(HttpClientErrorException ex) {
+        HttpStatusCode status = ex.getStatusCode();
+        return status.isSameCodeAs(HttpStatus.UNAUTHORIZED) || status.isSameCodeAs(HttpStatus.FORBIDDEN);
     }
 
     private static String truncate(String message) {

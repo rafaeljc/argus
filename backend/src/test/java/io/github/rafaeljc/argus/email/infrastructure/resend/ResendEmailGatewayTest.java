@@ -168,6 +168,27 @@ class ResendEmailGatewayTest {
         server.verify();
     }
 
+    // A rejected key fails every message equally, so it must not be charged to the message. Left as
+    // a returned failure it would burn one error_count per message per poll, and the queue would be
+    // exhausted and unclaimable within minutes — with the breaker closed and readiness green.
+    @Test
+    void send_credentialsRejected_throwsServiceUnavailableWithoutRetrying() {
+        server.expect(ExpectedCount.once(), requestTo(SEND_URL)).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+
+        assertThatThrownBy(() -> gateway.send(message(PAYLOAD))).isInstanceOf(ServiceUnavailableException.class);
+
+        server.verify();
+    }
+
+    @Test
+    void send_senderNotAuthorised_throwsServiceUnavailableWithoutRetrying() {
+        server.expect(ExpectedCount.once(), requestTo(SEND_URL)).andRespond(withStatus(HttpStatus.FORBIDDEN));
+
+        assertThatThrownBy(() -> gateway.send(message(PAYLOAD))).isInstanceOf(ServiceUnavailableException.class);
+
+        server.verify();
+    }
+
     // Must throw rather than return failure: only a thrown exception reaches the circuit breaker
     // that PollOutboxOnce wraps around this call.
     @Test
