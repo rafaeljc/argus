@@ -32,8 +32,14 @@ management:
         enabled: true
       show-details: when-authorized
       group:
+        # Deliberately excludes the vendor breakers, which still report on /actuator/health.
+        # Readiness gates the load balancer, so it must answer "can this instance serve traffic?" —
+        # this process and the database. A vendor outage degrades a background capability: email
+        # stays queued in the outbox for a later poll, and market data falls back to the last cached
+        # close. Gating on either would convert that into a total outage across every instance at
+        # once, since they all share the same vendor.
         readiness:
-          include: readinessState,db,vendorEmail,vendorMarketdata
+          include: readinessState,db
   info:
     env:
       enabled: true
