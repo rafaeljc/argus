@@ -11,10 +11,6 @@ function Placeholder({ title }: PlaceholderProps) {
   );
 }
 
-export function AdminAuditLogPage() {
-  return <Placeholder title="Admin Audit Log" />;
-}
-
 export function AdminEodPipelinePage() {
   return <Placeholder title="Admin EOD Pipeline" />;
 }
