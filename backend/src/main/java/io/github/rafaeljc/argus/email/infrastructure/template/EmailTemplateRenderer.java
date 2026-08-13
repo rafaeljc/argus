@@ -1,8 +1,5 @@
 package io.github.rafaeljc.argus.email.infrastructure.template;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.rafaeljc.argus.email.domain.OutboxMessage;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -14,6 +11,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import org.springframework.web.util.HtmlUtils;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 // Turns an outbox row into the subject and bodies the vendor sends. Lives in infrastructure, not
 // application, because it parses the payload JSON and Jackson is barred from the inner layers.
@@ -241,7 +241,7 @@ public class EmailTemplateRenderer {
     private JsonNode parse(String payload) {
         try {
             return objectMapper.readTree(payload);
-        } catch (JsonProcessingException ex) {
+        } catch (JacksonException ex) {
             throw new IllegalArgumentException("outbox payload is not valid JSON", ex);
         }
     }
@@ -250,9 +250,9 @@ public class EmailTemplateRenderer {
     // Failing loudly beats sending an email with a dead link in it.
     private static String required(JsonNode node, String field) {
         JsonNode value = node.path(field);
-        if (value.isMissingNode() || value.isNull() || value.asText().isBlank()) {
+        if (value.isMissingNode() || value.isNull() || value.asString().isBlank()) {
             throw new IllegalArgumentException("outbox payload is missing required field: " + field);
         }
-        return value.asText();
+        return value.asString();
     }
 }

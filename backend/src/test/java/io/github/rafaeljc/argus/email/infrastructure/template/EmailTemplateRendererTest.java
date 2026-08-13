@@ -3,13 +3,13 @@ package io.github.rafaeljc.argus.email.infrastructure.template;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.rafaeljc.argus.common.domain.OutboxId;
 import io.github.rafaeljc.argus.email.domain.EventType;
 import io.github.rafaeljc.argus.email.domain.OutboxMessage;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 class EmailTemplateRendererTest {
 
