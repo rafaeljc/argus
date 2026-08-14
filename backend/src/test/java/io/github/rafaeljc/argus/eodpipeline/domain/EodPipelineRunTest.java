@@ -246,6 +246,48 @@ class EodPipelineRunTest {
         assertThat(restarted.stepInProgress()).isEmpty();
     }
 
+    @Test
+    void restartingFrom_priorStepFailed_throwsPriorStepNotSucceeded() {
+        EodPipelineRun run = run(RunStatus.FAILED,
+                StepStatus.SUCCEEDED, StepStatus.FAILED, StepStatus.PENDING);
+
+        assertThatThrownBy(() -> run.restartingFrom(PipelineStep.EVALUATE))
+                .isInstanceOf(PriorStepNotSucceededException.class)
+                .extracting("runId", "entryStep", "blockingStep", "blockingStatus")
+                .containsExactly(RUN_ID, PipelineStep.EVALUATE, PipelineStep.PRICES, StepStatus.FAILED);
+    }
+
+    @Test
+    void restartingFrom_priorStepStillPending_throwsPriorStepNotSucceeded() {
+        EodPipelineRun run = run(RunStatus.FAILED,
+                StepStatus.SUCCEEDED, StepStatus.PENDING, StepStatus.PENDING);
+
+        assertThatThrownBy(() -> run.restartingFrom(PipelineStep.EVALUATE))
+                .isInstanceOf(PriorStepNotSucceededException.class)
+                .extracting("blockingStep", "blockingStatus")
+                .containsExactly(PipelineStep.PRICES, StepStatus.PENDING);
+    }
+
+    @Test
+    void restartingFrom_allPriorStepsSucceeded_isAllowed() {
+        EodPipelineRun run = run(RunStatus.FAILED,
+                StepStatus.SUCCEEDED, StepStatus.SUCCEEDED, StepStatus.FAILED);
+
+        EodPipelineRun restarted = run.restartingFrom(PipelineStep.EVALUATE);
+
+        assertThat(restarted.stepEvaluateStatus()).isEqualTo(StepStatus.PENDING);
+    }
+
+    @Test
+    void restartingFrom_symbols_hasNoPriorStepsToCheck() {
+        EodPipelineRun run = run(RunStatus.FAILED,
+                StepStatus.FAILED, StepStatus.SKIPPED, StepStatus.SKIPPED);
+
+        EodPipelineRun restarted = run.restartingFrom(PipelineStep.SYMBOLS);
+
+        assertThat(restarted.stepSymbolsStatus()).isEqualTo(StepStatus.PENDING);
+    }
+
     private static EodPipelineRun run(
             RunStatus status, StepStatus symbols, StepStatus prices, StepStatus evaluate) {
         return new EodPipelineRun(
