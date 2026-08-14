@@ -160,9 +160,10 @@ describe('EodPipelineRunDetailPage', () => {
     renderAppAt(DETAIL_PATH);
 
     await screen.findByRole('heading', { name: /2026-07-09/ });
-    expect(screen.getByText(/^symbols$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^prices$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^evaluate$/i)).toBeInTheDocument();
+    const steps = screen.getByRole('list', { name: /pipeline steps/i });
+    expect(within(steps).getByText(/^symbols$/i)).toBeInTheDocument();
+    expect(within(steps).getByText(/^prices$/i)).toBeInTheDocument();
+    expect(within(steps).getByText(/^evaluate$/i)).toBeInTheDocument();
   });
 
   it('renders the three steps as an ordered sequence with directional arrows between them', async () => {

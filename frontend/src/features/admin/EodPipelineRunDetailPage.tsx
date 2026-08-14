@@ -10,9 +10,10 @@ import { EmptyState } from '../../shared/components/ui/EmptyState';
 import { Spinner } from '../../shared/components/ui/Spinner';
 import { EodStatusBadge } from './EodStatusBadge';
 import { formatDateTime } from './formatDate';
+import { RerunEodStepModal } from './RerunEodStepModal';
 import { getEodPipelineRun } from './service';
 import { PIPELINE_STEPS } from './types';
-import type { EodPipelineRun, EodStepStatus } from './types';
+import type { EodPipelineRun, EodPipelineStep, EodStepStatus } from './types';
 
 const RUNS_PATH = '/admin/eod-pipeline';
 const NOT_SET = '—';
@@ -123,10 +124,28 @@ interface EodPipelineRunDetailProps {
 }
 
 function EodPipelineRunDetail({ run, onRefresh }: EodPipelineRunDetailProps) {
+  const [openStep, setOpenStep] = useState<EodPipelineStep | null>(null);
+  const [focusSignal, setFocusSignal] = useState(0);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const canRerun = run.status === 'succeeded' || run.status === 'failed';
+
+  // Runs after Modal's own unmount cleanup (which restores focus to the triggering
+  // button) commits, so the heading reliably wins focus instead of losing it back
+  // to a re-run button that — unlike the suspend/unsuspend actions — never unmounts.
+  useEffect(() => {
+    if (focusSignal > 0) headingRef.current?.focus();
+  }, [focusSignal]);
+
+  function handleRerun(): void {
+    onRefresh();
+    setFocusSignal((signal) => signal + 1);
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1
+          ref={headingRef}
           tabIndex={-1}
           className="rounded text-2xl font-semibold text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
         >
@@ -184,7 +203,39 @@ function EodPipelineRunDetail({ run, onRefresh }: EodPipelineRunDetailProps) {
             </li>
           ))}
         </ol>
+
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
+          <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            Re-run from
+          </span>
+          {PIPELINE_STEPS.map((step) => (
+            <Button
+              key={step}
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={!canRerun}
+              aria-label={`Re-run from ${STEP_LABELS[step]}`}
+              onClick={() => setOpenStep(step)}
+            >
+              {STEP_LABELS[step]}
+            </Button>
+          ))}
+        </div>
+        {!canRerun && (
+          <p className="mt-2 text-sm text-slate-500">Re-run is available once the run settles.</p>
+        )}
       </Card>
+
+      {openStep && (
+        <RerunEodStepModal
+          open
+          runId={run.run_id}
+          step={openStep}
+          onClose={() => setOpenStep(null)}
+          onRerun={handleRerun}
+        />
+      )}
     </div>
   );
 }
