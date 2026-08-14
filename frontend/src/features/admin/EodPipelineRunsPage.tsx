@@ -12,6 +12,7 @@ import { EodStatusBadge } from './EodStatusBadge';
 import { formatDateTime } from './formatDate';
 import { listEodPipelineRuns } from './service';
 import { TriggerEodRunModal } from './TriggerEodRunModal';
+import { TRIGGER_LABELS } from './types';
 import type { EodPipelineRun } from './types';
 
 const PAGE_SIZE_STORAGE_KEY = 'argus.pageSize.eodPipelineRuns';
@@ -19,11 +20,6 @@ const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
 const DEFAULT_PAGE_SIZE = 25;
 const SKELETON_ROW_COUNT = 5;
 const NOT_SET = '—';
-
-const TRIGGER_LABELS: Record<EodPipelineRun['trigger'], string> = {
-  cron: 'Cron',
-  admin: 'Admin',
-};
 
 const PAGE_SIZE_SELECT_OPTIONS: SelectOption[] = PAGE_SIZE_OPTIONS.map((size) => ({
   value: String(size),

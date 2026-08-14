@@ -3,14 +3,8 @@ import { Modal } from '../../shared/components/ui/Modal';
 import { useForm } from '../../shared/hooks/useForm';
 import { toast } from '../../shared/hooks/useToastStore';
 import { rerunEodPipelineStep } from './service';
-import { PIPELINE_STEPS } from './types';
+import { PIPELINE_STEPS, STEP_LABELS } from './types';
 import type { EodPipelineStep } from './types';
-
-const STEP_LABELS: Record<EodPipelineStep, string> = {
-  symbols: 'Symbols',
-  prices: 'Prices',
-  evaluate: 'Evaluate',
-};
 
 export interface RerunEodStepModalProps {
   open: boolean;

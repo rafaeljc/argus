@@ -60,6 +60,12 @@ export const PIPELINE_STEPS = ['symbols', 'prices', 'evaluate'] as const;
 
 export type EodPipelineStep = (typeof PIPELINE_STEPS)[number];
 
+export const STEP_LABELS: Record<EodPipelineStep, string> = {
+  symbols: 'Symbols',
+  prices: 'Prices',
+  evaluate: 'Evaluate',
+};
+
 export type EodRunStatus = 'pending' | 'in_progress' | 'succeeded' | 'failed';
 
 export type EodStepStatus = 'pending' | 'in_progress' | 'succeeded' | 'failed' | 'skipped';
@@ -76,6 +82,11 @@ export interface EodPipelineRun {
   step_evaluate_status: EodStepStatus;
   error_message: string | null;
 }
+
+export const TRIGGER_LABELS: Record<EodPipelineRun['trigger'], string> = {
+  cron: 'Cron',
+  admin: 'Admin',
+};
 
 export interface EodPipelineRunSearchParams {
   page: number;

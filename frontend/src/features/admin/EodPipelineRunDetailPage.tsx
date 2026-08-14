@@ -12,22 +12,11 @@ import { EodStatusBadge } from './EodStatusBadge';
 import { formatDateTime } from './formatDate';
 import { RerunEodStepModal } from './RerunEodStepModal';
 import { getEodPipelineRun } from './service';
-import { PIPELINE_STEPS } from './types';
+import { PIPELINE_STEPS, STEP_LABELS, TRIGGER_LABELS } from './types';
 import type { EodPipelineRun, EodPipelineStep, EodStepStatus } from './types';
 
 const RUNS_PATH = '/admin/eod-pipeline';
 const NOT_SET = '—';
-
-const STEP_LABELS: Record<(typeof PIPELINE_STEPS)[number], string> = {
-  symbols: 'Symbols',
-  prices: 'Prices',
-  evaluate: 'Evaluate',
-};
-
-const TRIGGER_LABELS: Record<EodPipelineRun['trigger'], string> = {
-  cron: 'Cron',
-  admin: 'Admin',
-};
 
 function stepStatus(run: EodPipelineRun, step: (typeof PIPELINE_STEPS)[number]): EodStepStatus {
   switch (step) {
