@@ -707,7 +707,8 @@ paths:
         untouched. The run returns to in_progress, with the named step queued as pending until a
         worker picks it up, and settles on a terminal status once the sequence completes. Only a
         run that has already settled can be re-run: returns 409 if the run has not reached a
-        terminal status, or if another run already holds the same run_date.
+        terminal status, if any step before the named one did not succeed, or if another run
+        already holds the same run_date.
       security:
         - sessionCookie: []
           csrfToken: []
