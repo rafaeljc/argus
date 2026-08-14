@@ -9,8 +9,8 @@ import { PasswordResetConfirmPage } from './features/auth/PasswordResetConfirmPa
 import { PasswordResetPage } from './features/auth/PasswordResetPage';
 import { SignupPage } from './features/auth/SignupPage';
 import { VerifyEmailPage } from './features/auth/VerifyEmailPage';
-import { AdminEodPipelineRunPage } from './features/_placeholders/pages';
 import { AuditLogPage } from './features/admin/AuditLogPage';
+import { EodPipelineRunDetailPage } from './features/admin/EodPipelineRunDetailPage';
 import { EodPipelineRunsPage } from './features/admin/EodPipelineRunsPage';
 import { UserAccountDetailPage } from './features/admin/UserAccountDetailPage';
 import { UserAccountsPage } from './features/admin/UserAccountsPage';
@@ -57,7 +57,7 @@ function App() {
               <Route path="/admin/users/:id" element={<UserAccountDetailPage />} />
               <Route path="/admin/audit-log" element={<AuditLogPage />} />
               <Route path="/admin/eod-pipeline" element={<EodPipelineRunsPage />} />
-              <Route path="/admin/eod-pipeline/:runId" element={<AdminEodPipelineRunPage />} />
+              <Route path="/admin/eod-pipeline/:runId" element={<EodPipelineRunDetailPage />} />
             </Route>
           </Route>
 

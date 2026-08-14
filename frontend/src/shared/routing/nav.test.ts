@@ -43,7 +43,7 @@ describe('visibleNavItems', () => {
   it('replaces the primary items with admin nav for verified admin users', () => {
     const user = makeUser({ is_verified: true, is_admin: true });
     const seen = labels(visibleNavItems(user, 'authenticated'));
-    expect(seen).toEqual(['Users', 'Audit log', 'Account', 'Logout']);
+    expect(seen).toEqual(['Users', 'Audit log', 'EOD pipeline', 'Account', 'Logout']);
   });
 
   it('hides the investor surfaces from admins', () => {
