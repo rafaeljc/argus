@@ -43,7 +43,13 @@ describe('visibleNavItems', () => {
   it('replaces the primary items with admin nav for verified admin users', () => {
     const user = makeUser({ is_verified: true, is_admin: true });
     const seen = labels(visibleNavItems(user, 'authenticated'));
-    expect(seen).toEqual(['Users', 'Audit log', 'Account', 'Logout']);
+    expect(seen).toEqual(['EOD pipeline', 'Audit log', 'Users', 'Logout']);
+  });
+
+  it('does not show Account in the nav for admins', () => {
+    const user = makeUser({ is_verified: true, is_admin: true });
+    const seen = labels(visibleNavItems(user, 'authenticated'));
+    expect(seen).not.toContain('Account');
   });
 
   it('hides the investor surfaces from admins', () => {

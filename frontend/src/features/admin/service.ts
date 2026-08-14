@@ -3,6 +3,10 @@ import type { Paginated } from '../../shared/types/envelopes';
 import type {
   AuditLogEntry,
   AuditLogSearchParams,
+  EodPipelineRun,
+  EodPipelineRunSearchParams,
+  EodPipelineStep,
+  EodStepRerunResult,
   UserAccount,
   UserAccountActionResult,
   UserAccountSearchParams,
@@ -69,5 +73,35 @@ export async function searchAuditLog(
       to: params.to,
     },
   });
+  return response.data;
+}
+
+export async function listEodPipelineRuns(
+  params: EodPipelineRunSearchParams,
+): Promise<Paginated<EodPipelineRun>> {
+  const response = await apiClient.get<Paginated<EodPipelineRun>>('/admin/eod-pipeline/runs', {
+    params: { page: params.page, per_page: params.perPage },
+  });
+  return response.data;
+}
+
+export async function getEodPipelineRun(runId: string): Promise<EodPipelineRun> {
+  const response = await apiClient.get<EodPipelineRun>(`/admin/eod-pipeline/runs/${runId}`);
+  return response.data;
+}
+
+export async function triggerEodPipelineRun(runDate: string): Promise<EodPipelineRun> {
+  const body = runDate === '' ? {} : { run_date: runDate };
+  const response = await apiClient.post<EodPipelineRun>('/admin/eod-pipeline/runs', body);
+  return response.data;
+}
+
+export async function rerunEodPipelineStep(
+  runId: string,
+  step: EodPipelineStep,
+): Promise<EodStepRerunResult> {
+  const response = await apiClient.post<EodStepRerunResult>(
+    `/admin/eod-pipeline/runs/${runId}/steps/${step}`,
+  );
   return response.data;
 }

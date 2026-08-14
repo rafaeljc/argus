@@ -113,6 +113,20 @@ describe('LoginPage', () => {
     });
   });
 
+  it('signs a verified admin in and redirects to /admin/eod-pipeline', async () => {
+    server.use(anonymousMe(), loginSucceeds());
+    const user = userEvent.setup();
+    renderAppAt('/login');
+    await screen.findByRole('heading', { name: /sign in/i });
+
+    server.use(userMe({ ...VERIFIED_USER, is_admin: true }));
+    await fillAndSubmit(user);
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /^eod pipeline$/i })).toBeInTheDocument();
+    });
+  });
+
   it('honours the RequireAuth-captured `from` path when redirecting a verified user', async () => {
     server.use(anonymousMe(), loginSucceeds());
     const user = userEvent.setup();

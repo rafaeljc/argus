@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
 
 import { AppBootstrap } from './AppBootstrap';
 import { AccountPage } from './features/account/AccountPage';
@@ -9,8 +9,9 @@ import { PasswordResetConfirmPage } from './features/auth/PasswordResetConfirmPa
 import { PasswordResetPage } from './features/auth/PasswordResetPage';
 import { SignupPage } from './features/auth/SignupPage';
 import { VerifyEmailPage } from './features/auth/VerifyEmailPage';
-import { AdminEodPipelinePage, AdminEodPipelineRunPage } from './features/_placeholders/pages';
 import { AuditLogPage } from './features/admin/AuditLogPage';
+import { EodPipelineRunDetailPage } from './features/admin/EodPipelineRunDetailPage';
+import { EodPipelineRunsPage } from './features/admin/EodPipelineRunsPage';
 import { UserAccountDetailPage } from './features/admin/UserAccountDetailPage';
 import { UserAccountsPage } from './features/admin/UserAccountsPage';
 import { AlertFiringsPage } from './features/alerts/AlertFiringsPage';
@@ -23,6 +24,7 @@ import { NotFound } from './shared/components/NotFound';
 import { ToastProvider } from './shared/components/ui/ToastProvider';
 import { RequireAdmin } from './shared/routing/RequireAdmin';
 import { RequireAuth } from './shared/routing/RequireAuth';
+import { RootRedirect } from './shared/routing/RootRedirect';
 
 function App() {
   return (
@@ -30,7 +32,7 @@ function App() {
       <ToastProvider />
       <Routes>
         <Route element={<AppLayout />}>
-          <Route path="/" element={<Navigate to="/portfolio" replace />} />
+          <Route path="/" element={<RootRedirect />} />
 
           <Route path="/login" element={<LoginPage />} />
           <Route path="/logout" element={<LogoutPage />} />
@@ -55,8 +57,8 @@ function App() {
               <Route path="/admin/users" element={<UserAccountsPage />} />
               <Route path="/admin/users/:id" element={<UserAccountDetailPage />} />
               <Route path="/admin/audit-log" element={<AuditLogPage />} />
-              <Route path="/admin/eod-pipeline" element={<AdminEodPipelinePage />} />
-              <Route path="/admin/eod-pipeline/:runId" element={<AdminEodPipelineRunPage />} />
+              <Route path="/admin/eod-pipeline" element={<EodPipelineRunsPage />} />
+              <Route path="/admin/eod-pipeline/:runId" element={<EodPipelineRunDetailPage />} />
             </Route>
           </Route>
 
