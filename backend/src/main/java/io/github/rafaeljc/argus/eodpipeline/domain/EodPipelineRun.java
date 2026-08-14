@@ -78,16 +78,31 @@ public record EodPipelineRun(RunId id,
     }
 
     // Steps before entryStep keep whatever they last settled on — a rerun re-executes entryStep
-    // and everything after it, and the earlier steps' results are still valid. entryStep is left
-    // pending rather than in_progress: it is queued, not running, and claiming it here would make
-    // the executing worker's own claim collide with it.
+    // and everything after it, and the earlier steps' results are still valid to keep only if they
+    // actually succeeded; a failed or still-pending predecessor makes the transition invalid, so it
+    // is rejected rather than built. entryStep is left pending rather than in_progress: it is
+    // queued, not running, and claiming it here would make the executing worker's own claim
+    // collide with it.
     public EodPipelineRun restartingFrom(PipelineStep entryStep) {
+        Optional<PipelineStep> blocking = firstUnsucceededStepBefore(entryStep);
+        if (blocking.isPresent()) {
+            throw new PriorStepNotSucceededException(id, entryStep, blocking.get(), statusOf(blocking.get()));
+        }
         return new EodPipelineRun(
                 id, runDate, trigger, RunStatus.IN_PROGRESS, startedAt, null,
                 restartedStatusOf(PipelineStep.SYMBOLS, entryStep),
                 restartedStatusOf(PipelineStep.PRICES, entryStep),
                 restartedStatusOf(PipelineStep.EVALUATE, entryStep),
                 null);
+    }
+
+    private Optional<PipelineStep> firstUnsucceededStepBefore(PipelineStep entryStep) {
+        for (PipelineStep step : PipelineStep.values()) {
+            if (!step.isAtOrAfter(entryStep) && statusOf(step) != StepStatus.SUCCEEDED) {
+                return Optional.of(step);
+            }
+        }
+        return Optional.empty();
     }
 
     private StepStatus restartedStatusOf(PipelineStep step, PipelineStep entryStep) {

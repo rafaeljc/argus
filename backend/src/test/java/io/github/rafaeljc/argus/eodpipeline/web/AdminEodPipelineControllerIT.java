@@ -322,6 +322,21 @@ class AdminEodPipelineControllerIT {
     }
 
     @Test
+    void postStep_priorStepFailed_returns409Conflict() throws Exception {
+        User admin = seedVerified("admin13@example.com");
+        LocalDate runDate = LocalDate.of(2026, 7, 5);
+        EodPipelineRun saved = runs.insert(failedRun(
+                runDate, StepStatus.SUCCEEDED, StepStatus.FAILED, StepStatus.PENDING));
+
+        ResponseEntity<String> response = postStep(admin, saved.id(), "evaluate");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(409);
+        JsonNode error = json.readTree(response.getBody()).get("error");
+        assertThat(error.get("code").asString()).isEqualTo("CONFLICT");
+        assertThat(runs.findById(saved.id()).orElseThrow().status()).isEqualTo(RunStatus.FAILED);
+    }
+
+    @Test
     void postStep_unknownRunId_returns404() throws Exception {
         User admin = seedVerified("admin11@example.com");
 
