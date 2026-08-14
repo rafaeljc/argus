@@ -11,7 +11,6 @@ import type { Paginated } from '../../shared/types/envelopes';
 import { EodStatusBadge } from './EodStatusBadge';
 import { formatDateTime } from './formatDate';
 import { listEodPipelineRuns } from './service';
-import { PIPELINE_STEPS } from './types';
 import type { EodPipelineRun } from './types';
 
 const PAGE_SIZE_STORAGE_KEY = 'argus.pageSize.eodPipelineRuns';
@@ -19,12 +18,6 @@ const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
 const DEFAULT_PAGE_SIZE = 25;
 const SKELETON_ROW_COUNT = 5;
 const NOT_SET = '—';
-
-const STEP_LABELS: Record<(typeof PIPELINE_STEPS)[number], string> = {
-  symbols: 'Symbols',
-  prices: 'Prices',
-  evaluate: 'Evaluate',
-};
 
 const TRIGGER_LABELS: Record<EodPipelineRun['trigger'], string> = {
   cron: 'Cron',
@@ -191,11 +184,6 @@ function EodPipelineRunsTable({ runs }: EodPipelineRunsTableProps) {
             <th scope="col" className="px-4 py-3">
               Finished
             </th>
-            {PIPELINE_STEPS.map((step) => (
-              <th key={step} scope="col" className="px-4 py-3">
-                {STEP_LABELS[step]}
-              </th>
-            ))}
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-200">
@@ -216,15 +204,6 @@ function EodPipelineRunsTable({ runs }: EodPipelineRunsTableProps) {
               <td className="px-4 py-3">{formatDateTime(run.started_at)}</td>
               <td className="px-4 py-3">
                 {run.finished_at === null ? NOT_SET : formatDateTime(run.finished_at)}
-              </td>
-              <td className="px-4 py-3">
-                <EodStatusBadge status={run.step_symbols_status} />
-              </td>
-              <td className="px-4 py-3">
-                <EodStatusBadge status={run.step_prices_status} />
-              </td>
-              <td className="px-4 py-3">
-                <EodStatusBadge status={run.step_evaluate_status} />
               </td>
             </tr>
           ))}

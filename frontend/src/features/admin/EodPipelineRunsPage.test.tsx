@@ -143,16 +143,29 @@ describe('EodPipelineRunsPage', () => {
     window.localStorage.clear();
   });
 
-  it('renders one row per run with date, trigger, status, and step chips', async () => {
+  it('renders one row per run with date, trigger, status, started, and finished', async () => {
     server.use(userMe(ADMIN_USER), listOk([buildRun()]));
     renderAppAt('/admin/eod-pipeline');
 
     const table = await screen.findByRole('table');
     const row = within(table).getAllByRole('row')[1]!;
     const cells = within(row).getAllByRole('cell');
+    expect(cells).toHaveLength(5);
     expect(cells[0]).toHaveTextContent('2026-07-09');
     expect(cells[1]).toHaveTextContent(/cron/i);
-    expect(within(row).getAllByText(/succeeded/i).length).toBeGreaterThan(0);
+    expect(cells[2]).toHaveTextContent(/succeeded/i);
+    expect(cells[3]).toHaveTextContent('2026-07-09 21:00:00 UTC');
+    expect(cells[4]).toHaveTextContent('2026-07-09 21:04:12 UTC');
+  });
+
+  it('does not render per-step status columns, since the run status already summarizes them', async () => {
+    server.use(userMe(ADMIN_USER), listOk([buildRun()]));
+    renderAppAt('/admin/eod-pipeline');
+
+    await screen.findByRole('table');
+    expect(screen.queryByRole('columnheader', { name: /^symbols$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /^prices$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /^evaluate$/i })).not.toBeInTheDocument();
   });
 
   it('links the run date to the run detail page', async () => {
