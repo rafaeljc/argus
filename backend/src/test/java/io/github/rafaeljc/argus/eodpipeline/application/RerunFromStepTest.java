@@ -16,6 +16,7 @@ import io.github.rafaeljc.argus.eodpipeline.application.port.EodPipelineRunRepos
 import io.github.rafaeljc.argus.eodpipeline.application.port.RunDispatcher;
 import io.github.rafaeljc.argus.eodpipeline.domain.EodPipelineRun;
 import io.github.rafaeljc.argus.eodpipeline.domain.PipelineStep;
+import io.github.rafaeljc.argus.eodpipeline.domain.PriorStepNotSucceededException;
 import io.github.rafaeljc.argus.eodpipeline.domain.RunNotSettledException;
 import io.github.rafaeljc.argus.eodpipeline.domain.RunStatus;
 import io.github.rafaeljc.argus.eodpipeline.domain.StepStatus;
@@ -130,6 +131,20 @@ class RerunFromStepTest {
         verify(runs).updateIfRunTerminal(captor.capture());
         assertThat(captor.getValue()).isEqualTo(result);
         verify(dispatcher).dispatchFrom(RUN_ID, PipelineStep.PRICES);
+    }
+
+    @Test
+    void execute_fromEvaluateWithPricesFailed_throwsAndNeverClaimsOrDispatches() {
+        when(runs.findById(RUN_ID))
+                .thenReturn(Optional.of(failedRun(StepStatus.SUCCEEDED, StepStatus.FAILED, StepStatus.PENDING)));
+
+        assertThatThrownBy(() -> rerunFromStep.execute(RUN_ID, PipelineStep.EVALUATE, ACTOR_ID))
+                .isInstanceOf(PriorStepNotSucceededException.class)
+                .extracting("blockingStep", "blockingStatus")
+                .containsExactly(PipelineStep.PRICES, StepStatus.FAILED);
+
+        verify(runs, never()).updateIfRunTerminal(any());
+        verifyNoInteractions(dispatcher, events);
     }
 
     @Test
