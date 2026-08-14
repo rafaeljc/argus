@@ -55,3 +55,36 @@ export interface AuditLogSearchParams {
   from?: string | undefined;
   to?: string | undefined;
 }
+
+export const PIPELINE_STEPS = ['symbols', 'prices', 'evaluate'] as const;
+
+export type EodPipelineStep = (typeof PIPELINE_STEPS)[number];
+
+export type EodRunStatus = 'pending' | 'in_progress' | 'succeeded' | 'failed';
+
+export type EodStepStatus = 'pending' | 'in_progress' | 'succeeded' | 'failed' | 'skipped';
+
+export interface EodPipelineRun {
+  run_id: string;
+  run_date: string;
+  trigger: 'cron' | 'admin';
+  status: EodRunStatus;
+  started_at: string;
+  finished_at: string | null;
+  step_symbols_status: EodStepStatus;
+  step_prices_status: EodStepStatus;
+  step_evaluate_status: EodStepStatus;
+  error_message: string | null;
+}
+
+export interface EodPipelineRunSearchParams {
+  page: number;
+  perPage: number;
+}
+
+export interface EodStepRerunResult {
+  run_id: string;
+  step: EodPipelineStep;
+  status: EodRunStatus;
+  started_at: string;
+}
