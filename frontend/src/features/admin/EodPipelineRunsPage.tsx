@@ -11,6 +11,7 @@ import type { Paginated } from '../../shared/types/envelopes';
 import { EodStatusBadge } from './EodStatusBadge';
 import { formatDateTime } from './formatDate';
 import { listEodPipelineRuns } from './service';
+import { TriggerEodRunModal } from './TriggerEodRunModal';
 import type { EodPipelineRun } from './types';
 
 const PAGE_SIZE_STORAGE_KEY = 'argus.pageSize.eodPipelineRuns';
@@ -57,6 +58,7 @@ export function EodPipelineRunsPage() {
   const [status, setStatus] = useState<LoadStatus>('loading');
   const [result, setResult] = useState<Paginated<EodPipelineRun> | null>(null);
   const [retryToken, setRetryToken] = useState(0);
+  const [isTriggerModalOpen, setIsTriggerModalOpen] = useState(false);
   const requestIdRef = useRef(0);
 
   useEffect(() => {
@@ -102,13 +104,18 @@ export function EodPipelineRunsPage() {
       <div className="flex flex-col gap-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-2xl font-semibold text-slate-900">EOD pipeline</h1>
-          <div className="w-32">
-            <SelectField
-              label="Rows per page"
-              options={PAGE_SIZE_SELECT_OPTIONS}
-              value={String(perPage)}
-              onChange={handlePageSizeChange}
-            />
+          <div className="flex items-end gap-4">
+            <div className="w-32">
+              <SelectField
+                label="Rows per page"
+                options={PAGE_SIZE_SELECT_OPTIONS}
+                value={String(perPage)}
+                onChange={handlePageSizeChange}
+              />
+            </div>
+            <Button type="button" onClick={() => setIsTriggerModalOpen(true)}>
+              Trigger run
+            </Button>
           </div>
         </div>
 
@@ -145,6 +152,8 @@ export function EodPipelineRunsPage() {
           </>
         )}
       </div>
+
+      <TriggerEodRunModal open={isTriggerModalOpen} onClose={() => setIsTriggerModalOpen(false)} />
     </PageContainer>
   );
 }
