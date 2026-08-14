@@ -77,7 +77,7 @@ describe('AppNav', () => {
     setAuth(ADMIN_USER, 'authenticated');
     renderNav();
     const desktop = screen.getByTestId('app-nav-desktop');
-    expect(navLabels(desktop)).toEqual(['Users', 'Audit log', 'EOD pipeline', 'Account', 'Logout']);
+    expect(navLabels(desktop)).toEqual(['EOD pipeline', 'Audit log', 'Users', 'Logout']);
   });
 
   it('marks the active route with aria-current="page"', () => {

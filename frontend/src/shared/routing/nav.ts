@@ -21,14 +21,16 @@ const PRIMARY_ITEMS: readonly NavItem[] = [
 ] as const;
 
 const ADMIN_ITEMS: readonly NavItem[] = [
-  { label: 'Users', to: '/admin/users', section: 'admin' },
-  { label: 'Audit log', to: '/admin/audit-log', section: 'admin' },
   { label: 'EOD pipeline', to: '/admin/eod-pipeline', section: 'admin' },
+  { label: 'Audit log', to: '/admin/audit-log', section: 'admin' },
+  { label: 'Users', to: '/admin/users', section: 'admin' },
 ] as const;
+
+const LOGOUT_ITEM: NavItem = { label: 'Logout', to: '/logout', section: 'primary' };
 
 const ACCOUNT_ITEMS: readonly NavItem[] = [
   { label: 'Account', to: '/account', section: 'primary' },
-  { label: 'Logout', to: '/logout', section: 'primary' },
+  LOGOUT_ITEM,
 ] as const;
 
 export const NAV_ITEMS: readonly NavItem[] = [
@@ -45,8 +47,10 @@ export function visibleNavItems(user: CurrentUser | null, status: AuthStatus): r
   if (!user.is_verified) {
     return ACCOUNT_ITEMS;
   }
-  // Admins are staff, not investors: they get the admin surfaces instead of the portfolio ones.
-  const items = user.is_admin ? [...ADMIN_ITEMS] : [...PRIMARY_ITEMS];
-  items.push(...ACCOUNT_ITEMS);
-  return items;
+  // Admins are staff, not investors: they get the admin surfaces instead of the portfolio
+  // ones, and skip the personal Account page — Logout is their only account-level action.
+  if (user.is_admin) {
+    return [...ADMIN_ITEMS, LOGOUT_ITEM];
+  }
+  return [...PRIMARY_ITEMS, ...ACCOUNT_ITEMS];
 }

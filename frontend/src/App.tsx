@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
 
 import { AppBootstrap } from './AppBootstrap';
 import { AccountPage } from './features/account/AccountPage';
@@ -24,6 +24,7 @@ import { NotFound } from './shared/components/NotFound';
 import { ToastProvider } from './shared/components/ui/ToastProvider';
 import { RequireAdmin } from './shared/routing/RequireAdmin';
 import { RequireAuth } from './shared/routing/RequireAuth';
+import { RootRedirect } from './shared/routing/RootRedirect';
 
 function App() {
   return (
@@ -31,7 +32,7 @@ function App() {
       <ToastProvider />
       <Routes>
         <Route element={<AppLayout />}>
-          <Route path="/" element={<Navigate to="/portfolio" replace />} />
+          <Route path="/" element={<RootRedirect />} />
 
           <Route path="/login" element={<LoginPage />} />
           <Route path="/logout" element={<LogoutPage />} />

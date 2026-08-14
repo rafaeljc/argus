@@ -21,9 +21,9 @@ const DEFAULT_INVALID_CREDENTIALS_MESSAGE = 'Invalid email or password.';
 const DEFAULT_ACCOUNT_SUSPENDED_MESSAGE = 'Your account is suspended.';
 const INITIAL_VALUES: LoginBody = { email: '', password: '' };
 
-function resolveVerifiedTarget(fromPath: string | undefined): string {
+function resolveVerifiedTarget(fromPath: string | undefined, isAdmin: boolean): string {
   if (fromPath && fromPath !== '/login') return fromPath;
-  return '/portfolio';
+  return isAdmin ? '/admin/eod-pipeline' : '/portfolio';
 }
 
 export function LoginPage() {
@@ -67,7 +67,7 @@ export function LoginPage() {
         navigate('/verify-email', { replace: true });
         return;
       }
-      navigate(resolveVerifiedTarget(capturedFrom), { replace: true });
+      navigate(resolveVerifiedTarget(capturedFrom, user.is_admin), { replace: true });
     },
   });
 
