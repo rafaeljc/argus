@@ -100,10 +100,16 @@ function listPaged(pages: Record<number, EodPipelineRun[]>, perPage = 25) {
     const url = new URL(request.url);
     const page = Number(url.searchParams.get('page') ?? '1');
     const data = pages[page] ?? [];
-    const meta: PaginationMeta = { total: totalPages * perPage, page, per_page: perPage, total_pages: totalPages };
+    const meta: PaginationMeta = {
+      total: totalPages * perPage,
+      page,
+      per_page: perPage,
+      total_pages: totalPages,
+    };
     const links: PaginationLinks = {
       self: `/admin/eod-pipeline/runs?page=${page}&per_page=${perPage}`,
-      next: page < totalPages ? `/admin/eod-pipeline/runs?page=${page + 1}&per_page=${perPage}` : null,
+      next:
+        page < totalPages ? `/admin/eod-pipeline/runs?page=${page + 1}&per_page=${perPage}` : null,
       prev: page > 1 ? `/admin/eod-pipeline/runs?page=${page - 1}&per_page=${perPage}` : null,
       last: `/admin/eod-pipeline/runs?page=${totalPages}&per_page=${perPage}`,
     };
@@ -177,7 +183,10 @@ describe('EodPipelineRunsPage', () => {
   });
 
   it('renders an em dash for a null finished_at', async () => {
-    server.use(userMe(ADMIN_USER), listOk([buildRun({ finished_at: null, status: 'in_progress' })]));
+    server.use(
+      userMe(ADMIN_USER),
+      listOk([buildRun({ finished_at: null, status: 'in_progress' })]),
+    );
     renderAppAt('/admin/eod-pipeline');
 
     const table = await screen.findByRole('table');
@@ -214,7 +223,10 @@ describe('EodPipelineRunsPage', () => {
     server.use(
       userMe(ADMIN_USER),
       http.get(`${BASE_URL}/admin/eod-pipeline/runs`, () =>
-        HttpResponse.json({ error: { code: 'INTERNAL_ERROR', message: 'Internal error' } }, { status: 500 }),
+        HttpResponse.json(
+          { error: { code: 'INTERNAL_ERROR', message: 'Internal error' } },
+          { status: 500 },
+        ),
       ),
     );
     renderAppAt('/admin/eod-pipeline');
@@ -227,7 +239,10 @@ describe('EodPipelineRunsPage', () => {
     server.use(
       userMe(ADMIN_USER),
       http.get(`${BASE_URL}/admin/eod-pipeline/runs`, () =>
-        HttpResponse.json({ error: { code: 'INTERNAL_ERROR', message: 'Internal error' } }, { status: 500 }),
+        HttpResponse.json(
+          { error: { code: 'INTERNAL_ERROR', message: 'Internal error' } },
+          { status: 500 },
+        ),
       ),
     );
     const user = userEvent.setup();

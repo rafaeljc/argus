@@ -99,9 +99,7 @@ export function EodPipelineRunDetailPage() {
           />
         )}
 
-        {status === 'ready' && run && (
-          <EodPipelineRunDetail run={run} onRefresh={handleRetry} />
-        )}
+        {status === 'ready' && run && <EodPipelineRunDetail run={run} onRefresh={handleRetry} />}
       </div>
     </PageContainer>
   );

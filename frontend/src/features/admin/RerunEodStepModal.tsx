@@ -33,7 +33,9 @@ function RerunDescription({ step }: { step: EodPipelineStep }) {
   return (
     <p className="text-sm text-slate-700">
       This re-runs <Highlight>{stepLabel}</Highlight> and every step after it (
-      <Highlight>{downstreamSteps.map((downstream) => STEP_LABELS[downstream]).join(', ')}</Highlight>
+      <Highlight>
+        {downstreamSteps.map((downstream) => STEP_LABELS[downstream]).join(', ')}
+      </Highlight>
       ). Steps before it are left untouched.
     </p>
   );

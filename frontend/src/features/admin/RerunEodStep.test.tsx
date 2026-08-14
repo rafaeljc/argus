@@ -66,15 +66,17 @@ function runOk(run: EodPipelineRun) {
 }
 
 function rerunSpy(spy: (step: string) => void) {
-  return http.post(
-    `${BASE_URL}/admin/eod-pipeline/runs/${RUN_ID}/steps/:step`,
-    ({ params }) => {
-      spy(params.step as string);
-      return HttpResponse.json({
-        data: { run_id: RUN_ID, step: params.step, status: 'in_progress', started_at: '2026-07-09T22:00:00Z' },
-      });
-    },
-  );
+  return http.post(`${BASE_URL}/admin/eod-pipeline/runs/${RUN_ID}/steps/:step`, ({ params }) => {
+    spy(params.step as string);
+    return HttpResponse.json({
+      data: {
+        run_id: RUN_ID,
+        step: params.step,
+        status: 'in_progress',
+        started_at: '2026-07-09T22:00:00Z',
+      },
+    });
+  });
 }
 
 function rerunFails(step: string, status: number, message: string) {
@@ -134,9 +136,7 @@ describe('Re-run EOD step', () => {
     expect(screen.getByRole('button', { name: /re-run from symbols/i })).toBeEnabled();
     expect(screen.getByRole('button', { name: /re-run from prices/i })).toBeEnabled();
     expect(screen.getByRole('button', { name: /re-run from evaluate/i })).toBeEnabled();
-    expect(
-      screen.queryByText(/re-run is available once the run settles/i),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/re-run is available once the run settles/i)).not.toBeInTheDocument();
   });
 
   it('enables the re-run buttons on a settled (succeeded) run', async () => {

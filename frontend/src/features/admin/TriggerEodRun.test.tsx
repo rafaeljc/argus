@@ -179,9 +179,7 @@ describe('Trigger EOD run', () => {
     await user.type(screen.getByLabelText(/run date/i), '2999-01-01');
     await user.click(screen.getByRole('button', { name: /^confirm trigger$/i }));
 
-    expect(
-      await screen.findByText(/run date cannot be in the future/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/run date cannot be in the future/i)).toBeInTheDocument();
     expect(spy).not.toHaveBeenCalled();
   });
 
@@ -218,9 +216,7 @@ describe('Trigger EOD run', () => {
     await user.click(screen.getByRole('button', { name: /^confirm trigger$/i }));
 
     await waitFor(() =>
-      expect(screen.getByTestId('location')).toHaveTextContent(
-        `/admin/eod-pipeline/${NEW_RUN_ID}`,
-      ),
+      expect(screen.getByTestId('location')).toHaveTextContent(`/admin/eod-pipeline/${NEW_RUN_ID}`),
     );
     expect(await screen.findByText(/run triggered/i)).toBeInTheDocument();
   });
