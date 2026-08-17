@@ -2,6 +2,8 @@ from aws_cdk import Stack
 from constructs import Construct
 
 from argus_infra.config import ArgusEnv
+from argus_infra.constructs.network import Network
+from argus_infra.constructs.registry import Registry
 
 
 class ArgusStack(Stack):
@@ -14,3 +16,6 @@ class ArgusStack(Stack):
 
         self.env_config = env_config
         self.image_tag = image_tag
+
+        self.network = Network(self, "Network")
+        self.registry = Registry(self, "Registry")
