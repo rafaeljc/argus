@@ -2,6 +2,7 @@ from aws_cdk import Stack
 from constructs import Construct
 
 from argus_infra.config import ArgusEnv
+from argus_infra.constructs.database import Database
 from argus_infra.constructs.network import Network
 from argus_infra.constructs.registry import Registry
 
@@ -19,3 +20,9 @@ class ArgusStack(Stack):
 
         self.network = Network(self, "Network")
         self.registry = Registry(self, "Registry")
+        self.database = Database(
+            self,
+            "Database",
+            vpc=self.network.vpc,
+            instance_class=env_config.db_instance_class,
+        )
