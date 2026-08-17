@@ -24,6 +24,7 @@ class Web(Construct):
             self,
             "SpaBucket",
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
+            enforce_ssl=True,
         )
 
         self.distribution = cloudfront.Distribution(

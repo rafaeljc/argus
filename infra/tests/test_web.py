@@ -1,3 +1,28 @@
+from aws_cdk.assertions import Match
+
+
+def test_bucket_denies_non_tls_requests(template):
+    template.has_resource_properties(
+        "AWS::S3::BucketPolicy",
+        {
+            "PolicyDocument": {
+                "Statement": Match.array_with(
+                    [
+                        Match.object_like(
+                            {
+                                "Effect": "Deny",
+                                "Principal": {"AWS": "*"},
+                                "Action": "s3:*",
+                                "Condition": {"Bool": {"aws:SecureTransport": "false"}},
+                            }
+                        )
+                    ]
+                )
+            }
+        },
+    )
+
+
 def test_bucket_blocks_all_public_access(template):
     template.has_resource_properties(
         "AWS::S3::Bucket",
