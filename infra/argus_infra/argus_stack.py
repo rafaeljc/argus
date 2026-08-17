@@ -7,6 +7,7 @@ from argus_infra.config import ArgusEnv
 from argus_infra.constructs.api import Api
 from argus_infra.constructs.database import Database
 from argus_infra.constructs.network import Network
+from argus_infra.constructs.observability import Observability
 from argus_infra.constructs.registry import Registry
 from argus_infra.constructs.web import Web
 from argus_infra.parameters import Parameters
@@ -63,4 +64,11 @@ class ArgusStack(Stack):
             domain_name=domain_name,
             certificate=self.certificate,
             zone=self.zone,
+        )
+        self.observability = Observability(
+            self,
+            "Observability",
+            target_group=self.api.service.target_group,
+            log_group=self.api.log_group,
+            database=self.database.instance,
         )
