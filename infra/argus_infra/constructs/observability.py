@@ -27,7 +27,7 @@ class Observability(Construct):
         alarms = [
             # 1. The task is down or failing its health check. desired_count=1, so
             # this is "the API is off".
-            target_group.metric_healthy_host_count().create_alarm(
+            target_group.metrics.healthy_host_count().create_alarm(
                 self,
                 "NoHealthyTask",
                 threshold=1,
@@ -36,7 +36,7 @@ class Observability(Construct):
                 treat_missing_data=cloudwatch.TreatMissingData.BREACHING,
             ),
             # 2. The task is healthy but the application is throwing.
-            target_group.metric_http_code_target(
+            target_group.metrics.http_code_target(
                 elbv2.HttpCodeTarget.TARGET_5XX_COUNT,
                 statistic="Sum",
                 period=Duration.minutes(5),
