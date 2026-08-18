@@ -12,10 +12,12 @@ spring:
       # for Flyway, a psql session, and a second task if desired_count ever goes above one.
       maximum-pool-size: 10
       minimum-idle: 10
-      connection-timeout: 10s
-      validation-timeout: 5s
-      max-lifetime: 25m
-      keepalive-time: 5m
+      # HikariConfig's own fields are plain milliseconds (long), not java.time.Duration, so these
+      # are numeric rather than duration-suffixed like the timeouts elsewhere in this file.
+      connection-timeout: 10000
+      validation-timeout: 5000
+      max-lifetime: 1500000
+      keepalive-time: 300000
 
 server:
   # Prod runs behind a TLS-terminating LB. `framework` installs ForwardedHeaderFilter so
