@@ -18,14 +18,16 @@ import org.springframework.test.context.ActiveProfiles;
 @Import(PostgresContainer.class)
 @SpringBootTest(
         properties = {
-            "argus.email.from-address=argus@argus.example",
-            "argus.email.app-base-url=https://app.argus.example",
-            "argus.email.resend.api-key=re_test_key",
-            "argus.email.resend.base-url=https://api.resend.example",
-            "argus.marketdata.massive.api-key=test-api-key",
-            "argus.marketdata.massive.base-url=https://api.massive.example",
-            "ARGUS_DB_URL=unused",
-            "ARGUS_DB_USER=unused",
+            "ARGUS_APP_BASE_URL=https://app.argus.example",
+            "ARGUS_EMAIL_ADDRESS=argus@argus.example",
+            "ARGUS_EMAIL_RESEND_API_KEY=re_test_key",
+            "ARGUS_EMAIL_RESEND_API_URL=https://api.resend.example",
+            "ARGUS_MARKETDATA_MASSIVE_API_KEY=test-api-key",
+            "ARGUS_MARKETDATA_MASSIVE_API_URL=https://api.massive.example",
+            "ARGUS_DB_HOST=unused",
+            "ARGUS_DB_PORT=unused",
+            "ARGUS_DB_NAME=unused",
+            "ARGUS_DB_USERNAME=unused",
             "ARGUS_DB_PASSWORD=unused"
         })
 @ActiveProfiles("prod")

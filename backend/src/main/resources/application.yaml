@@ -15,9 +15,26 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: false
+  datasource:
+    hikari:
+      pool-name: argus-pool
+  task:
+    scheduling:
+      pool:
+        # The two long-running jobs release their thread immediately (EOD dispatches to its own
+        # executor, the reapers only fire at startup), so the remaining five short pollers/sweeps
+        # share this pool instead of serialising behind one another on the default single thread.
+        size: 4
+      thread-name-prefix: argus-sched-
+      shutdown:
+        await-termination: true
+        await-termination-period: 20s
+  lifecycle:
+    timeout-per-shutdown-phase: 25s
 
 server:
   port: 8080
+  shutdown: graceful
 
 management:
   server:
@@ -120,15 +137,9 @@ argus:
   email:
     # `noop` logs instead of sending. Set to `resend` — with the credentials below — to reach a real
     # inbox; anything else fails the boot rather than silently swallowing mail.
-    vendor: ${EMAIL_VENDOR:noop}
+    vendor: noop
     poll:
       interval-ms: 30000
-    resend:
-      # Credentials and endpoint are deliberately absent — they are supplied per environment. These
-      # two are transport limits, not secrets, so they carry the same value everywhere: without
-      # them a stalled vendor connection pins the poller and nothing behind it goes out.
-      connect-timeout: 5s
-      read-timeout: 30s
   marketdata:
     backfill:
       interval-ms: 60000
@@ -137,6 +148,7 @@ argus:
       interval-ms: 60000
   eodpipeline:
     cron: "0 0 17 * * MON-FRI"
+    zone: America/New_York
   auth:
     session:
       sweep:

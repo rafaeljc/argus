@@ -59,7 +59,7 @@ public class MassivePriceGateway implements VendorPriceGateway {
         // Bearer header rather than the vendor's apiKey query parameter: query strings land in
         // access logs on every hop between here and the vendor. Transport settings (timeouts) are
         // applied to the builder by the caller, so tests can substitute one.
-        this.client = builder.baseUrl(properties.baseUrl())
+        this.client = builder.baseUrl(properties.apiUrl())
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + properties.apiKey())
                 .build();
         this.mapper = mapper;

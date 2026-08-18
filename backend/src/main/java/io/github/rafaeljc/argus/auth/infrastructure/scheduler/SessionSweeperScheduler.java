@@ -21,7 +21,7 @@ public class SessionSweeperScheduler {
         log.info("session sweeper started");
     }
 
-    @Scheduled(fixedDelayString = "${argus.auth.session.sweep.interval-ms:3600000}")
+    @Scheduled(fixedDelayString = "${argus.auth.session.sweep.interval-ms}")
     public void sweep() {
         try {
             sweepExpiredSessionsOnce.execute();

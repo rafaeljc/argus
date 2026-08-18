@@ -1,5 +1,6 @@
 package io.github.rafaeljc.argus.email.infrastructure;
 
+import io.github.rafaeljc.argus.common.infrastructure.AppProperties;
 import io.github.rafaeljc.argus.email.application.PollOutboxOnce;
 import io.github.rafaeljc.argus.email.application.port.EmailGateway;
 import io.github.rafaeljc.argus.email.infrastructure.noop.NoOpLoggingEmailGateway;
@@ -70,12 +71,12 @@ public class EmailInfrastructureConfig {
     // to the `prod` profile would drag in the prod datasource and its credentials to do it.
     @Configuration(proxyBeanMethods = false)
     @ConditionalOnProperty(name = VENDOR_PROPERTY, havingValue = "resend")
-    @EnableConfigurationProperties({ResendProperties.class, EmailDeliveryProperties.class})
+    @EnableConfigurationProperties({ResendProperties.class, EmailDeliveryProperties.class, AppProperties.class})
     static class VendorEmailConfig {
 
         @Bean
-        EmailTemplateRenderer emailTemplateRenderer(ObjectMapper objectMapper, EmailDeliveryProperties delivery) {
-            return new EmailTemplateRenderer(objectMapper, delivery.appBaseUrl());
+        EmailTemplateRenderer emailTemplateRenderer(ObjectMapper objectMapper, AppProperties app) {
+            return new EmailTemplateRenderer(objectMapper, app.appBaseUrl());
         }
 
         @Bean
@@ -90,8 +91,7 @@ public class EmailInfrastructureConfig {
             RestClient.Builder configured = builder.requestFactory(ClientHttpRequestFactoryBuilder.detect()
                     .build(HttpClientSettings.defaults()
                             .withTimeouts(properties.connectTimeout(), properties.readTimeout())));
-            return new ResendEmailGateway(
-                    configured, properties, delivery.fromAddress(), renderer, vendorEmailRetry);
+            return new ResendEmailGateway(configured, properties, delivery.address(), renderer, vendorEmailRetry);
         }
     }
 }

@@ -23,7 +23,7 @@ public class OutboxPollerScheduler {
         log.info("outbox poller started: workerId={}", workerId);
     }
 
-    @Scheduled(fixedDelayString = "${argus.email.poll.interval-ms:30000}")
+    @Scheduled(fixedDelayString = "${argus.email.poll.interval-ms}")
     public void poll() {
         try {
             pollOutboxOnce.pollOnce(workerId);

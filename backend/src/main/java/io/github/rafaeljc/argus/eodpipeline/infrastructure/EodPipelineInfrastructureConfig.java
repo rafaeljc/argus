@@ -24,6 +24,10 @@ public class EodPipelineInfrastructureConfig {
         executor.setCorePoolSize(1);
         executor.setMaxPoolSize(1);
         executor.setThreadNamePrefix("eod-pipeline-");
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        // Same 20s as spring.task.scheduling.shutdown.await-termination-period: both must drain
+        // inside the 25s lifecycle-phase timeout, so they move together rather than independently.
+        executor.setAwaitTerminationSeconds(20);
         return executor;
     }
 
