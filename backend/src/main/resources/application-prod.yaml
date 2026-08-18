@@ -37,6 +37,9 @@ server:
 
 argus:
   app-base-url: ${ARGUS_APP_BASE_URL}
+  web:
+    cors-allowed-origin: ${ARGUS_WEB_CORS_ALLOWED_ORIGIN}
+    cookie-domain: ${ARGUS_WEB_COOKIE_DOMAIN}
   email:
     vendor: resend
     address: ${ARGUS_EMAIL_ADDRESS}
