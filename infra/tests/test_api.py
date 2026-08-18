@@ -13,6 +13,28 @@ def test_no_plaintext_config_in_task_definition(template):
     ]
 
 
+def test_container_secret_names_match_the_app_contract(template):
+    # This is the CDK half of the required-configuration contract; the application half is
+    # ConfigContractTest (backend/src/test/java/.../config/ConfigContractTest.java). Neither test
+    # can see the other's build, so this set is frozen here rather than derived.
+    (task_def,) = template.find_resources("AWS::ECS::TaskDefinition").values()
+    (container,) = task_def["Properties"]["ContainerDefinitions"]
+    secret_names = {secret["Name"] for secret in container["Secrets"]}
+    assert secret_names == {
+        "ARGUS_DB_HOST",
+        "ARGUS_DB_PORT",
+        "ARGUS_DB_NAME",
+        "ARGUS_DB_USERNAME",
+        "ARGUS_DB_PASSWORD",
+        "ARGUS_APP_BASE_URL",
+        "ARGUS_EMAIL_ADDRESS",
+        "ARGUS_EMAIL_RESEND_API_URL",
+        "ARGUS_EMAIL_RESEND_API_KEY",
+        "ARGUS_MARKETDATA_MASSIVE_API_URL",
+        "ARGUS_MARKETDATA_MASSIVE_API_KEY",
+    }
+
+
 def test_task_has_no_public_ip(template):
     (service,) = template.find_resources("AWS::ECS::Service").values()
     network_config = service["Properties"]["NetworkConfiguration"]["AwsvpcConfiguration"]

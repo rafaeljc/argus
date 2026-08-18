@@ -78,25 +78,23 @@ class Api(Construct):
                     "ARGUS_DB_HOST": ecs.Secret.from_secrets_manager(db_secret, "host"),
                     "ARGUS_DB_PORT": ecs.Secret.from_secrets_manager(db_secret, "port"),
                     "ARGUS_DB_NAME": ecs.Secret.from_secrets_manager(db_secret, "dbname"),
-                    "ARGUS_DB_USER": ecs.Secret.from_secrets_manager(db_secret, "username"),
+                    "ARGUS_DB_USERNAME": ecs.Secret.from_secrets_manager(db_secret, "username"),
                     "ARGUS_DB_PASSWORD": ecs.Secret.from_secrets_manager(db_secret, "password"),
-                    "EMAIL_API_KEY": ecs.Secret.from_secrets_manager(vendor_keys, "EMAIL_API_KEY"),
-                    "MARKETDATA_API_KEY": ecs.Secret.from_secrets_manager(
+                    "ARGUS_EMAIL_RESEND_API_KEY": ecs.Secret.from_secrets_manager(
+                        vendor_keys, "EMAIL_API_KEY"
+                    ),
+                    "ARGUS_MARKETDATA_MASSIVE_API_KEY": ecs.Secret.from_secrets_manager(
                         vendor_keys, "MARKETDATA_API_KEY"
                     ),
-                    "APP_BASE_URL": parameters.ssm_secret(self, "AppBaseUrlParam", "app-base-url"),
-                    "ARGUS_COOKIE_DOMAIN": parameters.ssm_secret(
-                        self, "CookieDomainParam", "cookie-domain"
+                    "ARGUS_APP_BASE_URL": parameters.ssm_secret(self, "AppBaseUrlParam", "app-base-url"),
+                    "ARGUS_EMAIL_ADDRESS": parameters.ssm_secret(
+                        self, "EmailAddressParam", "email-from-address"
                     ),
-                    "EMAIL_VENDOR": parameters.ssm_secret(self, "EmailVendorParam", "email-vendor"),
-                    "EMAIL_FROM_ADDRESS": parameters.ssm_secret(
-                        self, "EmailFromAddressParam", "email-from-address"
+                    "ARGUS_EMAIL_RESEND_API_URL": parameters.ssm_secret(
+                        self, "EmailResendApiUrlParam", "email-api-base-url"
                     ),
-                    "EMAIL_API_BASE_URL": parameters.ssm_secret(
-                        self, "EmailApiBaseUrlParam", "email-api-base-url"
-                    ),
-                    "MARKETDATA_BASE_URL": parameters.ssm_secret(
-                        self, "MarketdataBaseUrlParam", "marketdata-base-url"
+                    "ARGUS_MARKETDATA_MASSIVE_API_URL": parameters.ssm_secret(
+                        self, "MarketdataMassiveApiUrlParam", "marketdata-base-url"
                     ),
                 },
                 log_driver=ecs.LogDrivers.aws_logs(stream_prefix="argus", log_group=self.log_group),
