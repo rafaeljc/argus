@@ -17,23 +17,27 @@ public final class SessionCookies {
     }
 
     public static Cookie clearedSession() {
-        return cleared(SESSION_COOKIE_NAME, true);
+        return cleared(SESSION_COOKIE_NAME, true, "");
     }
 
     // The CSRF cookie is intentionally not HttpOnly at issuance so the SPA can echo it in the
     // X-CSRF-Token header (double-submit pattern). The cleared variant preserves the same
-    // attribute set so browsers overwrite the original rather than co-existing with it.
-    public static Cookie clearedCsrf() {
-        return cleared(CSRF_COOKIE_NAME, false);
+    // attribute set — including Domain — so browsers overwrite the original rather than
+    // co-existing with it. Blank domain omits the attribute, matching a same-origin deployment.
+    public static Cookie clearedCsrf(String domain) {
+        return cleared(CSRF_COOKIE_NAME, false, domain);
     }
 
-    private static Cookie cleared(String name, boolean httpOnly) {
+    private static Cookie cleared(String name, boolean httpOnly, String domain) {
         Cookie cookie = new Cookie(name, "");
         cookie.setMaxAge(0);
         cookie.setHttpOnly(httpOnly);
         cookie.setSecure(true);
         cookie.setPath(COOKIE_PATH);
         cookie.setAttribute("SameSite", SAME_SITE);
+        if (!domain.isBlank()) {
+            cookie.setDomain(domain);
+        }
         return cookie;
     }
 }
