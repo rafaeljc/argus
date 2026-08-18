@@ -1,6 +1,7 @@
 package io.github.rafaeljc.argus.common.web;
 
 import java.util.List;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,6 +14,7 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
 import org.springframework.security.web.util.matcher.AnyRequestMatcher;
 
 @Configuration
+@EnableConfigurationProperties(WebProperties.class)
 class SecurityConfig {
 
     private static final long HSTS_MAX_AGE_SECONDS = 31_536_000L;

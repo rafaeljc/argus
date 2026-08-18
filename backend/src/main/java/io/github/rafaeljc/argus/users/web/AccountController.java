@@ -4,6 +4,7 @@ import io.github.rafaeljc.argus.common.domain.UserId;
 import io.github.rafaeljc.argus.common.web.CurrentUserId;
 import io.github.rafaeljc.argus.common.web.SessionCookies;
 import io.github.rafaeljc.argus.common.web.SuccessEnvelope;
+import io.github.rafaeljc.argus.common.web.WebProperties;
 import io.github.rafaeljc.argus.users.application.UserService;
 import io.github.rafaeljc.argus.users.domain.User;
 import jakarta.servlet.http.HttpServletResponse;
@@ -20,9 +21,11 @@ import org.springframework.web.bind.annotation.RestController;
 class AccountController {
 
     private final UserService userService;
+    private final WebProperties webProperties;
 
-    AccountController(UserService userService) {
+    AccountController(UserService userService, WebProperties webProperties) {
         this.userService = userService;
+        this.webProperties = webProperties;
     }
 
     // lookupActive rather than lookup so a soft-deleted user with a stale session cookie can't
@@ -41,7 +44,7 @@ class AccountController {
         // Session rows are removed in-transaction by InvalidateSessionsOnUserSoftDeleted; drop
         // the browser cookies here so the response leaves no client-side auth state behind.
         response.addCookie(SessionCookies.clearedSession());
-        response.addCookie(SessionCookies.clearedCsrf());
+        response.addCookie(SessionCookies.clearedCsrf(webProperties.cookieDomain()));
         return ResponseEntity.noContent().build();
     }
 }
