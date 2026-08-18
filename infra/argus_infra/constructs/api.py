@@ -87,6 +87,12 @@ class Api(Construct):
                         vendor_keys, "MARKETDATA_API_KEY"
                     ),
                     "ARGUS_APP_BASE_URL": parameters.ssm_secret(self, "AppBaseUrlParam", "app-base-url"),
+                    "ARGUS_WEB_CORS_ALLOWED_ORIGIN": parameters.ssm_secret(
+                        self, "CorsAllowedOriginParam", "cors-allowed-origin"
+                    ),
+                    "ARGUS_WEB_COOKIE_DOMAIN": parameters.ssm_secret(
+                        self, "CookieDomainParam", "cookie-domain"
+                    ),
                     "ARGUS_EMAIL_ADDRESS": parameters.ssm_secret(
                         self, "EmailAddressParam", "email-from-address"
                     ),

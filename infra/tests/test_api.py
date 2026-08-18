@@ -27,6 +27,8 @@ def test_container_secret_names_match_the_app_contract(template):
         "ARGUS_DB_USERNAME",
         "ARGUS_DB_PASSWORD",
         "ARGUS_APP_BASE_URL",
+        "ARGUS_WEB_CORS_ALLOWED_ORIGIN",
+        "ARGUS_WEB_COOKIE_DOMAIN",
         "ARGUS_EMAIL_ADDRESS",
         "ARGUS_EMAIL_RESEND_API_URL",
         "ARGUS_EMAIL_RESEND_API_KEY",
