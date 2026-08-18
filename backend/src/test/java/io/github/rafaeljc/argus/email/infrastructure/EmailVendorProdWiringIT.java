@@ -19,6 +19,8 @@ import org.springframework.test.context.ActiveProfiles;
 @SpringBootTest(
         properties = {
             "ARGUS_APP_BASE_URL=https://app.argus.example",
+            "ARGUS_WEB_CORS_ALLOWED_ORIGIN=",
+            "ARGUS_WEB_COOKIE_DOMAIN=",
             "ARGUS_EMAIL_ADDRESS=argus@argus.example",
             "ARGUS_EMAIL_RESEND_API_KEY=re_test_key",
             "ARGUS_EMAIL_RESEND_API_URL=https://api.resend.example",
