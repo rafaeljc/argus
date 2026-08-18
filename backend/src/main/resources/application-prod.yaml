@@ -1,32 +1,23 @@
 spring:
   datasource:
-    url: ${ARGUS_DB_URL}
-    username: ${ARGUS_DB_USER}
+    # ECS injects each field of the RDS-generated secret as its own variable and cannot
+    # concatenate, so the URL is assembled here. That is also what keeps the database endpoint
+    # out of both the CDK source and the rendered task definition.
+    url: jdbc:postgresql://${ARGUS_DB_HOST}:${ARGUS_DB_PORT}/${ARGUS_DB_NAME}
+    username: ${ARGUS_DB_USERNAME}
     password: ${ARGUS_DB_PASSWORD}
     hikari:
-      pool-name: argus-pool
-
-argus:
-  email:
-    vendor: resend
-    # No defaults: a prod boot without vendor credentials, a sender address, or the public host the
-    # links point at must fail rather than start up and mail dead links to real users.
-    from-address: ${EMAIL_FROM_ADDRESS}
-    app-base-url: ${APP_BASE_URL}
-    resend:
-      api-key: ${EMAIL_API_KEY}
-      base-url: ${EMAIL_API_BASE_URL}
-  marketdata:
-    massive:
-      # No defaults: a prod boot without vendor credentials or endpoint must fail rather than
-      # start up and discover the gap on the first end-of-day run.
-      api-key: ${MARKETDATA_API_KEY}
-      base-url: ${MARKETDATA_BASE_URL}
-      connect-timeout: 5s
-      read-timeout: 30s
-      # The symbol sweep is the only paginated call. Bounded so a runaway cursor cannot spin
-      # against the vendor indefinitely.
-      max-universe-pages: 20
+      # Fixed size: a pool that grows and shrinks pays connection setup on the latency path and
+      # gains nothing at this scale. Ten against db.t4g.micro (~110 max_connections) leaves room
+      # for Flyway, a psql session, and a second task if desired_count ever goes above one.
+      maximum-pool-size: 10
+      minimum-idle: 10
+      # HikariConfig's own fields are plain milliseconds (long), not java.time.Duration, so these
+      # are numeric rather than duration-suffixed like the timeouts elsewhere in this file.
+      connection-timeout: 10000
+      validation-timeout: 5000
+      max-lifetime: 1500000
+      keepalive-time: 300000
 
 server:
   # Prod runs behind a TLS-terminating LB. `framework` installs ForwardedHeaderFilter so
@@ -34,3 +25,32 @@ server:
   # Only safe in environments with a trusted hop in front — left at default (none) elsewhere
   # so direct clients can't spoof their IP.
   forward-headers-strategy: framework
+  tomcat:
+    # Sized to the 1 vCPU Fargate task: the 200-connection framework default lets requests pile
+    # up far beyond what the 10-connection datasource pool can serve, so load sheds here instead
+    # of inside the JVM.
+    threads:
+      max: 50
+      min-spare: 10
+    accept-count: 100
+    max-connections: 200
+
+argus:
+  app-base-url: ${ARGUS_APP_BASE_URL}
+  email:
+    vendor: resend
+    address: ${ARGUS_EMAIL_ADDRESS}
+    resend:
+      api-key: ${ARGUS_EMAIL_RESEND_API_KEY}
+      api-url: ${ARGUS_EMAIL_RESEND_API_URL}
+      connect-timeout: 5s
+      read-timeout: 30s
+  marketdata:
+    massive:
+      api-key: ${ARGUS_MARKETDATA_MASSIVE_API_KEY}
+      api-url: ${ARGUS_MARKETDATA_MASSIVE_API_URL}
+      connect-timeout: 5s
+      read-timeout: 30s
+      # The symbol sweep is the only paginated call. Bounded so a runaway cursor cannot spin
+      # against the vendor indefinitely.
+      max-universe-pages: 20

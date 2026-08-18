@@ -23,7 +23,7 @@ public class SnapshotRebuildScheduler {
         log.info("snapshot rebuild poller started: workerId={}", workerId);
     }
 
-    @Scheduled(fixedDelayString = "${argus.portfolio.snapshot-rebuild.interval-ms:60000}")
+    @Scheduled(fixedDelayString = "${argus.portfolio.snapshot-rebuild.interval-ms}")
     public void poll() {
         try {
             worker.processPendingBatch();

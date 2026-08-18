@@ -4,7 +4,7 @@ spring:
     username: argus
     password: argus
     hikari:
-      pool-name: argus-pool
+      leak-detection-threshold: 30s
 
 management:
   endpoint:

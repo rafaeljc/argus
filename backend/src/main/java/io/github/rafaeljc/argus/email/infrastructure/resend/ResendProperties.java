@@ -6,14 +6,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 // Only bound where the real gateway is registered, so a blank key fails the boot exactly where the
 // key is required rather than silently degrading a running instance.
 @ConfigurationProperties("argus.email.resend")
-public record ResendProperties(String apiKey, String baseUrl, Duration connectTimeout, Duration readTimeout) {
+public record ResendProperties(String apiKey, String apiUrl, Duration connectTimeout, Duration readTimeout) {
 
     public ResendProperties {
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalArgumentException("argus.email.resend.api-key must not be blank");
         }
-        if (baseUrl == null || baseUrl.isBlank()) {
-            throw new IllegalArgumentException("argus.email.resend.base-url must not be blank");
+        if (apiUrl == null || apiUrl.isBlank()) {
+            throw new IllegalArgumentException("argus.email.resend.api-url must not be blank");
         }
         if (connectTimeout == null || connectTimeout.isNegative() || connectTimeout.isZero()) {
             throw new IllegalArgumentException("argus.email.resend.connect-timeout must be > 0");

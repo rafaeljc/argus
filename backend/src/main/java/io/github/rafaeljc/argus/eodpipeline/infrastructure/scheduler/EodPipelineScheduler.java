@@ -30,7 +30,7 @@ public class EodPipelineScheduler {
         log.info("eod pipeline scheduler started");
     }
 
-    @Scheduled(cron = "${argus.eodpipeline.cron:0 0 17 * * MON-FRI}", zone = "America/New_York")
+    @Scheduled(cron = "${argus.eodpipeline.cron}", zone = "${argus.eodpipeline.zone}")
     public void triggerDailyRun() {
         LocalDate today = clock.today();
         if (!marketCalendar.isTradingDay(today)) {

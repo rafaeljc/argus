@@ -16,10 +16,12 @@ import org.springframework.context.ApplicationContext;
 @SpringBootTest(
         properties = {
             "argus.email.vendor=resend",
-            "argus.email.from-address=argus@argus.example",
-            "argus.email.app-base-url=https://app.argus.example",
+            "argus.email.address=argus@argus.example",
+            "argus.app-base-url=https://app.argus.example",
             "argus.email.resend.api-key=re_test_key",
-            "argus.email.resend.base-url=https://api.resend.example"
+            "argus.email.resend.api-url=https://api.resend.example",
+            "argus.email.resend.connect-timeout=5s",
+            "argus.email.resend.read-timeout=30s"
         })
 class EmailVendorResendWiringIT {
 

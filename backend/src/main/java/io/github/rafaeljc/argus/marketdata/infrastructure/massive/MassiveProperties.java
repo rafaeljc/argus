@@ -7,7 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 // key is required rather than silently degrading a running instance.
 @ConfigurationProperties("argus.marketdata.massive")
 public record MassiveProperties(String apiKey,
-                                String baseUrl,
+                                String apiUrl,
                                 Duration connectTimeout,
                                 Duration readTimeout,
                                 int maxUniversePages) {
@@ -16,8 +16,8 @@ public record MassiveProperties(String apiKey,
         if (apiKey == null || apiKey.isBlank()) {
             throw new IllegalArgumentException("argus.marketdata.massive.api-key must not be blank");
         }
-        if (baseUrl == null || baseUrl.isBlank()) {
-            throw new IllegalArgumentException("argus.marketdata.massive.base-url must not be blank");
+        if (apiUrl == null || apiUrl.isBlank()) {
+            throw new IllegalArgumentException("argus.marketdata.massive.api-url must not be blank");
         }
         if (connectTimeout == null || connectTimeout.isNegative() || connectTimeout.isZero()) {
             throw new IllegalArgumentException("argus.marketdata.massive.connect-timeout must be > 0");

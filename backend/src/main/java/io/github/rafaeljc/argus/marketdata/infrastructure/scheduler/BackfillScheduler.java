@@ -23,7 +23,7 @@ public class BackfillScheduler {
         log.info("backfill poller started: workerId={}", workerId);
     }
 
-    @Scheduled(fixedDelayString = "${argus.marketdata.backfill.interval-ms:60000}")
+    @Scheduled(fixedDelayString = "${argus.marketdata.backfill.interval-ms}")
     public void poll() {
         try {
             worker.processPendingBatch();

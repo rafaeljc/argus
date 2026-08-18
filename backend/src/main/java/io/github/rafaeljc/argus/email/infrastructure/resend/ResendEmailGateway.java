@@ -51,7 +51,7 @@ public class ResendEmailGateway implements EmailGateway {
             Retry vendorEmailRetry) {
         // Transport settings (timeouts) are applied to the builder by the caller, so tests can
         // substitute one.
-        this.client = builder.baseUrl(properties.baseUrl())
+        this.client = builder.baseUrl(properties.apiUrl())
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + properties.apiKey())
                 .build();
         this.fromAddress = fromAddress;
