@@ -61,6 +61,18 @@ def test_management_port_is_mapped_on_the_container(template):
     assert 8081 in ports
 
 
+def test_cluster_service_and_task_definition_are_exported(template):
+    (cluster_id,) = template.find_resources("AWS::ECS::Cluster").keys()
+    (service_id,) = template.find_resources("AWS::ECS::Service").keys()
+    (task_def,) = template.find_resources("AWS::ECS::TaskDefinition").values()
+    (container,) = task_def["Properties"]["ContainerDefinitions"]
+
+    template.has_output("*", {"Value": {"Ref": cluster_id}})
+    template.has_output("*", {"Value": {"Fn::GetAtt": [service_id, "Name"]}})
+    template.has_output("*", {"Value": task_def["Properties"]["Family"]})
+    template.has_output("*", {"Value": container["Name"]})
+
+
 def test_management_port_ingress_is_restricted_to_the_alb(template):
     # The ALBFargateService pattern only opens an ingress rule for the traffic
     # port (8080). 8081 needs an explicit rule scoped to the ALB's security
