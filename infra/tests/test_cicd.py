@@ -24,3 +24,21 @@ def test_no_policy_grants_cloudformation_actions_beyond_describe_stacks(template
         if action.startswith("cloudformation:")
     }
     assert cloudformation_actions == {"cloudformation:DescribeStacks"}
+
+
+def test_ecs_update_and_describe_service_are_scoped_to_the_specific_service(template):
+    # ecs:UpdateService/DescribeServices support resource-level permissions, unlike
+    # RegisterTaskDefinition/DescribeTaskDefinition, so a wildcard here would let the
+    # deploy role touch any ECS service in the account.
+    statements = [
+        statement
+        for policy in template.find_resources("AWS::IAM::Policy").values()
+        for statement in policy["Properties"]["PolicyDocument"]["Statement"]
+        if "ecs:UpdateService"
+        in (statement["Action"] if isinstance(statement["Action"], list) else [statement["Action"]])
+    ]
+    assert len(statements) == 1
+
+    resources = statements[0]["Resource"]
+    resources = resources if isinstance(resources, list) else [resources]
+    assert "*" not in resources

@@ -1,6 +1,7 @@
 from aws_cdk import CfnOutput, Stack
 from aws_cdk import aws_cloudfront as cloudfront
 from aws_cdk import aws_ecr as ecr
+from aws_cdk import aws_ecs as ecs
 from aws_cdk import aws_iam as iam
 from aws_cdk import aws_s3 as s3
 from constructs import Construct
@@ -16,6 +17,7 @@ class Cicd(Construct):
         construct_id: str,
         *,
         repository: ecr.IRepository,
+        service: ecs.IBaseService,
         task_execution_role: iam.IRole,
         task_role: iam.IRole,
         bucket: s3.IBucket,
@@ -68,14 +70,17 @@ class Cicd(Construct):
             )
         )
         self.backend_role.add_to_policy(
+            # RegisterTaskDefinition and DescribeTaskDefinition do not support resource-level
+            # permissions in IAM - AWS requires "*" for these two actions.
             iam.PolicyStatement(
-                actions=[
-                    "ecs:DescribeTaskDefinition",
-                    "ecs:RegisterTaskDefinition",
-                    "ecs:UpdateService",
-                    "ecs:DescribeServices",
-                ],
+                actions=["ecs:DescribeTaskDefinition", "ecs:RegisterTaskDefinition"],
                 resources=["*"],
+            )
+        )
+        self.backend_role.add_to_policy(
+            iam.PolicyStatement(
+                actions=["ecs:UpdateService", "ecs:DescribeServices"],
+                resources=[service.service_arn],
             )
         )
         self.backend_role.add_to_policy(

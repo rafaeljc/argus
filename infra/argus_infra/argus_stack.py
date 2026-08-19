@@ -76,6 +76,7 @@ class ArgusStack(Stack):
             self,
             "Cicd",
             repository=self.registry.repository,
+            service=self.api.service.service,
             task_execution_role=task_execution_role,
             task_role=self.api.service.task_definition.task_role,
             bucket=self.web.bucket,
