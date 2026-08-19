@@ -1,4 +1,4 @@
-from aws_cdk import Duration, RemovalPolicy
+from aws_cdk import CfnOutput, Duration, RemovalPolicy
 from aws_cdk import aws_certificatemanager as acm
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_ecr as ecr
@@ -127,3 +127,8 @@ class Api(Construct):
             ec2.Port.tcp(5432),
             "App reads/writes Postgres",
         )
+
+        CfnOutput(self, "ClusterName", value=cluster.cluster_name)
+        CfnOutput(self, "ServiceName", value=self.service.service.service_name)
+        CfnOutput(self, "TaskDefinitionFamily", value=self.service.task_definition.family)
+        CfnOutput(self, "ContainerName", value=default_container.container_name)

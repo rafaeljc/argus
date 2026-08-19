@@ -1,25 +1,35 @@
-import pytest
-from aws_cdk import App, Environment
-
-from argus_infra.argus_stack import ArgusStack
-from argus_infra.config import ENVIRONMENTS
-
-TEST_AWS_ENV = Environment(account="123456789012", region="us-east-1")
+from aws_cdk.assertions import Match
 
 
-def test_synth_without_image_tag_raises():
-    app = App()
+def test_task_definition_image_references_the_ssm_image_tag_parameter(template):
+    # CDK provisions infra only; it never names an image tag. The task definition's
+    # Image must resolve the tag from the CFN parameter CloudFormation binds to
+    # /argus/prod/image-tag at deploy time, not a literal string CDK chose at synth time.
+    (ssm_param_id,) = (
+        logical_id
+        for logical_id, param in template.to_json()["Parameters"].items()
+        if param.get("Default") == "/argus/prod/image-tag"
+    )
+    assert template.to_json()["Parameters"][ssm_param_id]["Type"] == "AWS::SSM::Parameter::Value<String>"
 
-    with pytest.raises(ValueError, match="image_tag"):
-        ArgusStack(app, "Test", env_config=ENVIRONMENTS["prod"], env=TEST_AWS_ENV)
-
-
-def test_synth_with_image_tag_succeeds():
-    app = App(context={"image_tag": "test-tag"})
-
-    stack = ArgusStack(app, "Test", env_config=ENVIRONMENTS["prod"], env=TEST_AWS_ENV)
-
-    assert stack is not None
+    template.has_resource_properties(
+        "AWS::ECS::TaskDefinition",
+        {
+            "ContainerDefinitions": Match.array_with(
+                [
+                    Match.object_like(
+                        {
+                            "Image": {
+                                "Fn::Join": Match.array_with(
+                                    [Match.array_with([{"Ref": ssm_param_id}])]
+                                )
+                            }
+                        }
+                    )
+                ]
+            )
+        },
+    )
 
 
 def test_certificate_covers_apex_and_api_hostname(template):

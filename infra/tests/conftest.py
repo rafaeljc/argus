@@ -10,7 +10,7 @@ TEST_AWS_ENV = Environment(account="123456789012", region="us-east-1")
 
 @pytest.fixture
 def stack() -> ArgusStack:
-    app = App(context={"image_tag": "test-tag"})
+    app = App()
     return ArgusStack(app, "Test", env_config=ENVIRONMENTS["prod"], env=TEST_AWS_ENV)
 
 

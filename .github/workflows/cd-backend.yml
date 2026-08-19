@@ -1,0 +1,100 @@
+name: CD Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: 'Commit SHA to deploy (defaults to the latest on main)'
+        required: false
+
+concurrency:
+  group: cd-backend
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    name: build and deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Resolve target SHA
+        id: target
+        run: echo "sha=${{ inputs.sha || github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.target.outputs.sha }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.BACKEND_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Read stack outputs
+        id: stack
+        run: |
+          OUTPUTS=$(aws cloudformation describe-stacks --stack-name Argus-Prod \
+            --query 'Stacks[0].Outputs' --output json)
+          for name in EcrRepositoryName EcrRepositoryUri ClusterName ServiceName \
+                      TaskDefinitionFamily ContainerName; do
+            value=$(echo "$OUTPUTS" | jq -r --arg n "$name" '.[] | select(.OutputKey | contains($n)) | .OutputValue')
+            echo "$name=$value" >> "$GITHUB_OUTPUT"
+          done
+
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Check whether the image already exists
+        id: image
+        run: |
+          if aws ecr describe-images \
+               --repository-name "${{ steps.stack.outputs.EcrRepositoryName }}" \
+               --image-ids imageTag="${{ steps.target.outputs.sha }}" >/dev/null 2>&1; then
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and push image
+        if: steps.image.outputs.build == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: ${{ steps.stack.outputs.EcrRepositoryUri }}:${{ steps.target.outputs.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Point SSM at this SHA
+        run: |
+          aws ssm put-parameter --name /argus/prod/image-tag \
+            --value "${{ steps.target.outputs.sha }}" --overwrite
+
+      - name: Render task definition
+        id: render
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition-family: ${{ steps.stack.outputs.TaskDefinitionFamily }}
+          container-name: ${{ steps.stack.outputs.ContainerName }}
+          image: ${{ steps.stack.outputs.EcrRepositoryUri }}:${{ steps.target.outputs.sha }}
+
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render.outputs.task-definition }}
+          cluster: ${{ steps.stack.outputs.ClusterName }}
+          service: ${{ steps.stack.outputs.ServiceName }}
+          wait-for-service-stability: true
