@@ -1,0 +1,14 @@
+target/
+.env
+.env.example
+.git
+.gitignore
+.gitattributes
+.mvn/wrapper/*.jar
+.idea
+.vscode
+.claude
+CLAUDE.md
+HELP.md
+Dockerfile
+.dockerignore

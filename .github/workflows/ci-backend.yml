@@ -4,11 +4,19 @@ on:
   push:
     branches: [main]
     paths:
-      - 'backend/**'
+      - 'backend/src/**'
+      - 'backend/pom.xml'
+      - 'backend/config/**'
+      - 'backend/mvnw'
+      - 'backend/.mvn/**'
       - '.github/workflows/ci-backend.yml'
   pull_request:
     paths:
-      - 'backend/**'
+      - 'backend/src/**'
+      - 'backend/pom.xml'
+      - 'backend/config/**'
+      - 'backend/mvnw'
+      - 'backend/.mvn/**'
       - '.github/workflows/ci-backend.yml'
 
 jobs:
