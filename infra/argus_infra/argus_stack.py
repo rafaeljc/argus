@@ -17,13 +17,9 @@ class ArgusStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, *, env_config: ArgusEnv, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        image_tag = self.node.try_get_context("image_tag")
-        if not image_tag:
-            raise ValueError("image_tag context is required: cdk deploy -c image_tag=<tag>")
-
         self.env_config = env_config
-        self.image_tag = image_tag
         self.parameters = Parameters(env_config.name)
+        self.image_tag = self.parameters.deploy_time_value(self, "image-tag")
 
         domain_name = self.parameters.synth_time_value(self, "domain-name")
         api_hostname = self.parameters.synth_time_value(self, "api-hostname")
@@ -50,7 +46,7 @@ class ArgusStack(Stack):
             "Api",
             vpc=self.network.vpc,
             repository=self.registry.repository,
-            image_tag=image_tag,
+            image_tag=self.image_tag,
             env_config=env_config,
             certificate=self.certificate,
             api_hostname=api_hostname,

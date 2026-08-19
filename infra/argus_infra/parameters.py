@@ -13,6 +13,9 @@ class Parameters:
     def synth_time_value(self, scope: Construct, param: str) -> str:
         return ssm.StringParameter.value_from_lookup(scope, self.name(param))
 
+    def deploy_time_value(self, scope: Construct, param: str) -> str:
+        return ssm.StringParameter.value_for_string_parameter(scope, self.name(param))
+
     def ssm_secret(self, scope: Construct, construct_id: str, param: str) -> ecs.Secret:
         string_param = ssm.StringParameter.from_string_parameter_name(
             scope, construct_id, self.name(param)
