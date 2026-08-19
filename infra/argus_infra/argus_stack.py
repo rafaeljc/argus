@@ -5,6 +5,7 @@ from constructs import Construct
 
 from argus_infra.config import ArgusEnv
 from argus_infra.constructs.api import Api
+from argus_infra.constructs.cicd import Cicd
 from argus_infra.constructs.database import Database
 from argus_infra.constructs.network import Network
 from argus_infra.constructs.observability import Observability
@@ -67,4 +68,17 @@ class ArgusStack(Stack):
             target_group=self.api.service.target_group,
             log_group=self.api.log_group,
             database=self.database.instance,
+        )
+
+        task_execution_role = self.api.service.task_definition.execution_role
+        assert task_execution_role is not None, "Fargate task definitions always get an execution role"
+        self.cicd = Cicd(
+            self,
+            "Cicd",
+            repository=self.registry.repository,
+            task_execution_role=task_execution_role,
+            task_role=self.api.service.task_definition.task_role,
+            bucket=self.web.bucket,
+            distribution=self.web.distribution,
+            image_tag_parameter_name=self.parameters.name("image-tag"),
         )
