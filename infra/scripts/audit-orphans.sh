@@ -15,6 +15,13 @@
 #   * Matching is by physical id appearing in the ARN, because CloudFormation
 #     reports physical ids and the tagging API reports ARNs, and the two are not
 #     the same string for every resource type.
+#   * The tagging index lags deletion, so a resource can be reported minutes to
+#     hours after it is gone. Confirm a reported ARN still exists before acting
+#     on it -- the last section of the output says how.
+#
+# Task definition revisions are skipped. Every deploy registers one and only the
+# newest is ever owned by the stack, so by construction the rest are unowned;
+# they are pruned by the backend deployment workflow, not here.
 #
 # After a deliberate teardown this will report the four retained resources.
 # That is expected, not a defect -- see the teardown section of README.md.
@@ -53,6 +60,9 @@ tagged=$(aws resourcegroupstaggingapi get-resources \
 orphans=0
 while IFS= read -r arn; do
     [ -n "$arn" ] || continue
+    case "$arn" in
+        *:task-definition/*) continue ;;
+    esac
     if ! grep -qF -f <(grep -v '^$' "$owned") <<<"$arn" 2>/dev/null; then
         echo "ORPHAN: $arn"
         orphans=$((orphans + 1))
@@ -61,7 +71,13 @@ done <<<"$tagged"
 
 if [ "$orphans" -eq 0 ]; then
     echo "No orphans found." >&2
-else
-    echo "${orphans} resource(s) tagged as ours but owned by no stack." >&2
-    exit 1
+    exit 0
 fi
+
+cat >&2 <<EOF
+${orphans} resource(s) tagged as ours but owned by no stack.
+
+Confirm each one still exists before acting -- the tagging index lags deletion:
+    aws <service> describe-<resource> ...   # NoSuchEntity means it is already gone
+EOF
+exit 1
