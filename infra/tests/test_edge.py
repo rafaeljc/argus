@@ -176,20 +176,21 @@ def test_the_certificate_is_validated_through_the_hosted_zone(template: Template
 
 
 def test_browsers_are_told_never_to_use_plaintext_again(template: Template) -> None:
-    policy = _only_resource(template, "AWS::CloudFront::ResponseHeadersPolicy")["Properties"][
-        "ResponseHeadersPolicyConfig"
-    ]["SecurityHeadersConfig"]
-    hsts = policy["StrictTransportSecurity"]
+    hsts = _security_headers(template)["StrictTransportSecurity"]
 
     assert hsts["AccessControlMaxAgeSec"] == 31536000
     assert hsts["IncludeSubdomains"] is True
-    assert hsts["Preload"] is True
+
+
+def test_the_domain_is_not_committed_to_the_browser_preload_list(template: Template) -> None:
+    """Preload is close to irreversible, so it is a later decision, not a default."""
+    hsts = _security_headers(template)["StrictTransportSecurity"]
+
+    assert hsts.get("Preload", False) is False
 
 
 def test_the_usual_browser_side_protections_are_set(template: Template) -> None:
-    policy = _only_resource(template, "AWS::CloudFront::ResponseHeadersPolicy")["Properties"][
-        "ResponseHeadersPolicyConfig"
-    ]["SecurityHeadersConfig"]
+    policy = _security_headers(template)
 
     assert policy["ContentTypeOptions"]["Override"] is True
     assert policy["FrameOptions"]["FrameOption"] == "DENY"
@@ -245,6 +246,13 @@ def _only_resource(template: Template, resource_type: str) -> Resource:
     assert len(resources) == 1, f"expected one {resource_type}, got {list(resources)}"
     resource: Resource = next(iter(resources.values()))
     return resource
+
+
+def _security_headers(template: Template) -> Resource:
+    headers: Resource = _only_resource(template, "AWS::CloudFront::ResponseHeadersPolicy")[
+        "Properties"
+    ]["ResponseHeadersPolicyConfig"]["SecurityHeadersConfig"]
+    return headers
 
 
 def _behavior_for(distribution: Resource, path: str) -> Resource:

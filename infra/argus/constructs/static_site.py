@@ -64,7 +64,12 @@ def security_headers(
             strict_transport_security=cloudfront.ResponseHeadersStrictTransportSecurity(
                 access_control_max_age=HSTS_MAX_AGE,
                 include_subdomains=True,
-                preload=True,
+                # No preload. Submitting the domain to the browser preload list
+                # is close to irreversible -- browsers then refuse plaintext for
+                # it and every subdomain regardless of what this header says,
+                # and removal takes months. Enable it once the domain and its
+                # subdomains are settled.
+                preload=False,
                 override=True,
             ),
             content_type_options=cloudfront.ResponseHeadersContentTypeOptions(override=True),
