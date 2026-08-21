@@ -30,10 +30,11 @@ python -m venv .venv
 .venv/bin/pytest --cov=argus --cov-report=term-missing --cov-fail-under=80
 ```
 
-`cdk` itself needs the virtualenv on `PATH`, because `cdk.json` runs `python3 app.py`:
+`cdk.json` runs `.venv/bin/python app.py`, so the CDK CLI works without
+activating anything — but it does mean the virtualenv must live at `infra/.venv`
+exactly as created above.
 
 ```bash
-source .venv/bin/activate
 npx cdk synth --all
 ```
 
