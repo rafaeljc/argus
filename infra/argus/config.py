@@ -45,6 +45,7 @@ class DatabaseSizing:
     allocated_storage_gib: int = 20
     backup_retention_days: int = 14
     database_name: str = "argus"
+    username: str = "argus"
     port: int = 5432
 
 
