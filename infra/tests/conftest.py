@@ -1,19 +1,17 @@
 import pytest
-from aws_cdk import App, Environment
-from aws_cdk.assertions import Template
 
-from argus_infra.argus_stack import ArgusStack
-from argus_infra.config import ENVIRONMENTS
-
-TEST_AWS_ENV = Environment(account="123456789012", region="us-east-1")
+from argus.config import EnvironmentConfig
 
 
-@pytest.fixture
-def stack() -> ArgusStack:
-    app = App()
-    return ArgusStack(app, "Test", env_config=ENVIRONMENTS["prod"], env=TEST_AWS_ENV)
-
-
-@pytest.fixture
-def template(stack: ArgusStack) -> Template:
-    return Template.from_stack(stack)
+@pytest.fixture(scope="session")
+def config() -> EnvironmentConfig:
+    return EnvironmentConfig(
+        name="prod",
+        account="123456789012",
+        region="us-east-1",
+        domain_name="argusapp.click",
+        hosted_zone_id="Z0123456789ABCDEFGHIJ",
+        image_tag="1f2e3d4c5b6a798877665544332211ffeeddccbb",
+        alert_email="ops@argusapp.click",
+        cloudfront_prefix_list_id="pl-3b927c52",
+    )

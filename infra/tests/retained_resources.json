@@ -1,0 +1,26 @@
+[
+  {
+    "stack": "argus-prod-data",
+    "logical_id": "DatabaseB269D8BB",
+    "type": "AWS::RDS::DBInstance",
+    "physical_name": "argus-prod-db"
+  },
+  {
+    "stack": "argus-prod-data",
+    "logical_id": "DatabaseSecret86DBB7B3",
+    "type": "AWS::SecretsManager::Secret",
+    "physical_name": "argus/prod/db"
+  },
+  {
+    "stack": "argus-prod-edge",
+    "logical_id": "FrontendBucketEFE2E19C",
+    "type": "AWS::S3::Bucket",
+    "physical_name": "argus-prod-frontend-123456789012"
+  },
+  {
+    "stack": "argus-prod-foundation",
+    "logical_id": "BackendRepository9B711290",
+    "type": "AWS::ECR::Repository",
+    "physical_name": "argus-backend"
+  }
+]

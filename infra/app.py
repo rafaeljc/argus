@@ -1,26 +1,59 @@
 #!/usr/bin/env python3
+"""CDK entry point.
+
+Reads every input from the account, builds the environment, and synthesizes. All
+the AWS access lives behind :mod:`argus.lookups`, so a missing input fails here,
+in seconds, rather than partway through a CloudFormation rollback.
+"""
+
 import os
+import sys
 
-from aws_cdk import App, Environment
+from aws_cdk import App
 
-from argus_infra.argus_stack import ArgusStack
-from argus_infra.config import ENVIRONMENTS
+from argus.config import EnvironmentConfig
+from argus.environment import build_environment
+from argus.lookups import AwsLookups, MissingInputsError, resolve_inputs
+from argus.naming import Naming
 
-app = App()
+ENVIRONMENT_NAME = "prod"
 
-# CDK_DEFAULT_ACCOUNT/_REGION are set by the CDK CLI from the active AWS profile.
-# The domain-name and api-hostname synth-time lookups need a concrete account, so
-# a real `cdk synth`/`cdk deploy` needs working AWS credentials — offline testing
-# goes through pytest instead, which supplies a fixed test account explicitly.
-account = os.environ["CDK_DEFAULT_ACCOUNT"]
-region = os.environ.get("CDK_DEFAULT_REGION", "us-east-1")
 
-for env_name, env_config in ENVIRONMENTS.items():
-    ArgusStack(
+def main() -> int:
+    account = os.environ.get("CDK_DEFAULT_ACCOUNT")
+    region = os.environ.get("CDK_DEFAULT_REGION")
+    if not account or not region:
+        print(
+            "No AWS account resolved. Run through the cdk CLI with credentials "
+            "available, or set CDK_DEFAULT_ACCOUNT and CDK_DEFAULT_REGION.",
+            file=sys.stderr,
+        )
+        return 1
+
+    naming = Naming(environment=ENVIRONMENT_NAME)
+    try:
+        inputs = resolve_inputs(AwsLookups(), naming)
+    except MissingInputsError as missing:
+        print(missing, file=sys.stderr)
+        return 1
+
+    app = App()
+    build_environment(
         app,
-        f"Argus-{env_name.capitalize()}",
-        env_config=env_config,
-        env=Environment(account=account, region=region),
+        EnvironmentConfig(
+            name=ENVIRONMENT_NAME,
+            account=account,
+            region=region,
+            domain_name=inputs.domain_name,
+            hosted_zone_id=inputs.hosted_zone_id,
+            image_tag=inputs.image_tag,
+            alert_email=inputs.alert_email,
+            cloudfront_prefix_list_id=inputs.cloudfront_prefix_list_id,
+        ),
     )
+    app.synth()
+    return 0
 
-app.synth()
+
+if __name__ == "__main__":
+    raise SystemExit(main())

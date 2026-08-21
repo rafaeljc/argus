@@ -29,6 +29,18 @@ jobs:
         working-directory: infra
         run: pip install -r requirements.txt -r requirements-dev.txt
 
+      - name: Lint
+        working-directory: infra
+        run: ruff check .
+
+      - name: Check formatting
+        working-directory: infra
+        run: ruff format --check .
+
+      - name: Type check
+        working-directory: infra
+        run: mypy .
+
       - name: pytest
         working-directory: infra
-        run: pytest -v
+        run: pytest --cov=argus --cov-report=term-missing --cov-fail-under=80
