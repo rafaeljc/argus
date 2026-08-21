@@ -183,12 +183,7 @@ def test_the_task_may_reach_the_database(template: Template) -> None:
 
 
 def test_the_backend_role_may_roll_the_service_it_deploys(template: Template) -> None:
-    granted = {
-        action
-        for policy in template.find_resources("AWS::IAM::Policy").values()
-        for statement in policy["Properties"]["PolicyDocument"]["Statement"]
-        for action in _as_list(statement["Action"])
-    }
+    granted = _granted_actions(template)
 
     assert {
         "ecs:DescribeServices",
@@ -197,6 +192,13 @@ def test_the_backend_role_may_roll_the_service_it_deploys(template: Template) ->
         "ecs:DescribeTaskDefinition",
         "iam:PassRole",
     } <= granted
+
+
+def test_the_backend_role_may_prune_the_revisions_it_accumulates(template: Template) -> None:
+    """Every deploy registers a revision and AWS never reaps them."""
+    granted = _granted_actions(template)
+
+    assert {"ecs:ListTaskDefinitions", "ecs:DeregisterTaskDefinition"} <= granted
 
 
 # --- discovery -----------------------------------------------------------------------------
@@ -247,6 +249,15 @@ def _ingress_rules(template: Template) -> list[Resource]:
     for group in template.find_resources("AWS::EC2::SecurityGroup").values():
         rules.extend(group["Properties"].get("SecurityGroupIngress", []))
     return rules
+
+
+def _granted_actions(template: Template) -> set[str]:
+    return {
+        action
+        for policy in template.find_resources("AWS::IAM::Policy").values()
+        for statement in policy["Properties"]["PolicyDocument"]["Statement"]
+        for action in _as_list(statement["Action"])
+    }
 
 
 def _as_list(action: Any) -> list[str]:

@@ -83,11 +83,18 @@ class ComputeStack(ArgusStack):
                 resources=[self.backend.service.service_arn],
             )
         )
-        # Registering a revision and describing a definition are not scoped to a
-        # resource by ECS, so they cannot be narrowed further.
+        # Task definitions are not scoped to a resource by ECS, so these cannot
+        # be narrowed further. Listing and deregistering are how the workflow
+        # prunes the revisions it accumulates: every deploy registers one and
+        # AWS never reaps them.
         role.add_to_principal_policy(
             iam.PolicyStatement(
-                actions=["ecs:RegisterTaskDefinition", "ecs:DescribeTaskDefinition"],
+                actions=[
+                    "ecs:RegisterTaskDefinition",
+                    "ecs:DescribeTaskDefinition",
+                    "ecs:ListTaskDefinitions",
+                    "ecs:DeregisterTaskDefinition",
+                ],
                 resources=["*"],
             )
         )

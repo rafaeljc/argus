@@ -60,28 +60,31 @@ jobs:
           role-to-assume: ${{ vars.FRONTEND_DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Read stack outputs
-        id: stack
+      # One parameter at a time: a bulk read succeeds on a partial result, and a
+      # missing value would then surface as an empty bucket name.
+      - name: Read infrastructure outputs
+        id: infra
         run: |
-          OUTPUTS=$(aws cloudformation describe-stacks --stack-name Argus-Prod \
-            --query 'Stacks[0].Outputs' --output json)
-          for name in BucketName DistributionId; do
-            value=$(echo "$OUTPUTS" | jq -r --arg n "$name" '.[] | select(.OutputKey | contains($n)) | .OutputValue')
-            echo "$name=$value" >> "$GITHUB_OUTPUT"
-          done
+          set -euo pipefail
+          bucket_name=$(aws ssm get-parameter --name /argus/prod/out/frontend/bucket-name --query Parameter.Value --output text)
+          distribution_id=$(aws ssm get-parameter --name /argus/prod/out/frontend/distribution-id --query Parameter.Value --output text)
+          {
+            echo "bucket_name=$bucket_name"
+            echo "distribution_id=$distribution_id"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Upload hashed assets with a long-lived cache
         run: |
-          aws s3 sync dist/ "s3://${{ steps.stack.outputs.BucketName }}/" --delete \
+          aws s3 sync dist/ "s3://${{ steps.infra.outputs.bucket_name }}/" --delete \
             --cache-control 'public,max-age=31536000,immutable' \
             --exclude index.html
 
       - name: Upload index.html uncached
         run: |
-          aws s3 cp dist/index.html "s3://${{ steps.stack.outputs.BucketName }}/index.html" \
+          aws s3 cp dist/index.html "s3://${{ steps.infra.outputs.bucket_name }}/index.html" \
             --cache-control 'no-cache' --content-type 'text/html'
 
       - name: Invalidate CloudFront
         run: |
           aws cloudfront create-invalidation \
-            --distribution-id "${{ steps.stack.outputs.DistributionId }}" --paths '/*'
+            --distribution-id "${{ steps.infra.outputs.distribution_id }}" --paths '/*'
