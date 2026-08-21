@@ -116,10 +116,43 @@ def test_the_backend_role_may_push_images_and_record_the_deployed_tag(
     assert "ssm:PutParameter" in granted
 
 
-def test_the_frontend_role_gains_no_permissions_it_cannot_use_yet(template: Template) -> None:
+def test_the_frontend_role_gains_only_what_this_stack_owns(template: Template) -> None:
     frontend_role = logical_id_of(template, "AWS::IAM::Role", "RoleName", "argus-prod-cd-frontend")
 
-    assert _actions_granted_to(template, frontend_role) == set()
+    # The bucket and distribution are granted by the stack that owns them.
+    assert _actions_granted_to(template, frontend_role) == {"ssm:GetParameter"}
+
+
+@pytest.mark.parametrize("component", ["backend", "frontend"])
+def test_each_role_can_read_the_parameters_its_workflow_discovers_through(
+    template: Template, component: str
+) -> None:
+    """Publishing a discovery value is useless if the reader cannot read it."""
+    role = logical_id_of(template, "AWS::IAM::Role", "RoleName", f"argus-prod-cd-{component}")
+    readable = _resources_readable_by(template, role)
+
+    assert any(f"parameter/argus/prod/out/{component}/*" in resource for resource in readable), (
+        readable
+    )
+
+
+def _resources_readable_by(template: Template, role_logical_id: str) -> list[str]:
+    """ARNs a role may GetParameter on, rendered as text.
+
+    Rendered rather than compared structurally because CDK emits them as
+    ``Fn::Join`` fragments around the partition, not as plain strings.
+    """
+    resources: list[str] = []
+    for policy in template.find_resources("AWS::IAM::Policy").values():
+        properties = policy["Properties"]
+        if not any(role.get("Ref") == role_logical_id for role in properties["Roles"]):
+            continue
+        for statement in properties["PolicyDocument"]["Statement"]:
+            action = statement["Action"]
+            actions = [action] if isinstance(action, str) else action
+            if "ssm:GetParameter" in actions:
+                resources.append(json.dumps(statement["Resource"]))
+    return resources
 
 
 def _actions_granted_to(template: Template, role_logical_id: str) -> set[str]:
