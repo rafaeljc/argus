@@ -34,6 +34,7 @@ class FoundationStack(ArgusStack):
         self.deploy_roles = GitHubDeployRoles(self, "DeployRoles", config=config)
 
         self._allow_backend_deployments(config)
+        self._allow_reading_discovery(config)
 
         discovery = self.discovery
         discovery.publish(
@@ -90,6 +91,30 @@ class FoundationStack(ArgusStack):
         )
         topic.add_subscription(subscriptions.EmailSubscription(config.alert_email))
         return topic
+
+    def _allow_reading_discovery(self, config: EnvironmentConfig) -> None:
+        """Let each role read the parameters its workflow finds its resources through.
+
+        Granted per component prefix rather than per parameter, because a later
+        stack publishing a new value under the same prefix must not require the
+        foundation stack to be redeployed before the workflow can read it.
+        """
+        for component, role in (
+            ("backend", self.deploy_roles.backend),
+            ("frontend", self.deploy_roles.frontend),
+        ):
+            role.add_to_policy(
+                iam.PolicyStatement(
+                    actions=["ssm:GetParameter"],
+                    resources=[
+                        self.format_arn(
+                            service="ssm",
+                            resource="parameter",
+                            resource_name=config.naming.output_parameter(component, "*")[1:],
+                        )
+                    ],
+                )
+            )
 
     def _allow_backend_deployments(self, config: EnvironmentConfig) -> None:
         """Grant the backend role the two things this stack owns: push, and record the tag."""
