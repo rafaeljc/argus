@@ -34,7 +34,7 @@ class BackendSizing:
     traffic_port: int = 8080
     management_port: int = 8081
     log_retention_days: int = 30
-    readiness_path: str = "/actuator/health/ready"
+    readiness_path: str = "/actuator/health/readiness"
 
 
 @dataclass(frozen=True)

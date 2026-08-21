@@ -161,7 +161,7 @@ def test_health_is_checked_on_the_management_port(template: Template) -> None:
             {
                 "Port": 8080,
                 "HealthCheckPort": "8081",
-                "HealthCheckPath": "/actuator/health/ready",
+                "HealthCheckPath": "/actuator/health/readiness",
             }
         ),
     )
