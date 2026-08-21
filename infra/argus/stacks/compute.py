@@ -98,8 +98,24 @@ class ComputeStack(ArgusStack):
                 resources=["*"],
             )
         )
-        # Handing a task definition to ECS means passing the roles it names.
+        # Registering a revision carries the tags applied to everything in this
+        # project, and tagging on create is its own action. Scoped to the family,
+        # which RegisterTaskDefinition itself cannot be.
         task_definition = self.backend.task_definition
+        role.add_to_principal_policy(
+            iam.PolicyStatement(
+                actions=["ecs:TagResource"],
+                resources=[
+                    self.format_arn(
+                        service="ecs",
+                        resource="task-definition",
+                        resource_name=f"{task_definition.family}:*",
+                    )
+                ],
+            )
+        )
+
+        # Handing a task definition to ECS means passing the roles it names.
         passable = [task_definition.task_role.role_arn]
         if task_definition.execution_role is not None:
             passable.append(task_definition.execution_role.role_arn)

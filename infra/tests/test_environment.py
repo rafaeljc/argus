@@ -77,6 +77,83 @@ def _tags_of(resource: dict) -> dict[str, str]:  # type: ignore[type-arg]
     return {tag["Key"]: tag["Value"] for tag in tags}
 
 
+# Every AWS action each deployment workflow performs, in the order its steps
+# run. A role's permissions are granted across three stacks, so this is the only
+# place the whole contract is visible -- and the only place a missing grant shows
+# up before a workflow fails on it.
+BACKEND_WORKFLOW_ACTIONS = {
+    "ssm:GetParameter",  # read infrastructure outputs
+    "ecr:GetAuthorizationToken",  # log in to ECR
+    "ecr:InitiateLayerUpload",  # build and push
+    "ecr:UploadLayerPart",
+    "ecr:CompleteLayerUpload",
+    "ecr:BatchCheckLayerAvailability",
+    "ecr:PutImage",
+    "ssm:PutParameter",  # point SSM at this SHA
+    "ecs:DescribeTaskDefinition",  # render task definition
+    "ecs:RegisterTaskDefinition",  # deploy
+    "ecs:TagResource",  # deploy: every resource is tagged, so registering tags
+    "iam:PassRole",  # deploy: hands ECS the roles the definition names
+    "ecs:UpdateService",
+    "ecs:DescribeServices",  # wait for service stability
+    "ecs:ListTaskDefinitions",  # deregister superseded revisions
+    "ecs:DeregisterTaskDefinition",
+}
+
+FRONTEND_WORKFLOW_ACTIONS = {
+    "ssm:GetParameter",  # read infrastructure outputs
+    "s3:PutObject",  # upload assets and index.html
+    "s3:DeleteObject",  # sync --delete
+    "s3:ListBucket",  # sync compares against what is there
+    "cloudfront:CreateInvalidation",
+}
+
+
+@pytest.mark.parametrize(
+    ("component", "required"),
+    [("backend", BACKEND_WORKFLOW_ACTIONS), ("frontend", FRONTEND_WORKFLOW_ACTIONS)],
+)
+def test_each_deploy_role_can_perform_every_step_of_its_workflow(
+    app: App, component: str, required: set[str]
+) -> None:
+    role_name = f"argus-prod-cd-{component}"
+    granted = set()
+    for stack in _stacks(app):
+        granted |= _actions_granted_to(Template.from_stack(stack), role_name)
+
+    missing = {action for action in required if not _covered_by(action, granted)}
+    assert not missing, f"{role_name} cannot: {sorted(missing)}"
+
+
+def _covered_by(action: str, granted: set[str]) -> bool:
+    """CDK's grants use wildcard action names, e.g. s3:DeleteObject*."""
+    return any(
+        allowed == action or (allowed.endswith("*") and action.startswith(allowed[:-1]))
+        for allowed in granted
+    )
+
+
+def _actions_granted_to(template: Template, role_name: str) -> set[str]:
+    """Actions granted to a role, whether it is created here or imported by name."""
+    actions: set[str] = set()
+    roles_by_id = {
+        logical_id: resource["Properties"].get("RoleName")
+        for logical_id, resource in template.find_resources("AWS::IAM::Role").items()
+    }
+    for policy in template.find_resources("AWS::IAM::Policy").values():
+        properties = policy["Properties"]
+        attached = {
+            roles_by_id.get(role["Ref"]) if isinstance(role, dict) else role
+            for role in properties["Roles"]
+        }
+        if role_name not in attached:
+            continue
+        for statement in properties["PolicyDocument"]["Statement"]:
+            action = statement["Action"]
+            actions.update([action] if isinstance(action, str) else action)
+    return actions
+
+
 def _stacks(app: App) -> list:  # type: ignore[type-arg]
     from aws_cdk import Stack
 
