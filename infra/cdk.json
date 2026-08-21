@@ -1,0 +1,13 @@
+{
+  "app": "python3 app.py",
+  "watch": null,
+  "context": {
+    "@aws-cdk/aws-iam:minimizePolicies": true,
+    "@aws-cdk/core:checkSecretUsage": true,
+    "@aws-cdk/aws-ecs:disableEcsImdsBlocking": true,
+    "@aws-cdk/core:enablePartitionLiterals": true,
+    "@aws-cdk/aws-s3:createDefaultLoggingPolicy": true,
+    "@aws-cdk/aws-ec2:restrictDefaultSecurityGroup": true,
+    "@aws-cdk/aws-cloudfront:useOriginAccessControl": true
+  }
+}

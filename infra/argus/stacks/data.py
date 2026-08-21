@@ -64,7 +64,18 @@ class DataStack(ArgusStack):
             engine=rds.DatabaseInstanceEngine.postgres(version=ENGINE_VERSION),
             instance_type=ec2.InstanceType(DATABASE.instance_class),
             vpc=vpc,
-            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_ISOLATED),
+            # Created here rather than generated, because the instance's RETAIN
+            # would otherwise propagate to it. A subnet group is a list of
+            # subnet ids -- nothing to lose, and a retained one with a generated
+            # name lingers after teardown and can block deleting the VPC.
+            subnet_group=rds.SubnetGroup(
+                self,
+                "DatabaseSubnetGroup",
+                description="Isolated subnets for the Argus database",
+                vpc=vpc,
+                vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_ISOLATED),
+                removal_policy=Durability.DISPOSABLE.removal_policy,
+            ),
             credentials=rds.Credentials.from_secret(self.credentials),
             # Without this the generated secret has no dbname field, and the
             # backend assembles its JDBC url from those fields.
