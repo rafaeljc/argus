@@ -28,5 +28,10 @@ export default defineConfig({
     env: {
       VITE_API_BASE_URL: 'http://localhost:8080/api/v1',
     },
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov'],
+      exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**', '**/*.config.*', 'src/test/**'],
+    },
   },
 });

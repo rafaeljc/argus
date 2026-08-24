@@ -16,5 +16,15 @@ services:
       timeout: 5s
       retries: 10
 
+  swagger-ui:
+    image: swaggerapi/swagger-ui:v5.32.14
+    container_name: argus-swagger-ui
+    environment:
+      SWAGGER_JSON: /spec/argus-v1.yaml
+    volumes:
+      - ./contracts/openapi:/spec:ro
+    ports:
+      - "127.0.0.1:9090:8080"
+
 volumes:
   argus-pg-data:
