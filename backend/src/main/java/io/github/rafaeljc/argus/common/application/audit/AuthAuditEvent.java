@@ -6,7 +6,8 @@ public sealed interface AuthAuditEvent {
 
     sealed interface Success extends AuthAuditEvent
             permits SignupSucceeded, LoginSucceeded, LogoutSucceeded, EmailVerified,
-                    PasswordResetRequested, PasswordResetCompleted, AccountDeleted {}
+                    PasswordResetRequested, PasswordResetCompleted, AccountDeleted,
+                    AdminAssigned {}
 
     sealed interface Failure extends AuthAuditEvent
             permits SignupFailed, LoginFailed, EmailVerificationFailed,
@@ -38,4 +39,8 @@ public sealed interface AuthAuditEvent {
     record AccountDeleted(UserId userId, String email) implements Success {}
 
     record AccountDeletionFailed(UserId userId, String reason) implements Failure {}
+
+    // Emitted only when the assignment actually changed rows, so a restart that re-applies the
+    // same configuration stays silent instead of claiming an assignment that did not happen.
+    record AdminAssigned(UserId userId, String email) implements Success {}
 }
