@@ -134,6 +134,10 @@ resilience4j:
           - java.io.IOException
 
 argus:
+  admin:
+    # The single administrator, named by user id. Empty means "leave the current assignment
+    # alone", so local runs and tests are inert unless they opt in.
+    user-id: ""
   email:
     # `noop` logs instead of sending. Set to `resend` — with the credentials below — to reach a real
     # inbox; anything else fails the boot rather than silently swallowing mail.
