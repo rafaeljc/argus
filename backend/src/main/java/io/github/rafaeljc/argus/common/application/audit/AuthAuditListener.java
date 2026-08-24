@@ -4,6 +4,7 @@ import static net.logstash.logback.argument.StructuredArguments.kv;
 
 import io.github.rafaeljc.argus.common.application.audit.AuthAuditEvent.AccountDeleted;
 import io.github.rafaeljc.argus.common.application.audit.AuthAuditEvent.AccountDeletionFailed;
+import io.github.rafaeljc.argus.common.application.audit.AuthAuditEvent.AdminAssigned;
 import io.github.rafaeljc.argus.common.application.audit.AuthAuditEvent.EmailVerificationFailed;
 import io.github.rafaeljc.argus.common.application.audit.AuthAuditEvent.EmailVerified;
 import io.github.rafaeljc.argus.common.application.audit.AuthAuditEvent.Failure;
@@ -62,6 +63,7 @@ public class AuthAuditListener {
             case PasswordResetCompletionFailed ignored -> "auth.complete_password_reset";
             case AccountDeleted ignored -> "auth.delete_account";
             case AccountDeletionFailed ignored -> "auth.delete_account";
+            case AdminAssigned ignored -> "admin.assign";
         };
     }
 
@@ -80,6 +82,8 @@ public class AuthAuditListener {
             case PasswordResetCompleted e -> new StructuredArgument[]{
                     kv("user_id", e.userId().value()), kv("email", e.email())};
             case AccountDeleted e -> new StructuredArgument[]{
+                    kv("user_id", e.userId().value()), kv("email", e.email())};
+            case AdminAssigned e -> new StructuredArgument[]{
                     kv("user_id", e.userId().value()), kv("email", e.email())};
         };
     }

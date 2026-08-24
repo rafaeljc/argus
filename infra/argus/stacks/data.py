@@ -68,6 +68,12 @@ class DataStack(ArgusStack):
             # would otherwise propagate to it. A subnet group is a list of
             # subnet ids -- nothing to lose, and a retained one with a generated
             # name lingers after teardown and can block deleting the VPC.
+            #
+            # The cost of that choice is teardown ordering: this is deleted with
+            # the stack while the instance it holds is not, so destroying while
+            # the instance still exists fails with "at least one database
+            # instance is still using it". Delete the instance first -- see the
+            # teardown section of README.md.
             subnet_group=rds.SubnetGroup(
                 self,
                 "DatabaseSubnetGroup",

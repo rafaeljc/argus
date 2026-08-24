@@ -37,6 +37,8 @@ server:
 
 argus:
   app-base-url: ${ARGUS_APP_BASE_URL}
+  admin:
+    user-id: ${ARGUS_ADMIN_USER_ID}
   web:
     cors-allowed-origin: ${ARGUS_WEB_CORS_ALLOWED_ORIGIN}
     cookie-domain: ${ARGUS_WEB_COOKIE_DOMAIN}

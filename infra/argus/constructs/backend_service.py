@@ -33,6 +33,7 @@ LISTENER_PORT = 80
 # application reads.
 ENVIRONMENT_PARAMETERS = {
     "ARGUS_APP_BASE_URL": "app-base-url",
+    "ARGUS_ADMIN_USER_ID": "admin-user-id",
     "ARGUS_WEB_CORS_ALLOWED_ORIGIN": "web-cors-allowed-origin",
     "ARGUS_WEB_COOKIE_DOMAIN": "web-cookie-domain",
     "ARGUS_EMAIL_ADDRESS": "email-address",
