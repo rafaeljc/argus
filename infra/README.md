@@ -70,6 +70,7 @@ aws ssm put-parameter --name /argus/prod/env/web-cookie-domain           --type 
 aws ssm put-parameter --name /argus/prod/env/email-address               --type String --value no-reply@argusapp.click
 aws ssm put-parameter --name /argus/prod/env/email-resend-api-url        --type String --value https://api.resend.com
 aws ssm put-parameter --name /argus/prod/env/marketdata-massive-api-url  --type String --value <vendor url>
+aws ssm put-parameter --name /argus/prod/env/admin-user-id               --type String --value none
 
 aws secretsmanager create-secret --name argus/prod/vendor-keys --secret-string '{
   "email-resend-api-key": "<key>",
@@ -79,6 +80,12 @@ aws secretsmanager create-secret --name argus/prod/vendor-keys --secret-string '
 
 `/argus/prod/env/*` values are hand-managed for good. CDK references them and
 never writes them, so a deploy cannot clobber one.
+
+Every one of them has to exist before the first deploy that references it: ECS
+resolves each at task start and fails the task with `ResourceInitializationError`
+if one is missing. `admin-user-id` has no real value yet at this point and SSM
+rejects an empty `String`, hence the `none` sentinel -- see
+[Appointing the admin](#appointing-the-admin).
 
 ### 2. Pass one
 
@@ -135,6 +142,38 @@ they need through `/argus/prod/out/*`, and both fail loudly if it is absent.
 
 To roll back to an older image, set `/argus/prod/image-tag` to that SHA and
 `cdk deploy argus-prod-compute`.
+
+## Appointing the admin
+
+`/argus/prod/env/admin-user-id` names the single administrator. The application
+promotes that account on startup and demotes every other admin in the same
+statement, so the parameter -- not the database -- is the source of truth for who
+holds the flag.
+
+No account is created and no password is stored. The admin is an ordinary user
+who signed up and verified through the app, so nothing here mints credentials.
+
+1. Sign up through the app and complete email verification, as a normal user.
+2. Take the account's UUID from the signup response (`data.user_id`), from
+   `GET /api/v1/account` once logged in, or from the `auth.signup` audit line in
+   CloudWatch. None of these need admin access.
+3. Point the parameter at it:
+   ```bash
+   aws ssm put-parameter --name /argus/prod/env/admin-user-id --value <uuid> --overwrite
+   ```
+4. `aws ecs update-service --cluster <cluster> --service <service> --force-new-deployment`.
+   The value is read at task start, so a restart is required either way.
+5. Log in. The admin surface is reachable.
+
+The account has to be active, verified and unsuspended, or the promotion is
+refused and logged. Moving the admin to someone else is the same operation:
+change the value and restart, and the previous admin is demoted by the same
+statement. Re-running with the value unchanged does nothing.
+
+Setting it back to `none` leaves the current assignment alone rather than
+clearing it -- a value that fails to resolve must never silently strip the
+running deployment of its administrator. To remove someone, appoint their
+successor.
 
 ## Changing the infrastructure
 
