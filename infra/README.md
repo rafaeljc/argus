@@ -163,24 +163,73 @@ what you want.
 
 ## Teardown
 
-`cdk destroy` leaves the four retained resources behind, plus the RDS final
-snapshot. That is by design, and it means teardown is not free:
+`cdk destroy` leaves the four retained resources behind. That is by design, and
+it means teardown is not free -- and not a single command.
+
+**The database has to be deleted before `cdk destroy`, not after.** The subnet
+group and security group around it are disposable, so CloudFormation deletes
+them; the instance is retained, so it does not. Destroying the data stack while
+the instance still exists therefore asks CloudFormation to delete a subnet group
+the instance is still using, which fails:
+
+```
+DELETE_SKIPPED  AWS::RDS::DBInstance     (retained, as designed)
+DELETE_FAILED   AWS::RDS::DBSubnetGroup  ...instance argus-prod-db is still using it
+```
+
+The network stack fails the same way on its subnets. Deleting the instance first
+avoids both.
+
+### 1. Delete the database
 
 ```bash
+aws rds modify-db-instance --db-instance-identifier argus-prod-db \
+  --no-deletion-protection --apply-immediately
 aws rds delete-db-instance --db-instance-identifier argus-prod-db \
   --skip-final-snapshot --delete-automated-backups
+aws rds wait db-instance-deleted --db-instance-identifier argus-prod-db
+```
+
+`deletion_protection` has to come off first or the delete is refused. Wait for it
+to finish -- an instance still in `deleting` blocks the stack just as an
+available one does. Drop `--skip-final-snapshot` to keep a restorable copy, and
+remember the snapshot then outlives everything else here.
+
+### 2. Destroy the stacks
+
+```bash
+npx cdk destroy --all
+```
+
+### 3. Delete what was retained
+
+```bash
 aws s3 rb "s3://argus-prod-frontend-<account>" --force
 aws ecr delete-repository --repository-name argus-backend --force
 aws secretsmanager delete-secret --secret-id argus/prod/db \
   --force-delete-without-recovery
 ```
 
-The database also has `deletion_protection`, which has to be turned off before
-it will delete at all.
+Without `--force-delete-without-recovery` a secret is only scheduled for
+deletion and holds its name for the recovery window, so recreating one under the
+same name fails until the window elapses.
 
-Deleting a secret without `--force-delete-without-recovery` schedules it and
-holds the name for the recovery window, so recreating one under the same name
-fails until the window elapses.
+### 4. Delete the hand-managed inputs
 
-Running `./scripts/audit-orphans.sh` after a teardown will report these. That is
-expected.
+Not created by CDK, so nothing above removes them:
+
+```bash
+aws secretsmanager delete-secret --secret-id argus/prod/vendor-keys \
+  --force-delete-without-recovery
+for name in $(aws ssm get-parameters-by-path --path /argus --recursive \
+    --query 'Parameters[].Name' --output text); do
+  aws ssm delete-parameter --name "$name"
+done
+```
+
+The Route 53 hosted zone is adopted, not created, so it survives -- only the
+apex record goes with the edge stack. Leave the zone alone unless the domain
+itself is being retired; it also holds the mail records.
+
+Running `./scripts/audit-orphans.sh` between steps 2 and 3 will report the
+retained resources. That is expected.
