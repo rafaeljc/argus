@@ -42,6 +42,12 @@ jobs:
         working-directory: backend
         run: ./mvnw -B --no-transfer-progress clean verify
 
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: backend/target/site/jacoco/jacoco.xml
+          flags: backend
+
       - name: Upload Surefire reports
         if: always()
         uses: actions/upload-artifact@v4
