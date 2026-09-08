@@ -55,6 +55,14 @@ class DbValueLookupTest {
     }
 
     @Test
+    void of_nullDbValue_throwsIllegalState() {
+        assertThatThrownBy(() -> DbValueLookup.of(NullValue.values(), "null_value"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("null_value")
+                .hasMessageContaining("NULL");
+    }
+
+    @Test
     void of_duplicateDbValue_throwsIllegalState() {
         assertThatThrownBy(() -> DbValueLookup.of(DuplicateValue.values(), "duplicate_value"))
                 .isInstanceOf(IllegalStateException.class)
@@ -87,6 +95,23 @@ class DbValueLookupTest {
         private final String dbValue;
 
         BlankValue(String dbValue) {
+            this.dbValue = dbValue;
+        }
+
+        @Override
+        public String dbValue() {
+            return dbValue;
+        }
+    }
+
+    private enum NullValue implements DbValued {
+
+        NULL(null),
+        FINE("fine");
+
+        private final String dbValue;
+
+        NullValue(String dbValue) {
             this.dbValue = dbValue;
         }
 
