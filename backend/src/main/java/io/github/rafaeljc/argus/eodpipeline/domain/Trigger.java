@@ -1,29 +1,27 @@
 package io.github.rafaeljc.argus.eodpipeline.domain;
 
-public enum Trigger {
+import io.github.rafaeljc.argus.common.domain.DbValueLookup;
+import io.github.rafaeljc.argus.common.domain.DbValued;
+
+public enum Trigger implements DbValued {
 
     CRON("cron"),
     ADMIN("admin");
 
+    private static final DbValueLookup<Trigger> LOOKUP = DbValueLookup.of(values(), "trigger");
+
     private final String dbValue;
 
     Trigger(String dbValue) {
-        if (dbValue == null || dbValue.isBlank()) {
-            throw new IllegalArgumentException("Trigger dbValue must not be blank");
-        }
         this.dbValue = dbValue;
     }
 
+    @Override
     public String dbValue() {
         return dbValue;
     }
 
     public static Trigger fromDbValue(String value) {
-        for (Trigger trigger : values()) {
-            if (trigger.dbValue.equals(value)) {
-                return trigger;
-            }
-        }
-        throw new IllegalArgumentException("unknown trigger: " + value);
+        return LOOKUP.get(value);
     }
 }

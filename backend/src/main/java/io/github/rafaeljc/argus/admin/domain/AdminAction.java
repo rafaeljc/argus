@@ -1,6 +1,9 @@
 package io.github.rafaeljc.argus.admin.domain;
 
-public enum AdminAction {
+import io.github.rafaeljc.argus.common.domain.DbValueLookup;
+import io.github.rafaeljc.argus.common.domain.DbValued;
+
+public enum AdminAction implements DbValued {
 
     SUSPEND("SUSPEND"),
     UNSUSPEND("UNSUSPEND"),
@@ -8,15 +11,15 @@ public enum AdminAction {
     EOD_RUN("EOD_RUN"),
     EOD_STEP_RERUN("EOD_STEP_RERUN");
 
+    private static final DbValueLookup<AdminAction> LOOKUP = DbValueLookup.of(values(), "action");
+
     private final String dbValue;
 
     AdminAction(String dbValue) {
-        if (dbValue == null || dbValue.isBlank()) {
-            throw new IllegalArgumentException("AdminAction dbValue must not be blank");
-        }
         this.dbValue = dbValue;
     }
 
+    @Override
     public String dbValue() {
         return dbValue;
     }
@@ -26,11 +29,6 @@ public enum AdminAction {
     }
 
     public static AdminAction fromDbValue(String value) {
-        for (AdminAction action : values()) {
-            if (action.dbValue.equals(value)) {
-                return action;
-            }
-        }
-        throw new IllegalArgumentException("unknown action: " + value);
+        return LOOKUP.get(value);
     }
 }

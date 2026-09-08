@@ -1,30 +1,28 @@
 package io.github.rafaeljc.argus.email.domain;
 
-public enum EventType {
+import io.github.rafaeljc.argus.common.domain.DbValueLookup;
+import io.github.rafaeljc.argus.common.domain.DbValued;
+
+public enum EventType implements DbValued {
 
     VERIFICATION("email.verification"),
     PASSWORD_RESET("email.password_reset"),
     DIGEST("email.digest");
 
+    private static final DbValueLookup<EventType> LOOKUP = DbValueLookup.of(values(), "event_type");
+
     private final String dbValue;
 
     EventType(String dbValue) {
-        if (dbValue == null || dbValue.isBlank()) {
-            throw new IllegalArgumentException("EventType dbValue must not be blank");
-        }
         this.dbValue = dbValue;
     }
 
+    @Override
     public String dbValue() {
         return dbValue;
     }
 
     public static EventType fromDbValue(String value) {
-        for (EventType type : values()) {
-            if (type.dbValue.equals(value)) {
-                return type;
-            }
-        }
-        throw new IllegalArgumentException("unknown event_type: " + value);
+        return LOOKUP.get(value);
     }
 }

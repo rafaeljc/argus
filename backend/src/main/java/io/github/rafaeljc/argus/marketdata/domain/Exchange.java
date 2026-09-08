@@ -1,29 +1,27 @@
 package io.github.rafaeljc.argus.marketdata.domain;
 
-public enum Exchange {
+import io.github.rafaeljc.argus.common.domain.DbValueLookup;
+import io.github.rafaeljc.argus.common.domain.DbValued;
+
+public enum Exchange implements DbValued {
 
     NYSE("NYSE"),
     NASDAQ("NASDAQ");
 
+    private static final DbValueLookup<Exchange> LOOKUP = DbValueLookup.of(values(), "exchange");
+
     private final String dbValue;
 
     Exchange(String dbValue) {
-        if (dbValue == null || dbValue.isBlank()) {
-            throw new IllegalArgumentException("Exchange dbValue must not be blank");
-        }
         this.dbValue = dbValue;
     }
 
+    @Override
     public String dbValue() {
         return dbValue;
     }
 
     public static Exchange fromDbValue(String value) {
-        for (Exchange exchange : values()) {
-            if (exchange.dbValue.equals(value)) {
-                return exchange;
-            }
-        }
-        throw new IllegalArgumentException("unknown exchange: " + value);
+        return LOOKUP.get(value);
     }
 }
