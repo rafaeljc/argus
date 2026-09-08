@@ -1,6 +1,9 @@
 package io.github.rafaeljc.argus.eodpipeline.domain;
 
-public enum StepStatus {
+import io.github.rafaeljc.argus.common.domain.DbValueLookup;
+import io.github.rafaeljc.argus.common.domain.DbValued;
+
+public enum StepStatus implements DbValued {
 
     PENDING("pending"),
     IN_PROGRESS("in_progress"),
@@ -8,25 +11,20 @@ public enum StepStatus {
     FAILED("failed"),
     SKIPPED("skipped");
 
+    private static final DbValueLookup<StepStatus> LOOKUP = DbValueLookup.of(values(), "step_status");
+
     private final String dbValue;
 
     StepStatus(String dbValue) {
-        if (dbValue == null || dbValue.isBlank()) {
-            throw new IllegalArgumentException("StepStatus dbValue must not be blank");
-        }
         this.dbValue = dbValue;
     }
 
+    @Override
     public String dbValue() {
         return dbValue;
     }
 
     public static StepStatus fromDbValue(String value) {
-        for (StepStatus status : values()) {
-            if (status.dbValue.equals(value)) {
-                return status;
-            }
-        }
-        throw new IllegalArgumentException("unknown step_status: " + value);
+        return LOOKUP.get(value);
     }
 }

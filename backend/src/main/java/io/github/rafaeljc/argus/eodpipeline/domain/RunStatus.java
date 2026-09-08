@@ -1,31 +1,29 @@
 package io.github.rafaeljc.argus.eodpipeline.domain;
 
-public enum RunStatus {
+import io.github.rafaeljc.argus.common.domain.DbValueLookup;
+import io.github.rafaeljc.argus.common.domain.DbValued;
+
+public enum RunStatus implements DbValued {
 
     PENDING("pending"),
     IN_PROGRESS("in_progress"),
     SUCCEEDED("succeeded"),
     FAILED("failed");
 
+    private static final DbValueLookup<RunStatus> LOOKUP = DbValueLookup.of(values(), "run_status");
+
     private final String dbValue;
 
     RunStatus(String dbValue) {
-        if (dbValue == null || dbValue.isBlank()) {
-            throw new IllegalArgumentException("RunStatus dbValue must not be blank");
-        }
         this.dbValue = dbValue;
     }
 
+    @Override
     public String dbValue() {
         return dbValue;
     }
 
     public static RunStatus fromDbValue(String value) {
-        for (RunStatus status : values()) {
-            if (status.dbValue.equals(value)) {
-                return status;
-            }
-        }
-        throw new IllegalArgumentException("unknown run_status: " + value);
+        return LOOKUP.get(value);
     }
 }
