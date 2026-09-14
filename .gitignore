@@ -28,7 +28,3 @@ Thumbs.db
 # Python
 __pycache__/
 *.pyc
-
-# Claude Code
-.claude/
-CLAUDE.md
