@@ -3,6 +3,7 @@ package io.github.rafaeljc.argus.auth.web;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import io.github.rafaeljc.argus.users.application.UserService;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -22,7 +23,7 @@ import org.springframework.test.context.TestPropertySource;
 
 // Separate Spring context from AuthControllerIT / CsrfFilterIT because the Domain attribute is
 // driven by a property override — argus.web.cookie-domain is otherwise absent (same-origin).
-@Import(PostgresContainer.class)
+@Import({PostgresContainer.class, RedisContainer.class})
 @AutoConfigureTestRestTemplate
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = "argus.web.cookie-domain=argus.example")

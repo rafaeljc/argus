@@ -8,6 +8,7 @@ import io.github.rafaeljc.argus.auth.domain.Session;
 import io.github.rafaeljc.argus.common.domain.SessionId;
 import io.github.rafaeljc.argus.common.domain.UserId;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import io.github.rafaeljc.argus.users.application.UserService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -30,7 +31,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Import({PostgresContainer.class, SessionResolutionFilterIT.WhoamiEndpoint.class})
+@Import({PostgresContainer.class, RedisContainer.class, SessionResolutionFilterIT.WhoamiEndpoint.class})
 @AutoConfigureTestRestTemplate
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class SessionResolutionFilterIT {

@@ -17,6 +17,7 @@ import io.github.rafaeljc.argus.eodpipeline.domain.RunStatus;
 import io.github.rafaeljc.argus.eodpipeline.domain.StepStatus;
 import io.github.rafaeljc.argus.eodpipeline.domain.Trigger;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import io.github.rafaeljc.argus.users.application.UserService;
 import io.github.rafaeljc.argus.users.application.port.UserRepository;
 import io.github.rafaeljc.argus.users.domain.User;
@@ -49,7 +50,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-@Import({PostgresContainer.class, AdminEodPipelineControllerIT.TestStubsConfig.class})
+@Import({PostgresContainer.class, RedisContainer.class, AdminEodPipelineControllerIT.TestStubsConfig.class})
 @AutoConfigureTestRestTemplate
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class AdminEodPipelineControllerIT {

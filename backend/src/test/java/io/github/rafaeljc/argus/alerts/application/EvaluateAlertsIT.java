@@ -18,6 +18,7 @@ import io.github.rafaeljc.argus.marketdata.application.port.MarketCalendar;
 import io.github.rafaeljc.argus.portfolio.application.port.PortfolioSnapshotRepository;
 import io.github.rafaeljc.argus.portfolio.domain.PortfolioSnapshot;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import io.github.rafaeljc.argus.users.application.UserService;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -32,7 +33,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-@Import(PostgresContainer.class)
+@Import({PostgresContainer.class, RedisContainer.class})
 @SpringBootTest
 class EvaluateAlertsIT {
 

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.github.rafaeljc.argus.marketdata.application.port.VendorPriceGateway;
 import io.github.rafaeljc.argus.marketdata.infrastructure.massive.MassivePriceGateway;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -14,7 +15,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 // Boots the real `prod` context. The datasource comes from the container via @ServiceConnection;
 // the ARGUS_DB_* values only exist so the prod placeholders resolve.
-@Import(PostgresContainer.class)
+@Import({PostgresContainer.class, RedisContainer.class})
 @SpringBootTest(
         properties = {
             "ARGUS_APP_BASE_URL=https://app.argus.example",

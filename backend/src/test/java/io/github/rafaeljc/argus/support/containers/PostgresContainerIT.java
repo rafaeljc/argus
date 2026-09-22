@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 @SpringBootTest
-@Import(PostgresContainer.class)
+@Import({PostgresContainer.class, RedisContainer.class})
 class PostgresContainerIT {
 
     @Autowired

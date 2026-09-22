@@ -20,6 +20,7 @@ import io.github.rafaeljc.argus.portfolio.application.port.HoldingRepository;
 import io.github.rafaeljc.argus.portfolio.application.port.PortfolioSnapshotRepository;
 import io.github.rafaeljc.argus.portfolio.domain.PortfolioSnapshot;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import io.github.rafaeljc.argus.users.application.UserService;
 import io.github.rafaeljc.argus.users.domain.User;
 import java.math.BigDecimal;
@@ -44,7 +45,7 @@ import org.springframework.http.ResponseEntity;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-@Import(PostgresContainer.class)
+@Import({PostgresContainer.class, RedisContainer.class})
 @AutoConfigureTestRestTemplate
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class PortfolioControllerIT {

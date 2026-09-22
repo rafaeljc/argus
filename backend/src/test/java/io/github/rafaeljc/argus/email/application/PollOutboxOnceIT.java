@@ -9,6 +9,7 @@ import io.github.rafaeljc.argus.email.application.port.OutboxRepository;
 import io.github.rafaeljc.argus.email.domain.EventType;
 import io.github.rafaeljc.argus.email.domain.OutboxMessage;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import java.time.Instant;
 import java.util.HashMap;
@@ -24,7 +25,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-@Import({PostgresContainer.class, PollOutboxOnceIT.TestStubsConfig.class})
+@Import({PostgresContainer.class, RedisContainer.class, PollOutboxOnceIT.TestStubsConfig.class})
 @SpringBootTest
 class PollOutboxOnceIT {
 

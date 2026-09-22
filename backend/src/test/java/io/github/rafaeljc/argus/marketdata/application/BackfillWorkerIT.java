@@ -14,6 +14,7 @@ import io.github.rafaeljc.argus.marketdata.domain.JobStatus;
 import io.github.rafaeljc.argus.marketdata.domain.PriceHistory;
 import io.github.rafaeljc.argus.marketdata.domain.Symbol;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -34,7 +35,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-@Import({PostgresContainer.class, BackfillWorkerIT.TestStubsConfig.class})
+@Import({PostgresContainer.class, RedisContainer.class, BackfillWorkerIT.TestStubsConfig.class})
 @SpringBootTest
 class BackfillWorkerIT {
 

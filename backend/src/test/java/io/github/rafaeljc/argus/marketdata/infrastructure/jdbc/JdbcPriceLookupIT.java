@@ -10,6 +10,7 @@ import io.github.rafaeljc.argus.marketdata.domain.Exchange;
 import io.github.rafaeljc.argus.marketdata.domain.PriceHistory;
 import io.github.rafaeljc.argus.marketdata.domain.Symbol;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -22,7 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 
-@Import(PostgresContainer.class)
+@Import({PostgresContainer.class, RedisContainer.class})
 @SpringBootTest
 class JdbcPriceLookupIT {
 

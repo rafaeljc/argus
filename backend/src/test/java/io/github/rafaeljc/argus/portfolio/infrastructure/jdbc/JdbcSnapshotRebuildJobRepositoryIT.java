@@ -9,6 +9,7 @@ import io.github.rafaeljc.argus.portfolio.application.port.SnapshotRebuildJobRep
 import io.github.rafaeljc.argus.portfolio.domain.RebuildJobStatus;
 import io.github.rafaeljc.argus.portfolio.domain.SnapshotRebuildJob;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
@@ -20,7 +21,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-@Import(PostgresContainer.class)
+@Import({PostgresContainer.class, RedisContainer.class})
 @SpringBootTest
 class JdbcSnapshotRebuildJobRepositoryIT {
 

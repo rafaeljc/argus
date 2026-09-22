@@ -17,6 +17,7 @@ import io.github.rafaeljc.argus.marketdata.application.port.SymbolRepository;
 import io.github.rafaeljc.argus.marketdata.domain.Exchange;
 import io.github.rafaeljc.argus.marketdata.domain.Symbol;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import io.github.rafaeljc.argus.transactions.application.TransactionService;
 import io.github.rafaeljc.argus.transactions.domain.Operation;
 import io.github.rafaeljc.argus.transactions.domain.Transaction;
@@ -48,7 +49,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-@Import(PostgresContainer.class)
+@Import({PostgresContainer.class, RedisContainer.class})
 @AutoConfigureTestRestTemplate
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class TransactionControllerIT {
