@@ -7,6 +7,10 @@ spring:
       - org.springframework.boot.jdbc.autoconfigure.DataSourceTransactionManagerAutoConfiguration
       - org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration
       - org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration
+      - org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration
+      - org.springframework.boot.data.redis.autoconfigure.health.DataRedisHealthContributorAutoConfiguration
+      - org.springframework.boot.session.autoconfigure.SessionAutoConfiguration
+      - org.springframework.boot.session.data.redis.autoconfigure.SessionDataRedisAutoConfiguration
 
 # Override the production readiness group: in no-db tests, the 'db' health contributor isn't
 # registered (DataSource autoconfig is excluded) and referencing it would fail startup.

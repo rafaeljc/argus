@@ -3,34 +3,26 @@ package io.github.rafaeljc.argus.transactions.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.github.f4b6a3.uuid.UuidCreator;
-import io.github.rafaeljc.argus.auth.application.port.SessionRepository;
-import io.github.rafaeljc.argus.auth.domain.Session;
-import io.github.rafaeljc.argus.auth.web.CsrfCookieFactory;
-import io.github.rafaeljc.argus.auth.web.SessionCookieFactory;
 import io.github.rafaeljc.argus.common.domain.Quantity;
 import io.github.rafaeljc.argus.common.domain.ResourceNotFoundException;
-import io.github.rafaeljc.argus.common.domain.SessionId;
 import io.github.rafaeljc.argus.common.domain.Ticker;
 import io.github.rafaeljc.argus.marketdata.application.port.BackfillJobRepository;
 import io.github.rafaeljc.argus.marketdata.application.port.SymbolRepository;
 import io.github.rafaeljc.argus.marketdata.domain.Exchange;
 import io.github.rafaeljc.argus.marketdata.domain.Symbol;
+import io.github.rafaeljc.argus.support.auth.TestLogin;
+import io.github.rafaeljc.argus.support.auth.TestSession;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
 import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import io.github.rafaeljc.argus.transactions.application.TransactionService;
 import io.github.rafaeljc.argus.transactions.domain.Operation;
 import io.github.rafaeljc.argus.transactions.domain.Transaction;
 import io.github.rafaeljc.argus.users.application.UserService;
-import io.github.rafaeljc.argus.users.domain.User;
+import io.github.rafaeljc.argus.users.application.port.UserRepository;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.HexFormat;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,8 +48,6 @@ class TransactionControllerIT {
 
     private static final ZoneId ZONE = ZoneId.of("America/New_York");
     private static final String ENDPOINT = "/api/v1/transactions";
-    private static final String PASSWORD = "correct horse battery staple";
-    private static final String CSRF_VALUE = "transactions-it-csrf-token";
     private static final Ticker AAPL = new Ticker("AAPL");
     private static final Instant SYMBOL_NOW = Instant.parse("2026-01-01T00:00:00Z");
 
@@ -74,7 +64,7 @@ class TransactionControllerIT {
     private UserService userService;
 
     @Autowired
-    private SessionRepository sessionRepository;
+    private UserRepository userRepository;
 
     @Autowired
     private SymbolRepository symbolRepository;
@@ -88,15 +78,18 @@ class TransactionControllerIT {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    private TestLogin testLogin;
+
     @BeforeEach
-    void seedAaplSymbol() {
+    void setUp() {
+        testLogin = new TestLogin(userService, userRepository, http, port);
         symbolRepository.save(
                 new Symbol(AAPL, Exchange.NASDAQ, "Apple Inc.", false, SYMBOL_NOW, SYMBOL_NOW, SYMBOL_NOW));
     }
 
     @Test
     void postTransactions_validBuy_returns201WithLocationAndEnvelope() throws Exception {
-        User user = seedVerified("alice@example.com");
+        TestSession user = testLogin.login("alice@example.com");
         LocalDate tradeDate = today().minusDays(1);
 
         ResponseEntity<String> response = post(user, transactionBody("AAPL", "BUY", "10", tradeDate));
@@ -116,10 +109,10 @@ class TransactionControllerIT {
 
     @Test
     void postTransactions_validSellWithPriorBuy_returns201() {
-        User user = seedVerified("bob@example.com");
+        TestSession user = testLogin.login("bob@example.com");
         LocalDate buyDate = today().minusDays(10);
         LocalDate sellDate = today().minusDays(1);
-        transactionService.record(user.id(), AAPL, Operation.BUY, new Quantity(new BigDecimal("10")), buyDate);
+        transactionService.record(user.userId(), AAPL, Operation.BUY, new Quantity(new BigDecimal("10")), buyDate);
 
         ResponseEntity<String> response = post(user, transactionBody("AAPL", "SELL", "4", sellDate));
 
@@ -128,7 +121,7 @@ class TransactionControllerIT {
 
     @Test
     void postTransactions_oversell_returns422InsufficientHoldings() throws Exception {
-        User user = seedVerified("carol@example.com");
+        TestSession user = testLogin.login("carol@example.com");
 
         ResponseEntity<String> response = post(user, transactionBody("AAPL", "SELL", "5", today().minusDays(1)));
 
@@ -138,7 +131,7 @@ class TransactionControllerIT {
 
     @Test
     void postTransactions_futureDate_returns422TradeDateFuture() throws Exception {
-        User user = seedVerified("dave@example.com");
+        TestSession user = testLogin.login("dave@example.com");
 
         ResponseEntity<String> response = post(user, transactionBody("AAPL", "BUY", "10", today().plusDays(1)));
 
@@ -148,7 +141,7 @@ class TransactionControllerIT {
 
     @Test
     void postTransactions_unknownTicker_returns422TickerNotFound() throws Exception {
-        User user = seedVerified("erin@example.com");
+        TestSession user = testLogin.login("erin@example.com");
 
         ResponseEntity<String> response = post(user, transactionBody("ZZZZ", "BUY", "10", today().minusDays(1)));
 
@@ -158,7 +151,7 @@ class TransactionControllerIT {
 
     @Test
     void postTransactions_delistedBuy_returns422TickerDelisted() throws Exception {
-        User user = seedVerified("frank@example.com");
+        TestSession user = testLogin.login("frank@example.com");
         symbolRepository.save(new Symbol(new Ticker("GE"), Exchange.NYSE, "GE (delisted)", true,
                 SYMBOL_NOW, SYMBOL_NOW, SYMBOL_NOW));
 
@@ -170,7 +163,7 @@ class TransactionControllerIT {
 
     @Test
     void postTransactions_missingQuantity_returns422ValidationErrorWithQuantityField() throws Exception {
-        User user = seedVerified("gina@example.com");
+        TestSession user = testLogin.login("gina@example.com");
         String body = "{\"ticker\":\"AAPL\",\"operation\":\"BUY\",\"trade_date\":\"" + today().minusDays(1) + "\"}";
 
         ResponseEntity<String> response = post(user, body);
@@ -183,7 +176,7 @@ class TransactionControllerIT {
 
     @Test
     void postTransactions_invalidOperationString_returns400MalformedRequest() throws Exception {
-        User user = seedVerified("heidi@example.com");
+        TestSession user = testLogin.login("heidi@example.com");
         String body = "{\"ticker\":\"AAPL\",\"operation\":\"HOLD\",\"quantity\":\"10\",\"trade_date\":\""
                 + today().minusDays(1) + "\"}";
 
@@ -195,7 +188,7 @@ class TransactionControllerIT {
 
     @Test
     void postTransactions_newTicker_enqueuesBackfillExactlyOnce() {
-        User user = seedVerified("ivan@example.com");
+        TestSession user = testLogin.login("ivan@example.com");
         Ticker newTicker = new Ticker("NEWCO");
         symbolRepository.save(
                 new Symbol(newTicker, Exchange.NASDAQ, "New Co", false, SYMBOL_NOW, SYMBOL_NOW, SYMBOL_NOW));
@@ -214,10 +207,10 @@ class TransactionControllerIT {
 
     @Test
     void getTransactions_authenticated_returnsOwnedPageWithEnvelope() throws Exception {
-        User user = seedVerified("judy@example.com");
-        transactionService.record(user.id(), AAPL, Operation.BUY, new Quantity(new BigDecimal("10")),
+        TestSession user = testLogin.login("judy@example.com");
+        transactionService.record(user.userId(), AAPL, Operation.BUY, new Quantity(new BigDecimal("10")),
                 today().minusDays(2));
-        transactionService.record(user.id(), AAPL, Operation.BUY, new Quantity(new BigDecimal("5")),
+        transactionService.record(user.userId(), AAPL, Operation.BUY, new Quantity(new BigDecimal("5")),
                 today().minusDays(1));
 
         ResponseEntity<String> response = get(user, "");
@@ -239,7 +232,7 @@ class TransactionControllerIT {
 
     @Test
     void getTransactions_empty_returnsEmptyDataWithZeroMeta() throws Exception {
-        User user = seedVerified("kevin@example.com");
+        TestSession user = testLogin.login("kevin@example.com");
 
         ResponseEntity<String> response = get(user, "");
 
@@ -254,12 +247,12 @@ class TransactionControllerIT {
 
     @Test
     void getTransactions_perPageOne_secondPage_setsNextPrevLast() throws Exception {
-        User user = seedVerified("laura@example.com");
-        transactionService.record(user.id(), AAPL, Operation.BUY, new Quantity(new BigDecimal("1")),
+        TestSession user = testLogin.login("laura@example.com");
+        transactionService.record(user.userId(), AAPL, Operation.BUY, new Quantity(new BigDecimal("1")),
                 today().minusDays(3));
-        transactionService.record(user.id(), AAPL, Operation.BUY, new Quantity(new BigDecimal("1")),
+        transactionService.record(user.userId(), AAPL, Operation.BUY, new Quantity(new BigDecimal("1")),
                 today().minusDays(2));
-        transactionService.record(user.id(), AAPL, Operation.BUY, new Quantity(new BigDecimal("1")),
+        transactionService.record(user.userId(), AAPL, Operation.BUY, new Quantity(new BigDecimal("1")),
                 today().minusDays(1));
 
         ResponseEntity<String> response = get(user, "?page=2&per_page=1");
@@ -279,11 +272,11 @@ class TransactionControllerIT {
 
     @Test
     void getTransactions_onlyReturnsCallersTransactions() throws Exception {
-        User owner = seedVerified("mike@example.com");
-        User other = seedVerified("nina@example.com");
-        transactionService.record(owner.id(), AAPL, Operation.BUY, new Quantity(new BigDecimal("10")),
+        TestSession owner = testLogin.login("mike@example.com");
+        TestSession other = testLogin.login("nina@example.com");
+        transactionService.record(owner.userId(), AAPL, Operation.BUY, new Quantity(new BigDecimal("10")),
                 today().minusDays(1));
-        transactionService.record(other.id(), AAPL, Operation.BUY, new Quantity(new BigDecimal("20")),
+        transactionService.record(other.userId(), AAPL, Operation.BUY, new Quantity(new BigDecimal("20")),
                 today().minusDays(1));
 
         ResponseEntity<String> response = get(owner, "");
@@ -295,7 +288,7 @@ class TransactionControllerIT {
 
     @Test
     void getTransactions_perPageAboveMax_returns422() throws Exception {
-        User user = seedVerified("oscar@example.com");
+        TestSession user = testLogin.login("oscar@example.com");
 
         ResponseEntity<String> response = get(user, "?per_page=201");
 
@@ -307,7 +300,7 @@ class TransactionControllerIT {
 
     @Test
     void getTransactions_pageAboveMax_returns422() throws Exception {
-        User user = seedVerified("oliver@example.com");
+        TestSession user = testLogin.login("oliver@example.com");
 
         ResponseEntity<String> response = get(user, "?page=100001");
 
@@ -319,7 +312,7 @@ class TransactionControllerIT {
 
     @Test
     void getTransactions_perPageNonNumeric_returns400() throws Exception {
-        User user = seedVerified("peggy@example.com");
+        TestSession user = testLogin.login("peggy@example.com");
 
         ResponseEntity<String> response = get(user, "?per_page=abc");
 
@@ -329,8 +322,8 @@ class TransactionControllerIT {
 
     @Test
     void getTransaction_owned_returns200WithEnvelope() throws Exception {
-        User user = seedVerified("quentin@example.com");
-        Transaction saved = transactionService.record(user.id(), AAPL, Operation.BUY,
+        TestSession user = testLogin.login("quentin@example.com");
+        Transaction saved = transactionService.record(user.userId(), AAPL, Operation.BUY,
                 new Quantity(new BigDecimal("10")), today().minusDays(1));
 
         ResponseEntity<String> response = get(user, "/" + saved.id().value());
@@ -343,9 +336,9 @@ class TransactionControllerIT {
 
     @Test
     void getTransaction_otherUsersTransaction_returns404() throws Exception {
-        User owner = seedVerified("rachel@example.com");
-        User other = seedVerified("steve@example.com");
-        Transaction saved = transactionService.record(owner.id(), AAPL, Operation.BUY,
+        TestSession owner = testLogin.login("rachel@example.com");
+        TestSession other = testLogin.login("steve@example.com");
+        Transaction saved = transactionService.record(owner.userId(), AAPL, Operation.BUY,
                 new Quantity(new BigDecimal("10")), today().minusDays(1));
 
         ResponseEntity<String> response = get(other, "/" + saved.id().value());
@@ -356,7 +349,7 @@ class TransactionControllerIT {
 
     @Test
     void getTransaction_unknownId_returns404() throws Exception {
-        User user = seedVerified("tina@example.com");
+        TestSession user = testLogin.login("tina@example.com");
 
         ResponseEntity<String> response = get(user, "/" + UUID.randomUUID());
 
@@ -366,8 +359,8 @@ class TransactionControllerIT {
 
     @Test
     void patchTransaction_quantityEdit_returns200WithUpdatedQuantity() throws Exception {
-        User user = seedVerified("uma@example.com");
-        Transaction saved = transactionService.record(user.id(), AAPL, Operation.BUY,
+        TestSession user = testLogin.login("uma@example.com");
+        Transaction saved = transactionService.record(user.userId(), AAPL, Operation.BUY,
                 new Quantity(new BigDecimal("10")), today().minusDays(1));
 
         ResponseEntity<String> response = patch(user, saved.id().value(), "{\"quantity\":\"7\"}");
@@ -381,9 +374,9 @@ class TransactionControllerIT {
 
     @Test
     void patchTransaction_tradeDateEdit_returns200WithUpdatedTradeDate() throws Exception {
-        User user = seedVerified("victor@example.com");
+        TestSession user = testLogin.login("victor@example.com");
         LocalDate originalDate = today().minusDays(5);
-        Transaction saved = transactionService.record(user.id(), AAPL, Operation.BUY,
+        Transaction saved = transactionService.record(user.userId(), AAPL, Operation.BUY,
                 new Quantity(new BigDecimal("10")), originalDate);
         LocalDate newDate = today().minusDays(2);
 
@@ -396,10 +389,10 @@ class TransactionControllerIT {
 
     @Test
     void patchTransaction_wouldInvalidateLaterSell_returns422ValidationErrorWithSellDetails() throws Exception {
-        User user = seedVerified("wendy@example.com");
-        Transaction buy = transactionService.record(user.id(), AAPL, Operation.BUY,
+        TestSession user = testLogin.login("wendy@example.com");
+        Transaction buy = transactionService.record(user.userId(), AAPL, Operation.BUY,
                 new Quantity(new BigDecimal("10")), today().minusDays(10));
-        Transaction sell = transactionService.record(user.id(), AAPL, Operation.SELL,
+        Transaction sell = transactionService.record(user.userId(), AAPL, Operation.SELL,
                 new Quantity(new BigDecimal("8")), today().minusDays(1));
 
         ResponseEntity<String> response = patch(user, buy.id().value(), "{\"quantity\":\"5\"}");
@@ -415,10 +408,10 @@ class TransactionControllerIT {
 
     @Test
     void patchTransaction_selfOversell_returns422InsufficientHoldings() throws Exception {
-        User user = seedVerified("xavier@example.com");
-        transactionService.record(user.id(), AAPL, Operation.BUY,
+        TestSession user = testLogin.login("xavier@example.com");
+        transactionService.record(user.userId(), AAPL, Operation.BUY,
                 new Quantity(new BigDecimal("10")), today().minusDays(5));
-        Transaction sell = transactionService.record(user.id(), AAPL, Operation.SELL,
+        Transaction sell = transactionService.record(user.userId(), AAPL, Operation.SELL,
                 new Quantity(new BigDecimal("5")), today().minusDays(1));
 
         ResponseEntity<String> response = patch(user, sell.id().value(), "{\"quantity\":\"50\"}");
@@ -429,8 +422,8 @@ class TransactionControllerIT {
 
     @Test
     void patchTransaction_futureDate_returns422TradeDateFuture() throws Exception {
-        User user = seedVerified("yolanda@example.com");
-        Transaction saved = transactionService.record(user.id(), AAPL, Operation.BUY,
+        TestSession user = testLogin.login("yolanda@example.com");
+        Transaction saved = transactionService.record(user.userId(), AAPL, Operation.BUY,
                 new Quantity(new BigDecimal("10")), today().minusDays(1));
 
         ResponseEntity<String> response = patch(
@@ -442,9 +435,9 @@ class TransactionControllerIT {
 
     @Test
     void patchTransaction_notOwned_returns404() throws Exception {
-        User owner = seedVerified("zack@example.com");
-        User other = seedVerified("amy@example.com");
-        Transaction saved = transactionService.record(owner.id(), AAPL, Operation.BUY,
+        TestSession owner = testLogin.login("zack@example.com");
+        TestSession other = testLogin.login("amy@example.com");
+        Transaction saved = transactionService.record(owner.userId(), AAPL, Operation.BUY,
                 new Quantity(new BigDecimal("10")), today().minusDays(1));
 
         ResponseEntity<String> response = patch(other, saved.id().value(), "{\"quantity\":\"5\"}");
@@ -455,23 +448,23 @@ class TransactionControllerIT {
 
     @Test
     void deleteTransaction_noLaterSellDependency_returns204() {
-        User user = seedVerified("bruce@example.com");
-        Transaction saved = transactionService.record(user.id(), AAPL, Operation.BUY,
+        TestSession user = testLogin.login("bruce@example.com");
+        Transaction saved = transactionService.record(user.userId(), AAPL, Operation.BUY,
                 new Quantity(new BigDecimal("10")), today().minusDays(1));
 
         ResponseEntity<String> response = delete(user, saved.id().value());
 
         assertThat(response.getStatusCode().value()).isEqualTo(204);
-        assertThatThrownBy(() -> transactionService.get(user.id(), saved.id()))
+        assertThatThrownBy(() -> transactionService.get(user.userId(), saved.id()))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test
     void deleteTransaction_removesBuyWithDependentLaterSell_returns422() throws Exception {
-        User user = seedVerified("carla@example.com");
-        Transaction buy = transactionService.record(user.id(), AAPL, Operation.BUY,
+        TestSession user = testLogin.login("carla@example.com");
+        Transaction buy = transactionService.record(user.userId(), AAPL, Operation.BUY,
                 new Quantity(new BigDecimal("10")), today().minusDays(10));
-        Transaction sell = transactionService.record(user.id(), AAPL, Operation.SELL,
+        Transaction sell = transactionService.record(user.userId(), AAPL, Operation.SELL,
                 new Quantity(new BigDecimal("8")), today().minusDays(1));
 
         ResponseEntity<String> response = delete(user, buy.id().value());
@@ -484,9 +477,9 @@ class TransactionControllerIT {
 
     @Test
     void deleteTransaction_notOwned_returns404() {
-        User owner = seedVerified("dan@example.com");
-        User other = seedVerified("eve@example.com");
-        Transaction saved = transactionService.record(owner.id(), AAPL, Operation.BUY,
+        TestSession owner = testLogin.login("dan@example.com");
+        TestSession other = testLogin.login("eve@example.com");
+        Transaction saved = transactionService.record(owner.userId(), AAPL, Operation.BUY,
                 new Quantity(new BigDecimal("10")), today().minusDays(1));
 
         ResponseEntity<String> response = delete(other, saved.id().value());
@@ -497,8 +490,8 @@ class TransactionControllerIT {
 
     @Test
     void deleteTransaction_alreadyDeleted_returns404() {
-        User user = seedVerified("felix@example.com");
-        Transaction saved = transactionService.record(user.id(), AAPL, Operation.BUY,
+        TestSession user = testLogin.login("felix@example.com");
+        Transaction saved = transactionService.record(user.userId(), AAPL, Operation.BUY,
                 new Quantity(new BigDecimal("10")), today().minusDays(1));
         delete(user, saved.id().value());
 
@@ -521,18 +514,9 @@ class TransactionControllerIT {
                 + "\"quantity\":\"" + quantity + "\",\"trade_date\":\"" + tradeDate + "\"}";
     }
 
-    private User seedVerified(String email) {
-        User u = userService.createUnverified(email, PASSWORD);
-        return userService.markVerified(u.id());
-    }
-
-    private ResponseEntity<String> post(User authenticatedAs, String jsonBody) {
+    private ResponseEntity<String> post(TestSession authenticatedAs, String jsonBody) {
         HttpHeaders headers = new HttpHeaders();
-        String sessionToken = seedSession(authenticatedAs);
-        headers.add(HttpHeaders.COOKIE,
-                SessionCookieFactory.COOKIE_NAME + "=" + sessionToken
-                        + "; " + CsrfCookieFactory.COOKIE_NAME + "=" + CSRF_VALUE);
-        headers.add("X-CSRF-Token", CSRF_VALUE);
+        headers.addAll(authenticatedAs.headers());
         headers.setContentType(MediaType.APPLICATION_JSON);
         return http.exchange(
                 "http://localhost:" + port + ENDPOINT,
@@ -541,24 +525,17 @@ class TransactionControllerIT {
                 String.class);
     }
 
-    private ResponseEntity<String> get(User authenticatedAs, String pathAndQuery) {
-        HttpHeaders headers = new HttpHeaders();
-        String sessionToken = seedSession(authenticatedAs);
-        headers.add(HttpHeaders.COOKIE, SessionCookieFactory.COOKIE_NAME + "=" + sessionToken);
+    private ResponseEntity<String> get(TestSession authenticatedAs, String pathAndQuery) {
         return http.exchange(
                 "http://localhost:" + port + ENDPOINT + pathAndQuery,
                 HttpMethod.GET,
-                new HttpEntity<>(headers),
+                new HttpEntity<>(authenticatedAs.headers()),
                 String.class);
     }
 
-    private ResponseEntity<String> patch(User authenticatedAs, UUID id, String jsonBody) {
+    private ResponseEntity<String> patch(TestSession authenticatedAs, UUID id, String jsonBody) {
         HttpHeaders headers = new HttpHeaders();
-        String sessionToken = seedSession(authenticatedAs);
-        headers.add(HttpHeaders.COOKIE,
-                SessionCookieFactory.COOKIE_NAME + "=" + sessionToken
-                        + "; " + CsrfCookieFactory.COOKIE_NAME + "=" + CSRF_VALUE);
-        headers.add("X-CSRF-Token", CSRF_VALUE);
+        headers.addAll(authenticatedAs.headers());
         headers.setContentType(MediaType.APPLICATION_JSON);
         return http.exchange(
                 "http://localhost:" + port + ENDPOINT + "/" + id,
@@ -567,41 +544,11 @@ class TransactionControllerIT {
                 String.class);
     }
 
-    private ResponseEntity<String> delete(User authenticatedAs, UUID id) {
-        HttpHeaders headers = new HttpHeaders();
-        String sessionToken = seedSession(authenticatedAs);
-        headers.add(HttpHeaders.COOKIE,
-                SessionCookieFactory.COOKIE_NAME + "=" + sessionToken
-                        + "; " + CsrfCookieFactory.COOKIE_NAME + "=" + CSRF_VALUE);
-        headers.add("X-CSRF-Token", CSRF_VALUE);
+    private ResponseEntity<String> delete(TestSession authenticatedAs, UUID id) {
         return http.exchange(
                 "http://localhost:" + port + ENDPOINT + "/" + id,
                 HttpMethod.DELETE,
-                new HttpEntity<>(headers),
+                new HttpEntity<>(authenticatedAs.headers()),
                 String.class);
-    }
-
-    private String seedSession(User user) {
-        String token = "transactions-it-session-" + UuidCreator.getTimeOrderedEpoch();
-        Instant now = Instant.now();
-        sessionRepository.save(new Session(
-                new SessionId(UuidCreator.getTimeOrderedEpoch()),
-                user.id(),
-                sha256Hex(token),
-                "10.0.0.1",
-                "IT-Agent",
-                now,
-                now.plus(Duration.ofDays(30)),
-                now));
-        return token;
-    }
-
-    private static String sha256Hex(String value) {
-        try {
-            byte[] hash = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
     }
 }

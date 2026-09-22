@@ -78,7 +78,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private static Optional<String> currentUserId() {
         // Authentication.getName() is the framework-level accessor for the principal's stable
-        // identifier; SessionAuthenticationToken overrides it to return the user id. Reading
+        // identifier; the login-time principal returns the user id from it. Reading
         // through this contract keeps the filter free of auth-module imports.
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) {

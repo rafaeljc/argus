@@ -7,26 +7,21 @@ import io.github.rafaeljc.argus.alerts.application.port.AlertFiringRepository;
 import io.github.rafaeljc.argus.alerts.domain.AlertFiring;
 import io.github.rafaeljc.argus.alerts.domain.AlertLookbackWindow;
 import io.github.rafaeljc.argus.alerts.domain.Direction;
-import io.github.rafaeljc.argus.auth.application.port.SessionRepository;
-import io.github.rafaeljc.argus.auth.domain.Session;
-import io.github.rafaeljc.argus.auth.web.SessionCookieFactory;
 import io.github.rafaeljc.argus.common.domain.FiringId;
 import io.github.rafaeljc.argus.common.domain.Money;
 import io.github.rafaeljc.argus.common.domain.Percentage;
 import io.github.rafaeljc.argus.common.domain.RuleId;
-import io.github.rafaeljc.argus.common.domain.SessionId;
 import io.github.rafaeljc.argus.common.domain.UserId;
+import io.github.rafaeljc.argus.support.auth.TestLogin;
+import io.github.rafaeljc.argus.support.auth.TestSession;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
 import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import io.github.rafaeljc.argus.users.application.UserService;
-import io.github.rafaeljc.argus.users.domain.User;
+import io.github.rafaeljc.argus.users.application.port.UserRepository;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.HexFormat;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.TestRestTemplate;
@@ -35,7 +30,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import tools.jackson.databind.JsonNode;
@@ -47,7 +41,6 @@ import tools.jackson.databind.ObjectMapper;
 class AlertFiringControllerIT {
 
     private static final String ENDPOINT = "/api/v1/alert-firings";
-    private static final String PASSWORD = "correct horse battery staple";
 
     @LocalServerPort
     private int port;
@@ -62,16 +55,23 @@ class AlertFiringControllerIT {
     private UserService userService;
 
     @Autowired
-    private SessionRepository sessionRepository;
+    private UserRepository userRepository;
 
     @Autowired
     private AlertFiringRepository firingRepository;
 
+    private TestLogin testLogin;
+
+    @BeforeEach
+    void setUp() {
+        testLogin = new TestLogin(userService, userRepository, http, port);
+    }
+
     @Test
     void getAlertFirings_authenticated_returnsOwnedPageWithEnvelope() throws Exception {
-        User user = seedVerified("alice-firing@example.com");
-        seedFiring(user.id(), Instant.parse("2026-01-01T00:00:00Z"));
-        seedFiring(user.id(), Instant.parse("2026-02-01T00:00:00Z"));
+        TestSession user = testLogin.login("alice-firing@example.com");
+        seedFiring(user.userId(), Instant.parse("2026-01-01T00:00:00Z"));
+        seedFiring(user.userId(), Instant.parse("2026-02-01T00:00:00Z"));
 
         ResponseEntity<String> response = get(user, "");
 
@@ -91,9 +91,9 @@ class AlertFiringControllerIT {
 
     @Test
     void getAlertFirings_ordersNewestFirst() throws Exception {
-        User user = seedVerified("bob-firing@example.com");
-        AlertFiring oldest = seedFiring(user.id(), Instant.parse("2026-01-01T00:00:00Z"));
-        AlertFiring newest = seedFiring(user.id(), Instant.parse("2026-03-01T00:00:00Z"));
+        TestSession user = testLogin.login("bob-firing@example.com");
+        AlertFiring oldest = seedFiring(user.userId(), Instant.parse("2026-01-01T00:00:00Z"));
+        AlertFiring newest = seedFiring(user.userId(), Instant.parse("2026-03-01T00:00:00Z"));
 
         ResponseEntity<String> response = get(user, "");
 
@@ -104,7 +104,7 @@ class AlertFiringControllerIT {
 
     @Test
     void getAlertFirings_empty_returnsEmptyDataWithZeroMeta() throws Exception {
-        User user = seedVerified("carol-firing@example.com");
+        TestSession user = testLogin.login("carol-firing@example.com");
 
         ResponseEntity<String> response = get(user, "");
 
@@ -119,10 +119,10 @@ class AlertFiringControllerIT {
 
     @Test
     void getAlertFirings_perPageOne_secondPage_setsNextPrevLast() throws Exception {
-        User user = seedVerified("dave-firing@example.com");
-        seedFiring(user.id(), Instant.parse("2026-01-01T00:00:00Z"));
-        seedFiring(user.id(), Instant.parse("2026-02-01T00:00:00Z"));
-        seedFiring(user.id(), Instant.parse("2026-03-01T00:00:00Z"));
+        TestSession user = testLogin.login("dave-firing@example.com");
+        seedFiring(user.userId(), Instant.parse("2026-01-01T00:00:00Z"));
+        seedFiring(user.userId(), Instant.parse("2026-02-01T00:00:00Z"));
+        seedFiring(user.userId(), Instant.parse("2026-03-01T00:00:00Z"));
 
         ResponseEntity<String> response = get(user, "?page=2&per_page=1");
 
@@ -141,10 +141,10 @@ class AlertFiringControllerIT {
 
     @Test
     void getAlertFirings_onlyReturnsCallersFirings() throws Exception {
-        User owner = seedVerified("erin-firing@example.com");
-        User other = seedVerified("frank-firing@example.com");
-        seedFiring(owner.id(), Instant.parse("2026-01-01T00:00:00Z"));
-        seedFiring(other.id(), Instant.parse("2026-01-01T00:00:00Z"));
+        TestSession owner = testLogin.login("erin-firing@example.com");
+        TestSession other = testLogin.login("frank-firing@example.com");
+        seedFiring(owner.userId(), Instant.parse("2026-01-01T00:00:00Z"));
+        seedFiring(other.userId(), Instant.parse("2026-01-01T00:00:00Z"));
 
         ResponseEntity<String> response = get(owner, "");
 
@@ -154,7 +154,7 @@ class AlertFiringControllerIT {
 
     @Test
     void getAlertFirings_perPageAboveMax_returns422() throws Exception {
-        User user = seedVerified("grace-firing@example.com");
+        TestSession user = testLogin.login("grace-firing@example.com");
 
         ResponseEntity<String> response = get(user, "?per_page=201");
 
@@ -166,8 +166,8 @@ class AlertFiringControllerIT {
 
     @Test
     void getAlertFirings_responseFields_matchContractShape() throws Exception {
-        User user = seedVerified("heidi-firing@example.com");
-        AlertFiring saved = seedFiring(user.id(), Instant.parse("2026-01-01T00:00:00Z"));
+        TestSession user = testLogin.login("heidi-firing@example.com");
+        AlertFiring saved = seedFiring(user.userId(), Instant.parse("2026-01-01T00:00:00Z"));
 
         ResponseEntity<String> response = get(user, "");
 
@@ -178,11 +178,6 @@ class AlertFiringControllerIT {
         assertThat(item.get("direction").asString()).isEqualTo("UP");
         assertThat(item.get("portfolio_value_start").asString()).isEqualTo("1000.00");
         assertThat(item.get("portfolio_value_end").asString()).isEqualTo("1050.00");
-    }
-
-    private User seedVerified(String email) {
-        User u = userService.createUnverified(email, PASSWORD);
-        return userService.markVerified(u.id());
     }
 
     private AlertFiring seedFiring(UserId userId, Instant firedAt) {
@@ -201,38 +196,11 @@ class AlertFiringControllerIT {
                 LocalDate.parse("2026-01-01")));
     }
 
-    private ResponseEntity<String> get(User authenticatedAs, String pathAndQuery) {
-        HttpHeaders headers = new HttpHeaders();
-        String sessionToken = seedSession(authenticatedAs);
-        headers.add(HttpHeaders.COOKIE, SessionCookieFactory.COOKIE_NAME + "=" + sessionToken);
+    private ResponseEntity<String> get(TestSession authenticatedAs, String pathAndQuery) {
         return http.exchange(
                 "http://localhost:" + port + ENDPOINT + pathAndQuery,
                 HttpMethod.GET,
-                new HttpEntity<>(headers),
+                new HttpEntity<>(authenticatedAs.headers()),
                 String.class);
-    }
-
-    private String seedSession(User user) {
-        String token = "alert-firings-it-session-" + UuidCreator.getTimeOrderedEpoch();
-        Instant now = Instant.now();
-        sessionRepository.save(new Session(
-                new SessionId(UuidCreator.getTimeOrderedEpoch()),
-                user.id(),
-                sha256Hex(token),
-                "10.0.0.1",
-                "IT-Agent",
-                now,
-                now.plus(Duration.ofDays(30)),
-                now));
-        return token;
-    }
-
-    private static String sha256Hex(String value) {
-        try {
-            byte[] hash = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
     }
 }

@@ -5,9 +5,11 @@ import io.github.rafaeljc.argus.users.application.event.UserSuspended;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-// Runs synchronously inside UserLifecycleService.suspend's transaction: the suspended user's
-// sessions are dropped in the same unit of work as the users-row flip, so a rollback of one
-// rolls back the other and the browser's next request can no longer resolve a principal.
+// Runs synchronously inside UserLifecycleService.suspend's transaction, before commit: the
+// suspended user's Redis sessions are dropped before the Postgres row flip commits. A Redis
+// failure here rolls the suspend back; a later Postgres rollback only costs the user an extra
+// re-login. AccountStateGateFilter re-checks state on every request regardless, so even a
+// session that survives past this point is rejected on its next use.
 @Component
 public class InvalidateSessionsOnUserSuspended {
 

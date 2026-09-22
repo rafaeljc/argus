@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 // Cross-origin browser posture for a deployment that splits the SPA and the API across two
 // hosts. Both knobs are optional: blank means same-origin (local profile, every *IT) and leaves
-// CORS unregistered and the CSRF cookie host-only — see SecurityConfig and CsrfCookieFactory. A
+// CORS unregistered and the CSRF cookie host-only — see SecurityConfig. A
 // non-blank value must be well-formed at boot, not discovered later as a silent CORS/cookie
 // mismatch in production.
 @ConfigurationProperties("argus.web")

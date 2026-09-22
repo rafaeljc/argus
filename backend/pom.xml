@@ -39,6 +39,10 @@
 		<jacoco.version>0.8.13</jacoco.version>
 		<jacoco.line.coverage>0.80</jacoco.line.coverage>
 		<jacoco.branch.coverage>0.70</jacoco.branch.coverage>
+		<!-- Activates application-test.yaml for every test JVM (unit and integration). A test
+		     class that needs a different profile (@ActiveProfiles("prod"/"no-db"/etc.)) overrides
+		     this for its own context. -->
+		<test.spring.profiles.active>test</test.spring.profiles.active>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -199,6 +203,16 @@
 
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<systemPropertyVariables>
+						<spring.profiles.active>${test.spring.profiles.active}</spring.profiles.active>
+					</systemPropertyVariables>
+				</configuration>
+			</plugin>
+
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-failsafe-plugin</artifactId>
 				<executions>
 					<execution>
@@ -212,6 +226,9 @@
 					<includes>
 						<include>**/*IT.java</include>
 					</includes>
+					<systemPropertyVariables>
+						<spring.profiles.active>${test.spring.profiles.active}</spring.profiles.active>
+					</systemPropertyVariables>
 				</configuration>
 			</plugin>
 

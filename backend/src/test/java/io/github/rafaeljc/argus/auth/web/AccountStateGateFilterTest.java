@@ -10,7 +10,6 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.github.f4b6a3.uuid.UuidCreator;
-import io.github.rafaeljc.argus.common.domain.SessionId;
 import io.github.rafaeljc.argus.common.domain.SessionRequiredException;
 import io.github.rafaeljc.argus.common.domain.UserId;
 import io.github.rafaeljc.argus.users.application.UserService;
@@ -19,6 +18,8 @@ import io.github.rafaeljc.argus.users.domain.EmailNotVerifiedException;
 import io.github.rafaeljc.argus.users.domain.User;
 import jakarta.servlet.FilterChain;
 import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
@@ -155,11 +157,10 @@ class AccountStateGateFilterTest {
     }
 
     private UserId authenticate() {
-        UserId userId = new UserId(UuidCreator.getTimeOrderedEpoch());
-        SessionId sessionId = new SessionId(UuidCreator.getTimeOrderedEpoch());
+        UUID id = UuidCreator.getTimeOrderedEpoch();
         SecurityContextHolder.getContext().setAuthentication(
-                new SessionAuthenticationToken(userId, sessionId));
-        return userId;
+                new UsernamePasswordAuthenticationToken(new AuthenticatedUser(id), null, List.of()));
+        return new UserId(id);
     }
 
     private static User user(UserId id, boolean verified, boolean suspended, boolean deleted) {

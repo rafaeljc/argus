@@ -18,12 +18,31 @@ spring:
   datasource:
     hikari:
       pool-name: argus-pool
+  data:
+    redis:
+      # Lettuce defaults to a 60s command timeout, which would pin a Tomcat request thread for a
+      # minute on a stalled Redis before the request fails. Short-circuit well inside that.
+      timeout: 2s
+      connect-timeout: 2s
+      repositories:
+        # Only Spring Session's own repository (FindByIndexNameSessionRepository) is used; the
+        # generic @RedisHash repository-scanning machinery has no domain to scan for.
+        enabled: false
+  session:
+    # Rolling window: every request that resolves a session refreshes its Redis TTL to this value.
+    timeout: 30d
+    data:
+      redis:
+        # Needed for FindByIndexNameSessionRepository.findByPrincipalName(...), the per-user
+        # invalidation lookup (suspend, soft-delete, password reset, admin reassignment).
+        repository-type: indexed
+        namespace: argus:session
   task:
     scheduling:
       pool:
         # The two long-running jobs release their thread immediately (EOD dispatches to its own
-        # executor, the reapers only fire at startup), so the remaining five short pollers/sweeps
-        # share this pool instead of serialising behind one another on the default single thread.
+        # executor, the reapers only fire at startup), so the remaining four short pollers share
+        # this pool instead of serialising behind one another on the default single thread.
         size: 4
       thread-name-prefix: argus-sched-
       shutdown:
@@ -35,6 +54,19 @@ spring:
 server:
   port: 8080
   shutdown: graceful
+  servlet:
+    session:
+      cookie:
+        name: argus_session
+        http-only: true
+        secure: true
+        same-site: lax
+        path: /
+        # Spring Session only writes this header when the session is created, so a shorter
+        # Max-Age would log out a continuously active user at this age regardless of their
+        # server-side rolling TTL above. The Redis key's TTL is the session's real lifetime; this
+        # only needs to outlive it.
+        max-age: 365d
 
 management:
   server:
@@ -51,12 +83,13 @@ management:
       group:
         # Deliberately excludes the vendor breakers, which still report on /actuator/health.
         # Readiness gates the load balancer, so it must answer "can this instance serve traffic?" —
-        # this process and the database. A vendor outage degrades a background capability: email
-        # stays queued in the outbox for a later poll, and market data falls back to the last cached
+        # this process, the database, and Redis (every authenticated request resolves through a
+        # Spring Session lookup). A vendor outage degrades a background capability: email stays
+        # queued in the outbox for a later poll, and market data falls back to the last cached
         # close. Gating on either would convert that into a total outage across every instance at
         # once, since they all share the same vendor.
         readiness:
-          include: readinessState,db
+          include: readinessState,db,redis
   info:
     env:
       enabled: true
@@ -153,10 +186,6 @@ argus:
   eodpipeline:
     cron: "0 0 17 * * MON-FRI"
     zone: America/New_York
-  auth:
-    session:
-      sweep:
-        interval-ms: 3600000
   rate-limit:
     # Bucket keys are wrapped in "[...]" so Spring's relaxed binder treats the dots as part of
     # the map key instead of nesting (RL.auth.signup -> RL -> auth -> signup). Do not unquote.

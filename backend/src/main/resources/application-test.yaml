@@ -8,3 +8,28 @@ management:
   endpoint:
     health:
       show-details: always
+
+argus:
+  rate-limit:
+    # Authenticated ITs drive real signup/login flows via TestLogin instead of seeding session
+    # storage directly. Most of these share one cached Spring context (same PostgresContainer +
+    # RedisContainer import), so a full suite run performs far more signups/logins than the
+    # production budget allows from one IP-keyed bucket. RL.read and RL.write are left at
+    # production values — RateLimitIT depends on the RL.read capacity.
+    buckets:
+      "[RL.auth.signup]":
+        capacity: 100000
+        refill-tokens: 100000
+        refill-duration: PT1M
+      "[RL.auth.login]":
+        capacity: 100000
+        refill-tokens: 100000
+        refill-duration: PT1M
+      "[RL.auth.reset]":
+        capacity: 100000
+        refill-tokens: 100000
+        refill-duration: PT1M
+      "[RL.unauth.global]":
+        capacity: 100000
+        refill-tokens: 100000
+        refill-duration: PT1M

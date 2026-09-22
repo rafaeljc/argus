@@ -2,23 +2,16 @@ package io.github.rafaeljc.argus.users.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.github.f4b6a3.uuid.UuidCreator;
-import io.github.rafaeljc.argus.auth.application.port.SessionRepository;
-import io.github.rafaeljc.argus.auth.domain.Session;
-import io.github.rafaeljc.argus.auth.web.CsrfCookieFactory;
-import io.github.rafaeljc.argus.auth.web.SessionCookieFactory;
-import io.github.rafaeljc.argus.common.domain.SessionId;
+import io.github.rafaeljc.argus.support.auth.TestLogin;
+import io.github.rafaeljc.argus.support.auth.TestSession;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
 import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import io.github.rafaeljc.argus.users.application.UserService;
 import io.github.rafaeljc.argus.users.application.port.UserRepository;
 import io.github.rafaeljc.argus.users.domain.User;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.time.Duration;
 import java.time.Instant;
-import java.util.HexFormat;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.TestRestTemplate;
@@ -40,8 +33,6 @@ import tools.jackson.databind.ObjectMapper;
 class AccountControllerIT {
 
     private static final String ENDPOINT = "/api/v1/account/me";
-    private static final String PASSWORD = "correct horse battery staple";
-    private static final String CSRF_VALUE = "account-it-csrf-token";
 
     @LocalServerPort
     private int port;
@@ -58,14 +49,19 @@ class AccountControllerIT {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private SessionRepository sessionRepository;
+    private TestLogin testLogin;
+
+    @BeforeEach
+    void setUp() {
+        testLogin = new TestLogin(userService, userRepository, http, port);
+    }
 
     @Test
     void getMe_authenticatedUser_returns200WithSafeAccountEnvelope() throws Exception {
-        User seeded = userService.createUnverified("alice@example.com", PASSWORD);
+        TestSession session = testLogin.login("alice@example.com");
+        User seeded = userService.lookup(session.userId());
 
-        ResponseEntity<String> response = exchange(seeded, HttpMethod.GET, null);
+        ResponseEntity<String> response = exchange(session, HttpMethod.GET, null);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         assertThat(response.getHeaders().getContentType().toString()).startsWith("application/json");
@@ -95,40 +91,40 @@ class AccountControllerIT {
 
     @Test
     void deleteMe_authenticatedUserWithCorrectPassword_returns204AndSoftDeletes() {
-        User seeded = seedVerified("bob@example.com");
+        TestSession session = testLogin.login("bob@example.com");
 
-        ResponseEntity<String> response = exchange(seeded, HttpMethod.DELETE, passwordBody(PASSWORD));
+        ResponseEntity<String> response = exchange(session, HttpMethod.DELETE, passwordBody(TestLogin.PASSWORD));
 
         assertThat(response.getStatusCode().value()).isEqualTo(204);
         assertThat(response.getBody()).isNull();
 
-        User after = userService.lookup(seeded.id());
+        User after = userService.lookup(session.userId());
         assertThat(after.isDeleted()).isTrue();
         assertThat(after.deletedAt()).isNotNull();
     }
 
     @Test
     void deleteMe_secondCallOnDeletedUser_returns401AndPreservesDeletedAt() throws Exception {
-        User seeded = seedVerified("carol@example.com");
+        TestSession session = testLogin.login("carol@example.com");
 
-        ResponseEntity<String> first = exchange(seeded, HttpMethod.DELETE, passwordBody(PASSWORD));
+        ResponseEntity<String> first = exchange(session, HttpMethod.DELETE, passwordBody(TestLogin.PASSWORD));
         assertThat(first.getStatusCode().value()).isEqualTo(204);
-        Instant firstDeletedAt = userService.lookup(seeded.id()).deletedAt();
+        Instant firstDeletedAt = userService.lookup(session.userId()).deletedAt();
         assertThat(firstDeletedAt).isNotNull();
 
-        ResponseEntity<String> second = exchange(seeded, HttpMethod.DELETE, passwordBody(PASSWORD));
+        ResponseEntity<String> second = exchange(session, HttpMethod.DELETE, passwordBody(TestLogin.PASSWORD));
         assertThat(second.getStatusCode().value()).isEqualTo(401);
         assertThat(json.readTree(second.getBody()).get("error").get("code").asString())
                 .isEqualTo("UNAUTHORIZED");
-        assertThat(userService.lookup(seeded.id()).deletedAt()).isEqualTo(firstDeletedAt);
+        assertThat(userService.lookup(session.userId()).deletedAt()).isEqualTo(firstDeletedAt);
     }
 
     @Test
     void deleteMe_wrongPasswordOnDeletedUser_returns401UnauthorizedForAntiEnumeration() throws Exception {
-        User seeded = seedVerified("frank@example.com");
-        userService.softDelete(seeded.id(), PASSWORD);
+        TestSession session = testLogin.login("frank@example.com");
+        userService.softDelete(session.userId(), TestLogin.PASSWORD);
 
-        ResponseEntity<String> response = exchange(seeded, HttpMethod.DELETE, passwordBody("anything"));
+        ResponseEntity<String> response = exchange(session, HttpMethod.DELETE, passwordBody("anything"));
 
         assertThat(response.getStatusCode().value()).isEqualTo(401);
         assertThat(json.readTree(response.getBody()).get("error").get("code").asString())
@@ -137,24 +133,24 @@ class AccountControllerIT {
 
     @Test
     void deleteMe_wrongPassword_returns422InvalidCurrentPasswordAndDoesNotDelete() throws Exception {
-        User seeded = seedVerified("dave@example.com");
+        TestSession session = testLogin.login("dave@example.com");
 
-        ResponseEntity<String> response = exchange(seeded, HttpMethod.DELETE, passwordBody("not the password"));
+        ResponseEntity<String> response = exchange(session, HttpMethod.DELETE, passwordBody("not the password"));
 
         assertThat(response.getStatusCode().value()).isEqualTo(422);
         JsonNode error = json.readTree(response.getBody()).get("error");
         assertThat(error.get("code").asString()).isEqualTo("INVALID_CURRENT_PASSWORD");
 
-        User after = userService.lookup(seeded.id());
+        User after = userService.lookup(session.userId());
         assertThat(after.isDeleted()).isFalse();
         assertThat(after.deletedAt()).isNull();
     }
 
     @Test
     void deleteMe_blankPassword_returns422ValidationErrorWithCurrentPasswordField() throws Exception {
-        User seeded = seedVerified("erin@example.com");
+        TestSession session = testLogin.login("erin@example.com");
 
-        ResponseEntity<String> response = exchange(seeded, HttpMethod.DELETE, passwordBody(""));
+        ResponseEntity<String> response = exchange(session, HttpMethod.DELETE, passwordBody(""));
 
         assertThat(response.getStatusCode().value()).isEqualTo(422);
         JsonNode error = json.readTree(response.getBody()).get("error");
@@ -162,31 +158,24 @@ class AccountControllerIT {
         assertThat(error.get("details")).hasSize(1);
         assertThat(error.get("details").get(0).get("field").asString()).isEqualTo("current_password");
 
-        User after = userService.lookup(seeded.id());
+        User after = userService.lookup(session.userId());
         assertThat(after.isDeleted()).isFalse();
     }
 
     @Test
     void deleteMe_thenReusingOriginalSessionCookie_clearsCookiesAndRejectsFollowUpRequest()
             throws Exception {
-        User seeded = seedVerified("heidi@example.com");
-        String sessionToken = seedSession(seeded);
+        TestSession session = testLogin.login("heidi@example.com");
 
         ResponseEntity<String> deleteResponse =
-                exchangeWithToken(sessionToken, HttpMethod.DELETE, passwordBody(PASSWORD));
+                exchange(session, HttpMethod.DELETE, passwordBody(TestLogin.PASSWORD));
         assertThat(deleteResponse.getStatusCode().value()).isEqualTo(204);
 
         List<String> setCookieHeaders = deleteResponse.getHeaders().get(HttpHeaders.SET_COOKIE);
         assertThat(setCookieHeaders).isNotNull();
-        assertThat(setCookieHeaders)
-                .anySatisfy(header -> assertThat(header)
-                        .startsWith(SessionCookieFactory.COOKIE_NAME + "=;")
-                        .contains("Expires=Thu, 01 Jan 1970"))
-                .anySatisfy(header -> assertThat(header)
-                        .startsWith(CsrfCookieFactory.COOKIE_NAME + "=;")
-                        .contains("Expires=Thu, 01 Jan 1970"));
+        assertThat(setCookieHeaders).anySatisfy(header -> assertThat(header).startsWith("argus_session=;"));
 
-        ResponseEntity<String> reuse = exchangeWithToken(sessionToken, HttpMethod.GET, null);
+        ResponseEntity<String> reuse = exchange(session, HttpMethod.GET, null);
         assertThat(reuse.getStatusCode().value()).isEqualTo(401);
         assertThat(json.readTree(reuse.getBody()).get("error").get("code").asString())
                 .isEqualTo("UNAUTHORIZED");
@@ -194,39 +183,28 @@ class AccountControllerIT {
 
     @Test
     void deleteMe_suspendedLiveSession_returns403AccountSuspended() throws Exception {
-        User seeded = seedVerified("gina@example.com");
+        TestSession session = testLogin.login("gina@example.com");
+        User seeded = userService.lookup(session.userId());
         userRepository.save(new User(seeded.id(), seeded.email(), seeded.passwordHash(),
                 true, true, false, seeded.isAdmin(),
                 seeded.createdAt(), seeded.updatedAt(), null));
 
-        ResponseEntity<String> response = exchange(seeded, HttpMethod.DELETE, passwordBody(PASSWORD));
+        ResponseEntity<String> response = exchange(session, HttpMethod.DELETE, passwordBody(TestLogin.PASSWORD));
 
         assertThat(response.getStatusCode().value()).isEqualTo(403);
         assertThat(json.readTree(response.getBody()).get("error").get("code").asString())
                 .isEqualTo("ACCOUNT_SUSPENDED");
-        User after = userService.lookup(seeded.id());
+        User after = userService.lookup(session.userId());
         assertThat(after.isDeleted()).isFalse();
-    }
-
-    private User seedVerified(String email) {
-        User u = userService.createUnverified(email, PASSWORD);
-        return userService.markVerified(u.id());
     }
 
     private static String passwordBody(String currentPassword) {
         return "{\"current_password\":\"" + currentPassword + "\"}";
     }
 
-    private ResponseEntity<String> exchange(User authenticatedAs, HttpMethod method, String jsonBody) {
-        return exchangeWithToken(seedSession(authenticatedAs), method, jsonBody);
-    }
-
-    private ResponseEntity<String> exchangeWithToken(String sessionToken, HttpMethod method, String jsonBody) {
+    private ResponseEntity<String> exchange(TestSession session, HttpMethod method, String jsonBody) {
         HttpHeaders headers = new HttpHeaders();
-        headers.add(HttpHeaders.COOKIE,
-                SessionCookieFactory.COOKIE_NAME + "=" + sessionToken
-                        + "; " + CsrfCookieFactory.COOKIE_NAME + "=" + CSRF_VALUE);
-        headers.add("X-CSRF-Token", CSRF_VALUE);
+        headers.addAll(session.headers());
         if (jsonBody != null) {
             headers.setContentType(MediaType.APPLICATION_JSON);
         }
@@ -235,29 +213,5 @@ class AccountControllerIT {
                 method,
                 new HttpEntity<>(jsonBody, headers),
                 String.class);
-    }
-
-    private String seedSession(User user) {
-        String token = "account-it-session-" + UuidCreator.getTimeOrderedEpoch();
-        Instant now = Instant.now();
-        sessionRepository.save(new Session(
-                new SessionId(UuidCreator.getTimeOrderedEpoch()),
-                user.id(),
-                sha256Hex(token),
-                "10.0.0.1",
-                "IT-Agent",
-                now,
-                now.plus(Duration.ofDays(30)),
-                now));
-        return token;
-    }
-
-    private static String sha256Hex(String value) {
-        try {
-            byte[] hash = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
     }
 }

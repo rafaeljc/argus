@@ -2,15 +2,25 @@ package io.github.rafaeljc.argus.auth.web;
 
 import io.github.rafaeljc.argus.auth.application.AuthService;
 import io.github.rafaeljc.argus.auth.application.LoginResult;
-import io.github.rafaeljc.argus.auth.application.SessionStatusResult;
 import io.github.rafaeljc.argus.auth.application.SignUpResult;
+import io.github.rafaeljc.argus.common.domain.UserId;
+import io.github.rafaeljc.argus.common.web.CurrentUserId;
 import io.github.rafaeljc.argus.common.web.SuccessEnvelope;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.time.Instant;
+import java.util.List;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,19 +32,14 @@ import org.springframework.web.bind.annotation.RestController;
 class AuthController {
 
     private static final URI ACCOUNT_ME_LOCATION = URI.create("/api/v1/account/me");
-    private static final int USER_AGENT_MAX_CHARS = 512;
-    private static final String USER_AGENT_HEADER = "User-Agent";
+    private static final String ROLE_ADMIN = "ROLE_ADMIN";
 
     private final AuthService authService;
-    private final SessionCookieFactory sessionCookieFactory;
-    private final CsrfCookieFactory csrfCookieFactory;
+    private final SecurityContextRepository securityContextRepository;
 
-    AuthController(AuthService authService,
-                   SessionCookieFactory sessionCookieFactory,
-                   CsrfCookieFactory csrfCookieFactory) {
+    AuthController(AuthService authService, SecurityContextRepository securityContextRepository) {
         this.authService = authService;
-        this.sessionCookieFactory = sessionCookieFactory;
-        this.csrfCookieFactory = csrfCookieFactory;
+        this.securityContextRepository = securityContextRepository;
     }
 
     @PostMapping("/signup")
@@ -67,45 +72,38 @@ class AuthController {
     ResponseEntity<SuccessEnvelope<SessionResponse>> login(@Valid @RequestBody LoginRequest body,
                                                             HttpServletRequest request,
                                                             HttpServletResponse response) {
-        LoginResult result = authService.login(
-                body.email(),
-                body.password(),
-                request.getRemoteAddr(),
-                truncatedUserAgent(request));
+        LoginResult result = authService.login(body.email(), body.password());
 
-        response.addCookie(sessionCookieFactory.forToken(result.sessionToken()));
-        response.addCookie(csrfCookieFactory.forToken(result.csrfToken()));
+        // Session fixation: a session created before authentication (there shouldn't be one on
+        // this endpoint, but a client could send a stale cookie) must not carry over as the
+        // authenticated session.
+        HttpSession existing = request.getSession(false);
+        if (existing != null) {
+            existing.invalidate();
+        }
 
+        List<GrantedAuthority> authorities = result.admin()
+                ? List.of(new SimpleGrantedAuthority(ROLE_ADMIN))
+                : List.of();
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                new AuthenticatedUser(result.userId().value()), null, authorities);
+
+        SecurityContext context = SecurityContextHolder.createEmptyContext();
+        context.setAuthentication(authentication);
+        securityContextRepository.saveContext(context, request, response);
+
+        HttpSession session = request.getSession(true);
         return ResponseEntity.ok(new SuccessEnvelope<>(new SessionResponse(
-                result.userId().value().toString(), result.expiresAt())));
-    }
-
-    @PostMapping("/logout")
-    ResponseEntity<Void> logout(@AuthenticationPrincipal AuthenticatedSession principal,
-                                HttpServletResponse response) {
-        authService.logout(principal.sessionId(), principal.userId());
-
-        // SessionResolutionFilter has already added refreshed cookies to this response; append
-        // the cleared cookies so the browser applies Max-Age=0 last for both names.
-        response.addCookie(sessionCookieFactory.cleared());
-        response.addCookie(csrfCookieFactory.cleared());
-
-        return ResponseEntity.noContent().build();
+                result.userId().value().toString(), expiresAt(session))));
     }
 
     @GetMapping("/status")
-    ResponseEntity<SuccessEnvelope<SessionResponse>> status(
-            @AuthenticationPrincipal AuthenticatedSession principal) {
-        SessionStatusResult result = authService.getSessionStatus(principal.sessionId());
+    ResponseEntity<SuccessEnvelope<SessionResponse>> status(@CurrentUserId UserId userId, HttpSession session) {
         return ResponseEntity.ok(new SuccessEnvelope<>(new SessionResponse(
-                result.userId().value().toString(), result.expiresAt())));
+                userId.value().toString(), expiresAt(session))));
     }
 
-    private static String truncatedUserAgent(HttpServletRequest request) {
-        String value = request.getHeader(USER_AGENT_HEADER);
-        if (value == null) {
-            return null;
-        }
-        return value.length() <= USER_AGENT_MAX_CHARS ? value : value.substring(0, USER_AGENT_MAX_CHARS);
+    private static Instant expiresAt(HttpSession session) {
+        return Instant.ofEpochMilli(session.getLastAccessedTime()).plusSeconds(session.getMaxInactiveInterval());
     }
 }
