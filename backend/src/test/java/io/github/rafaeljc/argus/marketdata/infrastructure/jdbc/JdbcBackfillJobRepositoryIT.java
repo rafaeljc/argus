@@ -13,6 +13,7 @@ import io.github.rafaeljc.argus.marketdata.domain.Exchange;
 import io.github.rafaeljc.argus.marketdata.domain.JobStatus;
 import io.github.rafaeljc.argus.marketdata.domain.Symbol;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -27,7 +28,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-@Import(PostgresContainer.class)
+@Import({PostgresContainer.class, RedisContainer.class})
 @SpringBootTest
 class JdbcBackfillJobRepositoryIT {
 

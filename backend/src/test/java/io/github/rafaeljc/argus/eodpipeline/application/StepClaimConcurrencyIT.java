@@ -15,6 +15,7 @@ import io.github.rafaeljc.argus.eodpipeline.domain.StepInProgressException;
 import io.github.rafaeljc.argus.eodpipeline.domain.StepStatus;
 import io.github.rafaeljc.argus.eodpipeline.domain.Trigger;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -41,7 +42,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 // The point of splitting a step into claim / work / settle is that the work holds no transaction
 // and the claim is already committed while it runs. These tests pin both halves of that: a
 // competing rerun must be rejected immediately rather than queued behind the work.
-@Import({PostgresContainer.class, StepClaimConcurrencyIT.NoopDispatcherConfig.class})
+@Import({PostgresContainer.class, RedisContainer.class, StepClaimConcurrencyIT.NoopDispatcherConfig.class})
 @SpringBootTest
 class StepClaimConcurrencyIT {
 

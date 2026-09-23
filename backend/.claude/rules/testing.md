@@ -7,7 +7,7 @@ Detailed conventions backing the "Testing" section of `backend/CLAUDE.md`.
 | Suffix  | Scope               | Spring context          | DB                      | Runs on                    |
 |---------|---------------------|-------------------------|-------------------------|----------------------------|
 | `*Test` | unit + architecture | no                      | no                      | every build (`mvn test`)   |
-| `*IT`   | integration         | yes (`@SpringBootTest`) | Testcontainers Postgres | every build (`mvn verify`) |
+| `*IT`   | integration         | yes (`@SpringBootTest`) | Testcontainers Postgres + Redis | every build (`mvn verify`) |
 
 `mvn test` runs unit + architecture. `mvn verify` runs everything including `*IT`. Architecture tests live in the
 `architecture/` package and use the plain `*Test` suffix (e.g. `ModuleBoundaryTest`).
@@ -26,13 +26,15 @@ Detailed conventions backing the "Testing" section of `backend/CLAUDE.md`.
 - `@SpringBootTest(webEnvironment = RANDOM_PORT)` for HTTP-slice tests.
 - `@DataJpaTest` permitted for pure JPA repository tests, but prefer `@SpringBootTest` so JDBC adapters and JPA share
   the same `DataSource` configuration as production.
-- Testcontainers Postgres 16, started once per test class via `@Testcontainers` + static `@Container`.
+- Testcontainers Postgres (`postgres:18-alpine`) and Redis (`redis:8-alpine`), wired via Spring Boot's
+  `@ServiceConnection` support: `@Import({PostgresContainer.class, RedisContainer.class})`, not the classic
+  `@Testcontainers`/`@Container` JUnit extension.
 - DB cleanup between tests: `TRUNCATE ... RESTART IDENTITY CASCADE` in a `@BeforeEach`. No transactional rollback hack (
-  it hides commit-time behavior).
+  it hides commit-time behavior). Redis is flushed the same way (`FLUSHALL` on `BeforeTestMethodEvent`).
 - Flyway runs against the container on startup — never `ddl-auto`.
 - Use `TestRestTemplate` or `WebTestClient` for HTTP; never call controllers directly.
-- Authenticated tests: use a real signup + login flow via the test client, not `@WithMockUser`. Argus is a
-  session-cookie app; session middleware is part of what we're testing.
+- Authenticated tests: use the `support/auth/TestLogin` helper, which drives a real signup + login flow via the test
+  client, not `@WithMockUser`. Argus is a session-cookie app; session middleware is part of what we're testing.
 
 ## Architecture Tests
 

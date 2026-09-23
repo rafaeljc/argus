@@ -62,16 +62,16 @@ The drivers from ADR 0002 are inherited; the wording is unchanged.
 Options re-evaluated in light of the new constraint "per-module cost
 must be zero":
 
-- **Option A — Keep ADR 0002.** Annotate every new module's service
+- **Option 1 — Keep ADR 0002.** Annotate every new module's service
   facade and adapter with `@Lazy`.
-- **Option B — Test-only `no-db` Spring profile** with
+- **Option 2 — Test-only `no-db` Spring profile** with
   `spring.main.lazy-initialization: true` plus the `DataSource` exclude
   list, activated by `@NoDatabase`. Drops `@Lazy` from production beans.
-- **Option C — Per-module conditional `@Bean` config**
+- **Option 3 — Per-module conditional `@Bean` config**
   (Option 3 from ADR 0002). Centralizes wiring in
   `<Module>InfrastructureConfig` guarded by
   `@ConditionalOnBean(DataSource.class)`. Higher per-module cost.
-- **Option D — Narrow no-DB test contexts**
+- **Option 4 — Narrow no-DB test contexts**
   (Option 4 from ADR 0002). Replace `@SpringBootTest` package scan with
   explicit `classes = {…}` lists. Production code untouched.
 
@@ -80,7 +80,7 @@ remains rejected for the same reason: it violates DD-1.
 
 ## Decision Outcome
 
-Chosen option: **Option B — `no-db` test profile**. It satisfies DD-1
+Chosen option: **Option 2 — `no-db` test profile**. It satisfies DD-1
 strictly (zero per-module cost), DD-2 strictly (no Spring annotations on
 production beans for test-context reasons), DD-4 (a 7-line YAML file and
 a one-line annotation change ship for the whole project, not per module),
@@ -132,7 +132,7 @@ The decision is confirmed by:
 
 ## Pros and Cons of the Options
 
-### Option A — Keep ADR 0002 (`@Lazy` per module)
+### Option 1 — Keep ADR 0002 (`@Lazy` per module)
 
 - Good, because the change is local and the mechanism is documented next
   to the affected beans.
@@ -144,7 +144,7 @@ The decision is confirmed by:
 - Bad, because production code carries an annotation whose sole purpose
   is a test-context concern, putting pressure on DD-2.
 
-### Option B — `no-db` test profile (chosen)
+### Option 2 — `no-db` test profile (chosen)
 
 - Good, because per-module cost is zero (DD-1).
 - Good, because production beans are free of test-only annotations
@@ -156,15 +156,15 @@ The decision is confirmed by:
 - Bad, because the mechanism is one indirection away from the bean it
   protects. Mitigated by being a single, named, documented profile.
 
-### Option C — Per-module conditional `@Bean` config
+### Option 3 — Per-module conditional `@Bean` config
 
 - Good, because wiring is centralized and explicit per module.
 - Bad, because per-module cost is ~5 files — strictly worse than
-  Option B on DD-4.
+  Option 2 on DD-4.
 - Bad, because `@ConditionalOnBean` at bean-method level has
   evaluation-order subtleties that the profile-level flag avoids.
 
-### Option D — Narrow no-DB test contexts
+### Option 4 — Narrow no-DB test contexts
 
 - Good, because production code is untouched (DD-2 / DD-5).
 - Good, because each test only loads the infrastructure it actually
@@ -186,7 +186,7 @@ This decision should be re-evaluated when:
 
 - A test passes that should have failed because lazy init hid a wiring
   bug in the `no-db` profile. The remediation is to narrow the
-  affected component (Option D for that surface), not to abandon the
+  affected component (Option 4 for that surface), not to abandon the
   profile.
 - A no-DB integration test needs to assert behavior that depends on a
   business module being present in the context — at which point the

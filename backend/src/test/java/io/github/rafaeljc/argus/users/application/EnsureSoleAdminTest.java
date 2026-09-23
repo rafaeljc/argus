@@ -13,11 +13,13 @@ import io.github.rafaeljc.argus.common.application.audit.AuthAuditEvent;
 import io.github.rafaeljc.argus.common.domain.FixedClock;
 import io.github.rafaeljc.argus.common.domain.ResourceNotFoundException;
 import io.github.rafaeljc.argus.common.domain.UserId;
+import io.github.rafaeljc.argus.users.application.event.AdminAssignmentChanged;
 import io.github.rafaeljc.argus.users.application.port.AdminAssignment;
 import io.github.rafaeljc.argus.users.domain.AccountSuspendedException;
 import io.github.rafaeljc.argus.users.domain.EmailNotVerifiedException;
 import io.github.rafaeljc.argus.users.domain.User;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -52,29 +54,36 @@ class EnsureSoleAdminTest {
     }
 
     @Test
-    void execute_eligibleUser_assignsAndPublishesEvent() {
+    void execute_eligibleUser_assignsAndPublishesEvents() {
         UserId id = newUserId();
+        UserId demoted = newUserId();
         when(userService.lookupActive(id)).thenReturn(user(id, true, false, false));
-        when(adminAssignment.makeSoleAdmin(id, NOW)).thenReturn(1);
+        when(adminAssignment.makeSoleAdmin(id, NOW)).thenReturn(List.of(id, demoted));
 
         useCase.execute(id);
 
         verify(adminAssignment).makeSoleAdmin(id, NOW);
         ArgumentCaptor<Object> published = ArgumentCaptor.forClass(Object.class);
-        verify(events).publishEvent(published.capture());
-        assertThat(published.getValue())
-                .isInstanceOf(AuthAuditEvent.AdminAssigned.class)
+        verify(events, Mockito.times(2)).publishEvent(published.capture());
+        assertThat(published.getAllValues())
+                .filteredOn(AuthAuditEvent.AdminAssigned.class::isInstance)
+                .singleElement()
                 .extracting("userId", "email")
                 .containsExactly(id, EMAIL);
+        assertThat(published.getAllValues())
+                .filteredOn(AdminAssignmentChanged.class::isInstance)
+                .singleElement()
+                .extracting("userIds")
+                .isEqualTo(List.of(id, demoted));
     }
 
     // A restart with the configuration unchanged is the common case. The update matches no rows,
     // and an audit line there would claim an assignment that did not happen.
     @Test
-    void execute_alreadySoleAdmin_publishesNoEvent() {
+    void execute_alreadySoleAdmin_publishesNoEvents() {
         UserId id = newUserId();
         when(userService.lookupActive(id)).thenReturn(user(id, true, false, true));
-        when(adminAssignment.makeSoleAdmin(id, NOW)).thenReturn(0);
+        when(adminAssignment.makeSoleAdmin(id, NOW)).thenReturn(List.of());
 
         useCase.execute(id);
 

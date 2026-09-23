@@ -3,6 +3,7 @@ package io.github.rafaeljc.argus.auth.web;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import io.github.rafaeljc.argus.users.application.UserService;
 import io.github.rafaeljc.argus.users.domain.User;
 import java.util.List;
@@ -22,31 +23,13 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.TestPropertySource;
+import org.springframework.session.FindByIndexNameSessionRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-@Import(PostgresContainer.class)
+@Import({PostgresContainer.class, RedisContainer.class})
 @AutoConfigureTestRestTemplate
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-// Every HTTP test in this class shares one JVM-local bucket store keyed by the localhost IP, so
-// the production 5/h signup budget would exhaust part-way through a run. Bumping the buckets here
-// only relaxes what needs relaxing to exercise the endpoints; a dedicated rate-limit IT stays
-// responsible for enforcing the production numbers.
-@TestPropertySource(properties = {
-        "argus.rate-limit.buckets.[RL.auth.signup].capacity=1000",
-        "argus.rate-limit.buckets.[RL.auth.signup].refill-tokens=1000",
-        "argus.rate-limit.buckets.[RL.auth.signup].refill-duration=PT1M",
-        "argus.rate-limit.buckets.[RL.auth.login].capacity=1000",
-        "argus.rate-limit.buckets.[RL.auth.login].refill-tokens=1000",
-        "argus.rate-limit.buckets.[RL.auth.login].refill-duration=PT1M",
-        "argus.rate-limit.buckets.[RL.auth.reset].capacity=1000",
-        "argus.rate-limit.buckets.[RL.auth.reset].refill-tokens=1000",
-        "argus.rate-limit.buckets.[RL.auth.reset].refill-duration=PT1M",
-        "argus.rate-limit.buckets.[RL.unauth.global].capacity=1000",
-        "argus.rate-limit.buckets.[RL.unauth.global].refill-tokens=1000",
-        "argus.rate-limit.buckets.[RL.unauth.global].refill-duration=PT1M"
-})
 class AuthControllerIT {
 
     private static final String ENDPOINT = "/api/v1/auth/signup";
@@ -73,6 +56,9 @@ class AuthControllerIT {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private FindByIndexNameSessionRepository<?> sessions;
 
     @Test
     void postSignup_validRequest_returns201WithLocationAndUserIdAndSeedsOutbox() {
@@ -184,9 +170,7 @@ class AuthControllerIT {
         assertThat(cookies.get("argus_session")).isNotBlank();
         assertThat(cookies.get("argus_csrf")).isNotBlank();
 
-        Integer sessionCount = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM sessions WHERE user_id = ?", Integer.class, userId);
-        assertThat(sessionCount).isEqualTo(1);
+        assertThat(sessions.findByPrincipalName(userId.toString())).hasSize(1);
     }
 
     @Test
@@ -255,9 +239,7 @@ class AuthControllerIT {
         assertThat(setCookies).anyMatch(c -> c.startsWith("argus_session=;"));
         assertThat(setCookies).anyMatch(c -> c.startsWith("argus_csrf=;"));
 
-        Integer sessionCount = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM sessions WHERE user_id = ?", Integer.class, userId);
-        assertThat(sessionCount).isZero();
+        assertThat(sessions.findByPrincipalName(userId.toString())).isEmpty();
     }
 
     @Test
@@ -470,15 +452,16 @@ class AuthControllerIT {
                 passwordResetCompleteBody(plainToken, NEW_PASSWORD));
 
         assertThat(response.getStatusCode().value()).isEqualTo(204);
-        assertThat(response.getHeaders().get("Set-Cookie")).isNull();
+        // No argus_session cookie: this anonymous endpoint never authenticates. (argus_csrf is
+        // refreshed on every response by design — see CsrfCookieFilter.)
+        List<String> setCookies = response.getHeaders().get("Set-Cookie");
+        assertThat(setCookies).noneMatch(c -> c.startsWith("argus_session="));
 
         Object claimedAt = jdbc.queryForMap(
                 "SELECT claimed_at FROM password_resets WHERE user_id = ?", userId).get("claimed_at");
         assertThat(claimedAt).isNotNull();
 
-        Integer sessionCount = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM sessions WHERE user_id = ?", Integer.class, userId);
-        assertThat(sessionCount).isZero();
+        assertThat(sessions.findByPrincipalName(userId.toString())).isEmpty();
 
         // The old password no longer authenticates; the new one does.
         assertThat(postLogin(loginBody(email, VALID_PASSWORD)).getStatusCode().value()).isEqualTo(401);

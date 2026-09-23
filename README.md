@@ -58,7 +58,7 @@ Prerequisites: Docker, Java 21, [pnpm](https://pnpm.io).
 git clone https://github.com/rafaeljc/argus.git
 cd argus
 
-# 2. Start Postgres and the API docs
+# 2. Start Postgres, Redis, and the API docs
 docker compose up -d
 
 # 3. Run the backend (applies Flyway migrations on startup)

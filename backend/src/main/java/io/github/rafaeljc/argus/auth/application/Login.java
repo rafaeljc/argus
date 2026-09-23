@@ -1,18 +1,11 @@
 package io.github.rafaeljc.argus.auth.application;
 
-import com.github.f4b6a3.uuid.UuidCreator;
-import io.github.rafaeljc.argus.auth.application.port.SessionRepository;
 import io.github.rafaeljc.argus.auth.domain.InvalidCredentialsException;
-import io.github.rafaeljc.argus.auth.domain.Session;
 import io.github.rafaeljc.argus.common.application.audit.AuthAuditEvent;
-import io.github.rafaeljc.argus.common.domain.Clock;
 import io.github.rafaeljc.argus.common.domain.DomainException;
-import io.github.rafaeljc.argus.common.domain.SessionId;
 import io.github.rafaeljc.argus.users.application.UserService;
 import io.github.rafaeljc.argus.users.domain.AccountSuspendedException;
 import io.github.rafaeljc.argus.users.domain.User;
-import java.security.SecureRandom;
-import java.time.Instant;
 import java.util.Locale;
 import java.util.Optional;
 import org.springframework.context.ApplicationEventPublisher;
@@ -22,26 +15,17 @@ import org.springframework.stereotype.Service;
 public class Login {
 
     private final UserService userService;
-    private final SessionRepository sessionRepository;
-    private final Clock clock;
     private final ApplicationEventPublisher events;
-    private final SecureRandom secureRandom;
 
-    public Login(UserService userService,
-                 SessionRepository sessionRepository,
-                 Clock clock,
-                 ApplicationEventPublisher events) {
+    public Login(UserService userService, ApplicationEventPublisher events) {
         this.userService = userService;
-        this.sessionRepository = sessionRepository;
-        this.clock = clock;
         this.events = events;
-        this.secureRandom = Tokens.strongSecureRandom();
     }
 
-    public LoginResult execute(String email, String password, String ipAddress, String userAgent) {
+    public LoginResult execute(String email, String password) {
         String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
         try {
-            LoginResult result = attempt(normalizedEmail, password, ipAddress, userAgent);
+            LoginResult result = attempt(normalizedEmail, password);
             events.publishEvent(new AuthAuditEvent.LoginSucceeded(result.userId(), normalizedEmail));
             return result;
         } catch (DomainException ex) {
@@ -55,7 +39,7 @@ public class Login {
     // "email exists but not yet verified". The unknown-email branch also runs a dummy
     // Argon2id verify so its wall-clock cost matches the wrong-password branch, closing
     // the timing side-channel that would otherwise reveal account existence.
-    private LoginResult attempt(String normalizedEmail, String password, String ipAddress, String userAgent) {
+    private LoginResult attempt(String normalizedEmail, String password) {
         Optional<User> maybeUser = userService.lookupActiveByEmail(normalizedEmail);
         if (maybeUser.isEmpty()) {
             userService.verifyPasswordForUnknownUser(password);
@@ -77,24 +61,6 @@ public class Login {
             throw new InvalidCredentialsException();
         }
 
-        Instant now = clock.now();
-        String plainSessionToken = Tokens.plain(secureRandom);
-        String plainCsrfToken = Tokens.plain(secureRandom);
-        Session persisted = sessionRepository.save(new Session(
-                new SessionId(UuidCreator.getTimeOrderedEpoch()),
-                user.id(),
-                Tokens.sha256Hex(plainSessionToken),
-                ipAddress,
-                userAgent,
-                now,
-                now.plus(Session.ROLLING_WINDOW),
-                now));
-
-        return new LoginResult(
-                persisted.id(),
-                persisted.userId(),
-                plainSessionToken,
-                plainCsrfToken,
-                persisted.expiresAt());
+        return new LoginResult(user.id(), user.isAdmin());
     }
 }

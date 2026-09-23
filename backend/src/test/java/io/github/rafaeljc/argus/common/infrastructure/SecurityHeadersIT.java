@@ -3,6 +3,7 @@ package io.github.rafaeljc.argus.common.infrastructure;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,7 +15,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 
-@Import(PostgresContainer.class)
+@Import({PostgresContainer.class, RedisContainer.class})
 @AutoConfigureTestRestTemplate
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class SecurityHeadersIT {

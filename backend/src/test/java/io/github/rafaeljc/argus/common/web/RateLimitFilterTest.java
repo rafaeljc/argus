@@ -9,16 +9,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.github.f4b6a3.uuid.UuidCreator;
-import io.github.rafaeljc.argus.auth.web.SessionAuthenticationToken;
-import io.github.rafaeljc.argus.common.application.ratelimit.BucketSelection;
 import io.github.rafaeljc.argus.common.application.ratelimit.ConsumptionResult;
 import io.github.rafaeljc.argus.common.application.ratelimit.RateLimiter;
 import io.github.rafaeljc.argus.common.domain.FixedClock;
 import io.github.rafaeljc.argus.common.domain.RateLimitExceededException;
-import io.github.rafaeljc.argus.common.domain.SessionId;
 import io.github.rafaeljc.argus.common.domain.UserId;
 import jakarta.servlet.FilterChain;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
@@ -124,9 +123,11 @@ class RateLimitFilterTest {
 
     private UserId authenticate() {
         UserId userId = new UserId(UuidCreator.getTimeOrderedEpoch());
-        SessionId sessionId = new SessionId(UuidCreator.getTimeOrderedEpoch());
+        // RateLimitFilter reads only Authentication.getName(), so a plain token with the user id
+        // as its name is enough to exercise the user-keyed bucket path without a dependency on
+        // the auth module's own principal type.
         SecurityContextHolder.getContext().setAuthentication(
-                new SessionAuthenticationToken(userId, sessionId));
+                new UsernamePasswordAuthenticationToken(userId.value().toString(), null, List.of()));
         return userId;
     }
 

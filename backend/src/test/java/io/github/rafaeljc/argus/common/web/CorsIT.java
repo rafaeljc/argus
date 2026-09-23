@@ -3,6 +3,7 @@ package io.github.rafaeljc.argus.common.web;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.TestRestTemplate;
@@ -20,7 +21,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@Import({PostgresContainer.class, CorsIT.PingEndpoint.class})
+@Import({PostgresContainer.class, RedisContainer.class, CorsIT.PingEndpoint.class})
 @AutoConfigureTestRestTemplate
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = "argus.web.cors-allowed-origin=https://app.argus.example")

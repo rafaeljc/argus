@@ -1,33 +1,12 @@
 package io.github.rafaeljc.argus.auth.application.port;
 
-import io.github.rafaeljc.argus.auth.domain.Session;
-import io.github.rafaeljc.argus.common.domain.SessionId;
 import io.github.rafaeljc.argus.common.domain.UserId;
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
 
 public interface SessionRepository {
 
-    Session save(Session session);
-
-    Optional<Session> findById(SessionId id);
-
-    Optional<Session> findByTokenHash(String sessionTokenHash);
-
-    List<Session> findByUserId(UserId userId);
-
-    void touch(SessionId id, Instant lastActivityAt, Instant expiresAt, String ipAddress, String userAgent);
-
-    void deleteById(SessionId id);
-
-    // Bulk invalidation for a single user (password reset, admin-initiated logout-everywhere).
-    // Preferred over findByUserId + per-row deleteById because it is one round trip and one SQL
-    // statement, atomic under the caller's transaction.
+    // Bulk invalidation for a single user (password reset, suspension, soft-delete, admin
+    // reassignment). Session creation, resolution and per-request TTL refresh are owned by Spring
+    // Session directly — this is the only session lifecycle operation the application layer
+    // still needs a port for.
     void deleteAllForUser(UserId userId);
-
-    // Delete up to batchSize rows whose expires_at is strictly before the given instant. Returns
-    // the number of rows actually deleted. Callers loop until the returned count is < batchSize
-    // to drain the table in chunks without holding one long lock.
-    int deleteExpiredBefore(Instant before, int batchSize);
 }

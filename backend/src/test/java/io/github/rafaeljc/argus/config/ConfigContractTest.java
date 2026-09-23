@@ -25,11 +25,14 @@ import org.yaml.snakeyaml.Yaml;
 // @ConfigurationProperties records and the framework beans that consume them.
 class ConfigContractTest {
 
-    // The one deliberate exception to "env var = property path uppercased": ECS hands over the RDS
-    // secret field by field, so these three assemble from ARGUS_DB_HOST/PORT/NAME/USERNAME/PASSWORD
-    // instead of SPRING_DATASOURCE_*.
+    // Deliberate exceptions to "env var = property path uppercased":
+    //  - spring.datasource.*: ECS hands over the RDS secret field by field, so these three
+    //    assemble from ARGUS_DB_HOST/PORT/NAME/USERNAME/PASSWORD instead of SPRING_DATASOURCE_*.
+    //  - spring.data.redis.host/port: named after the app's ARGUS_* config, not the framework's
+    //    SPRING_DATA_REDIS_* property path, matching the datasource convention above.
     private static final Set<String> NAMING_RULE_EXCEPTIONS =
-            Set.of("spring.datasource.url", "spring.datasource.username", "spring.datasource.password");
+            Set.of("spring.datasource.url", "spring.datasource.username", "spring.datasource.password",
+                    "spring.data.redis.host", "spring.data.redis.port");
 
     private static final Pattern REQUIRED_PLACEHOLDER = Pattern.compile("\\$\\{([A-Z][A-Z0-9_]*)}");
     private static final Pattern PLACEHOLDER_WITH_DEFAULT = Pattern.compile("\\$\\{([A-Z][A-Z0-9_]*):[^}]*}");

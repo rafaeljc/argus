@@ -13,6 +13,7 @@ import io.github.rafaeljc.argus.portfolio.application.HoldingRebuild;
 import io.github.rafaeljc.argus.portfolio.application.port.HoldingRepository;
 import io.github.rafaeljc.argus.portfolio.domain.Holding;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Optional;
@@ -27,7 +28,7 @@ import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-@Import(PostgresContainer.class)
+@Import({PostgresContainer.class, RedisContainer.class})
 @SpringBootTest
 class HoldingRebuildIT {
 

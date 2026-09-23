@@ -19,7 +19,6 @@ class IdWrappersTest {
     private static List<IdType> idTypes() {
         return List.of(
                 new IdType("UserId", UserId::new, o -> ((UserId) o).value()),
-                new IdType("SessionId", SessionId::new, o -> ((SessionId) o).value()),
                 new IdType("TransactionId", TransactionId::new, o -> ((TransactionId) o).value()),
                 new IdType("RuleId", RuleId::new, o -> ((RuleId) o).value()),
                 new IdType("FiringId", FiringId::new, o -> ((FiringId) o).value()),

@@ -7,16 +7,17 @@ users. See `../docs/BRD.md`, `../docs/NFR.md`, `../docs/adr/`.
 
 - Java 21 (LTS)
 - Spring Boot 4
-- Spring Web (MVC), Spring Security, Spring Data JPA
+- Spring Web (MVC), Spring Security, Spring Data JPA, Spring Session Data Redis
 - `NamedParameterJdbcTemplate` (escape hatch for complex/perf-sensitive queries)
 - PostgreSQL 18 + Flyway (versioned migrations)
+- Redis (session storage via Spring Session)
 - Maven (single project, no submodules)
 - ArchUnit (module + layer boundary enforcement)
 - JUnit 5, AssertJ, Mockito, Testcontainers
 - Checkstyle (Google ruleset, customized in `config/checkstyle/`; 4-space indent, 120-char lines, no Javadoc rules)
 - Jacoco (coverage, 80% line minimum)
 - SLF4J + Logback (Spring Boot default)
-- argon2id (password hashing), session cookies (no JWT in v1)
+- argon2id (password hashing), Spring Session-backed cookies (no JWT in v1)
 
 Canonical API contract: `../contracts/openapi/argus-v1.yaml` (hand-maintained, sole source of truth). No springdoc /
 runtime spec generation.
@@ -149,7 +150,6 @@ success/failure — no `success` boolean in body. URL prefix `/api/v1/`. Backend
 | Term                                 | Code entity                                            | Module              |
 |--------------------------------------|--------------------------------------------------------|---------------------|
 | User                                 | `users.domain.User`                                    | users               |
-| Session                              | `auth.domain.Session`                                  | auth                |
 | Transaction (BUY/SELL ledger entry)  | `transactions.domain.Transaction`                      | transactions        |
 | Holding (materialized position)      | `portfolio.domain.Holding`                             | portfolio           |
 | Portfolio snapshot (EOD total value) | `portfolio.domain.PortfolioSnapshot`                   | portfolio           |

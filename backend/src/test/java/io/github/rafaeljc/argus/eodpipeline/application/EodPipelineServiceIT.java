@@ -37,6 +37,7 @@ import io.github.rafaeljc.argus.portfolio.application.port.HoldingRepository;
 import io.github.rafaeljc.argus.portfolio.application.port.PortfolioSnapshotRepository;
 import io.github.rafaeljc.argus.portfolio.domain.PortfolioSnapshot;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import io.github.rafaeljc.argus.users.application.UserService;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import java.math.BigDecimal;
@@ -60,7 +61,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-@Import({PostgresContainer.class, EodPipelineServiceIT.TestStubsConfig.class})
+@Import({PostgresContainer.class, RedisContainer.class, EodPipelineServiceIT.TestStubsConfig.class})
 @SpringBootTest
 class EodPipelineServiceIT {
 

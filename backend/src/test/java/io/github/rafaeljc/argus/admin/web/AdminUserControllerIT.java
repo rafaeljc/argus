@@ -3,24 +3,18 @@ package io.github.rafaeljc.argus.admin.web;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.github.f4b6a3.uuid.UuidCreator;
-import io.github.rafaeljc.argus.auth.application.port.SessionRepository;
-import io.github.rafaeljc.argus.auth.domain.Session;
-import io.github.rafaeljc.argus.auth.web.CsrfCookieFactory;
-import io.github.rafaeljc.argus.auth.web.SessionCookieFactory;
-import io.github.rafaeljc.argus.common.domain.SessionId;
 import io.github.rafaeljc.argus.common.domain.UserId;
+import io.github.rafaeljc.argus.support.auth.TestLogin;
+import io.github.rafaeljc.argus.support.auth.TestSession;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import io.github.rafaeljc.argus.users.application.UserService;
 import io.github.rafaeljc.argus.users.application.port.UserRepository;
 import io.github.rafaeljc.argus.users.domain.User;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.TestRestTemplate;
@@ -34,17 +28,16 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.session.FindByIndexNameSessionRepository;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-@Import(PostgresContainer.class)
+@Import({PostgresContainer.class, RedisContainer.class})
 @AutoConfigureTestRestTemplate
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class AdminUserControllerIT {
 
     private static final String ENDPOINT = "/api/v1/admin/users";
-    private static final String PASSWORD = "correct horse battery staple";
-    private static final String CSRF_VALUE = "admin-user-it-csrf-token";
 
     @LocalServerPort
     private int port;
@@ -62,54 +55,60 @@ class AdminUserControllerIT {
     private UserRepository userRepository;
 
     @Autowired
-    private SessionRepository sessionRepository;
+    private FindByIndexNameSessionRepository<?> sessions;
 
     @Autowired
     private JdbcTemplate jdbc;
 
+    private TestLogin testLogin;
+
+    @BeforeEach
+    void setUp() {
+        testLogin = new TestLogin(userService, userRepository, http, port);
+    }
+
     @Test
     void suspend_activeUser_returns200SuspendsAndPurgesSessions() throws Exception {
-        User admin = seedAdmin("admin-suspend1@example.com");
-        User target = seedPlain("target-suspend1@example.com");
-        seedSession(target);
+        TestSession admin = seedAdmin("admin-suspend1@example.com");
+        TestSession target = seedPlain("target-suspend1@example.com");
 
-        ResponseEntity<String> response = action(admin, target.id(), "suspend", "{\"reason\":\"abuse\"}");
+        ResponseEntity<String> response = action(admin, target.userId(), "suspend", "{\"reason\":\"abuse\"}");
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         JsonNode data = json.readTree(response.getBody()).get("data");
-        assertThat(data.get("id").asString()).isEqualTo(target.id().value().toString());
+        assertThat(data.get("id").asString()).isEqualTo(target.userId().value().toString());
         assertThat(data.get("is_suspended").asBoolean()).isTrue();
-        assertThat(sessionRepository.findByUserId(target.id())).isEmpty();
+        assertThat(sessionsFor(target)).isEmpty();
     }
 
     @Test
     void suspend_repeatedCall_writesExactlyOneAuditRow() throws Exception {
-        User admin = seedAdmin("admin-suspend2@example.com");
-        User target = seedPlain("target-suspend2@example.com");
+        TestSession admin = seedAdmin("admin-suspend2@example.com");
+        TestSession target = seedPlain("target-suspend2@example.com");
 
-        action(admin, target.id(), "suspend", "{\"reason\":\"abuse\"}");
-        ResponseEntity<String> second = action(admin, target.id(), "suspend", "{\"reason\":\"abuse\"}");
+        action(admin, target.userId(), "suspend", "{\"reason\":\"abuse\"}");
+        ResponseEntity<String> second = action(admin, target.userId(), "suspend", "{\"reason\":\"abuse\"}");
 
         assertThat(second.getStatusCode().value()).isEqualTo(200);
-        assertThat(auditRowCount(target.id(), "SUSPEND")).isEqualTo(1);
+        assertThat(auditRowCount(target.userId(), "SUSPEND")).isEqualTo(1);
     }
 
     @Test
     void suspend_reason_landsInAuditMetadata() throws Exception {
-        User admin = seedAdmin("admin-suspend3@example.com");
-        User target = seedPlain("target-suspend3@example.com");
+        TestSession admin = seedAdmin("admin-suspend3@example.com");
+        TestSession target = seedPlain("target-suspend3@example.com");
 
-        action(admin, target.id(), "suspend", "{\"reason\":\"repeated abuse reports\"}");
+        action(admin, target.userId(), "suspend", "{\"reason\":\"repeated abuse reports\"}");
 
         Map<String, Object> row = jdbc.queryForMap(
                 "SELECT metadata FROM admin_audit_log WHERE target_user_id = ? AND action = 'SUSPEND'",
-                target.id().value());
+                target.userId().value());
         assertThat(row.get("metadata").toString()).contains("repeated abuse reports");
     }
 
     @Test
     void suspend_unknownUser_returns404() throws Exception {
-        User admin = seedAdmin("admin-suspend4@example.com");
+        TestSession admin = seedAdmin("admin-suspend4@example.com");
 
         ResponseEntity<String> response =
                 action(admin, new UserId(UuidCreator.getTimeOrderedEpoch()), "suspend", null);
@@ -119,86 +118,85 @@ class AdminUserControllerIT {
 
     @Test
     void suspend_nonAdminActor_returns403() throws Exception {
-        User nonAdmin = seedPlain("actor-suspend5@example.com");
-        User target = seedPlain("target-suspend5@example.com");
+        TestSession nonAdmin = seedPlain("actor-suspend5@example.com");
+        TestSession target = seedPlain("target-suspend5@example.com");
 
-        ResponseEntity<String> response = action(nonAdmin, target.id(), "suspend", null);
+        ResponseEntity<String> response = action(nonAdmin, target.userId(), "suspend", null);
 
         assertThat(response.getStatusCode().value()).isEqualTo(403);
     }
 
     @Test
     void unsuspend_suspendedUser_returns200AndDoesNotPurgeSessions() throws Exception {
-        User admin = seedAdmin("admin-unsuspend1@example.com");
-        User target = seedPlain("target-unsuspend1@example.com");
-        suspend(target.id());
-        seedSession(target);
+        TestSession admin = seedAdmin("admin-unsuspend1@example.com");
+        TestSession target = seedPlain("target-unsuspend1@example.com");
+        // Direct repository flip (not the /suspend endpoint): the endpoint would itself purge
+        // sessions, defeating the point of this test.
+        suspend(target.userId());
 
-        ResponseEntity<String> response = action(admin, target.id(), "unsuspend", "{\"reason\":\"appeal\"}");
+        ResponseEntity<String> response = action(admin, target.userId(), "unsuspend", "{\"reason\":\"appeal\"}");
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         JsonNode data = json.readTree(response.getBody()).get("data");
         assertThat(data.get("is_suspended").asBoolean()).isFalse();
-        assertThat(sessionRepository.findByUserId(target.id())).isNotEmpty();
+        assertThat(sessionsFor(target)).isNotEmpty();
     }
 
     @Test
     void unsuspend_repeatedCall_writesExactlyOneAuditRow() throws Exception {
-        User admin = seedAdmin("admin-unsuspend2@example.com");
-        User target = seedPlain("target-unsuspend2@example.com");
-        suspend(target.id());
+        TestSession admin = seedAdmin("admin-unsuspend2@example.com");
+        TestSession target = seedPlain("target-unsuspend2@example.com");
+        suspend(target.userId());
 
-        action(admin, target.id(), "unsuspend", "{\"reason\":\"appeal\"}");
-        ResponseEntity<String> second = action(admin, target.id(), "unsuspend", "{\"reason\":\"appeal\"}");
+        action(admin, target.userId(), "unsuspend", "{\"reason\":\"appeal\"}");
+        ResponseEntity<String> second = action(admin, target.userId(), "unsuspend", "{\"reason\":\"appeal\"}");
 
         assertThat(second.getStatusCode().value()).isEqualTo(200);
-        assertThat(auditRowCount(target.id(), "UNSUSPEND")).isEqualTo(1);
+        assertThat(auditRowCount(target.userId(), "UNSUSPEND")).isEqualTo(1);
     }
 
     @Test
     void delete_activeUser_returns200DeletesAndPurgesSessions() throws Exception {
-        User admin = seedAdmin("admin-delete1@example.com");
-        User target = seedPlain("target-delete1@example.com");
-        seedSession(target);
+        TestSession admin = seedAdmin("admin-delete1@example.com");
+        TestSession target = seedPlain("target-delete1@example.com");
 
-        ResponseEntity<String> response = action(admin, target.id(), "delete", "{\"reason\":\"policy\"}");
+        ResponseEntity<String> response = action(admin, target.userId(), "delete", "{\"reason\":\"policy\"}");
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         JsonNode data = json.readTree(response.getBody()).get("data");
         assertThat(data.get("is_deleted").asBoolean()).isTrue();
         assertThat(data.get("deleted_at").isNull()).isFalse();
-        assertThat(sessionRepository.findByUserId(target.id())).isEmpty();
+        assertThat(sessionsFor(target)).isEmpty();
     }
 
     @Test
     void delete_repeatedCall_writesExactlyOneAuditRowAndDoesNotRestampDeletedAt() throws Exception {
-        User admin = seedAdmin("admin-delete2@example.com");
-        User target = seedPlain("target-delete2@example.com");
+        TestSession admin = seedAdmin("admin-delete2@example.com");
+        TestSession target = seedPlain("target-delete2@example.com");
 
-        ResponseEntity<String> first = action(admin, target.id(), "delete", "{\"reason\":\"policy\"}");
-        ResponseEntity<String> second = action(admin, target.id(), "delete", "{\"reason\":\"policy\"}");
+        ResponseEntity<String> first = action(admin, target.userId(), "delete", "{\"reason\":\"policy\"}");
+        ResponseEntity<String> second = action(admin, target.userId(), "delete", "{\"reason\":\"policy\"}");
 
         assertThat(second.getStatusCode().value()).isEqualTo(200);
-        assertThat(auditRowCount(target.id(), "DELETE")).isEqualTo(1);
+        assertThat(auditRowCount(target.userId(), "DELETE")).isEqualTo(1);
         String firstDeletedAt = json.readTree(first.getBody()).get("data").get("deleted_at").asString();
         String secondDeletedAt = json.readTree(second.getBody()).get("data").get("deleted_at").asString();
         assertThat(secondDeletedAt).isEqualTo(firstDeletedAt);
     }
 
     @Test
-    void delete_thenLogin_isRejectedByAccountStateGate() throws Exception {
-        User admin = seedAdmin("admin-delete3@example.com");
-        User target = seedPlain("target-delete3@example.com");
+    void delete_thenReusingTargetsOriginalSession_isRejectedByAccountStateGate() throws Exception {
+        TestSession admin = seedAdmin("admin-delete3@example.com");
+        TestSession target = seedPlain("target-delete3@example.com");
 
-        action(admin, target.id(), "delete", null);
+        action(admin, target.userId(), "delete", null);
 
-        String sessionToken = seedSession(target);
-        HttpHeaders headers = new HttpHeaders();
-        headers.add(HttpHeaders.COOKIE, SessionCookieFactory.COOKIE_NAME + "=" + sessionToken);
+        // Soft-delete invalidates the target's Redis sessions in the same transaction; the
+        // pre-delete cookie the browser is still holding no longer resolves to anyone.
         ResponseEntity<String> gated = http.exchange(
                 "http://localhost:" + port + "/api/v1/portfolio",
                 HttpMethod.GET,
-                new HttpEntity<>(headers),
+                new HttpEntity<>(target.headers()),
                 String.class);
         assertThat(gated.getStatusCode().value()).isEqualTo(401);
     }
@@ -209,13 +207,10 @@ class AdminUserControllerIT {
                 Integer.class, targetId.value(), action);
     }
 
-    private ResponseEntity<String> action(User authenticatedAs, UserId targetId, String actionName, String jsonBody) {
+    private ResponseEntity<String> action(TestSession authenticatedAs, UserId targetId, String actionName,
+                                          String jsonBody) {
         HttpHeaders headers = new HttpHeaders();
-        String sessionToken = seedSession(authenticatedAs);
-        headers.add(HttpHeaders.COOKIE,
-                SessionCookieFactory.COOKIE_NAME + "=" + sessionToken
-                        + "; " + CsrfCookieFactory.COOKIE_NAME + "=" + CSRF_VALUE);
-        headers.add("X-CSRF-Token", CSRF_VALUE);
+        headers.addAll(authenticatedAs.headers());
         headers.setContentType(MediaType.APPLICATION_JSON);
         return http.exchange(
                 "http://localhost:" + port + ENDPOINT + "/" + targetId.value() + "/" + actionName,
@@ -226,47 +221,47 @@ class AdminUserControllerIT {
 
     @Test
     void search_noFilters_returnsAllUsersWithEnvelope() throws Exception {
-        User admin = seedAdmin("admin1@example.com");
-        User other = seedPlain("other1@example.com");
+        TestSession admin = seedAdmin("admin1@example.com");
+        TestSession other = seedPlain("other1@example.com");
 
         ResponseEntity<String> response = search(admin, "", null);
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         JsonNode body = json.readTree(response.getBody());
         assertThat(body.get("data")).hasSizeGreaterThanOrEqualTo(2);
-        assertThat(idsOf(body)).contains(admin.id().value().toString(), other.id().value().toString());
+        assertThat(idsOf(body)).contains(admin.userId().value().toString(), other.userId().value().toString());
     }
 
     @Test
     void search_isSuspendedTrue_returnsOnlySuspended() throws Exception {
-        User admin = seedAdmin("admin2@example.com");
-        User suspended = seedPlain("suspended2@example.com");
-        suspend(suspended.id());
+        TestSession admin = seedAdmin("admin2@example.com");
+        TestSession suspended = seedPlain("suspended2@example.com");
+        suspend(suspended.userId());
         seedPlain("notsuspended2@example.com");
 
         ResponseEntity<String> response = search(admin, "?is_suspended=true", null);
 
         JsonNode body = json.readTree(response.getBody());
-        assertThat(idsOf(body)).containsExactly(suspended.id().value().toString());
+        assertThat(idsOf(body)).containsExactly(suspended.userId().value().toString());
     }
 
     @Test
     void search_isDeletedTrue_returnsOnlyDeleted() throws Exception {
-        User admin = seedAdmin("admin3@example.com");
-        User deleted = seedPlain("deleted3@example.com");
-        userService.softDelete(deleted.id(), PASSWORD);
+        TestSession admin = seedAdmin("admin3@example.com");
+        TestSession deleted = seedPlain("deleted3@example.com");
+        userService.softDelete(deleted.userId(), TestLogin.PASSWORD);
         seedPlain("notdeleted3@example.com");
 
         ResponseEntity<String> response = search(admin, "?is_deleted=true", null);
 
         JsonNode body = json.readTree(response.getBody());
-        assertThat(idsOf(body)).containsExactly(deleted.id().value().toString());
+        assertThat(idsOf(body)).containsExactly(deleted.userId().value().toString());
     }
 
     @Test
     void search_isVerifiedFalse_returnsOnlyUnverified() throws Exception {
-        User admin = seedAdmin("admin4@example.com");
-        User unverified = userService.createUnverified("unverified4@example.com", PASSWORD);
+        TestSession admin = seedAdmin("admin4@example.com");
+        User unverified = userService.createUnverified("unverified4@example.com", TestLogin.PASSWORD);
         seedPlain("verified4@example.com");
 
         ResponseEntity<String> response = search(admin, "?is_verified=false", null);
@@ -277,29 +272,29 @@ class AdminUserControllerIT {
 
     @Test
     void search_combinedFilters_appliesAllPredicates() throws Exception {
-        User match = seedPlain("acme5@example.com");
-        suspend(match.id());
-        User wrongEmail = seedPlain("other5@example.com");
-        suspend(wrongEmail.id());
+        TestSession match = seedPlain("acme5@example.com");
+        suspend(match.userId());
+        TestSession wrongEmail = seedPlain("other5@example.com");
+        suspend(wrongEmail.userId());
         seedPlain("acme5b@example.com");
-        User admin = seedAdmin("admin5@example.com");
+        TestSession admin = seedAdmin("admin5@example.com");
 
         ResponseEntity<String> response = search(admin, "?is_suspended=true", "{\"email_contains\":\"acme5\"}");
 
         JsonNode body = json.readTree(response.getBody());
-        assertThat(idsOf(body)).containsExactly(match.id().value().toString());
+        assertThat(idsOf(body)).containsExactly(match.userId().value().toString());
     }
 
     @Test
     void search_emailContainsFragment_isCaseInsensitivePartialMatch() throws Exception {
-        User admin = seedAdmin("admin6@example.com");
-        User target = seedPlain("jane.doe@ACME6.com");
+        TestSession admin = seedAdmin("admin6@example.com");
+        TestSession target = seedPlain("jane.doe@ACME6.com");
         seedPlain("someone-else6@example.com");
 
         ResponseEntity<String> response = search(admin, "", "{\"email_contains\":\"acme6\"}");
 
         JsonNode body = json.readTree(response.getBody());
-        assertThat(idsOf(body)).containsExactly(target.id().value().toString());
+        assertThat(idsOf(body)).containsExactly(target.userId().value().toString());
     }
 
     @Test
@@ -307,7 +302,7 @@ class AdminUserControllerIT {
         seedPlain("first7@example.com");
         seedPlain("second7@example.com");
         seedPlain("third7@example.com");
-        User admin = seedAdmin("admin7@example.com");
+        TestSession admin = seedAdmin("admin7@example.com");
 
         ResponseEntity<String> response = search(admin, "?is_suspended=false&page=1&per_page=2", null);
 
@@ -323,21 +318,21 @@ class AdminUserControllerIT {
 
     @Test
     void getUser_existingDeletedUser_returns200() throws Exception {
-        User admin = seedAdmin("admin9@example.com");
-        User deleted = seedPlain("deleted9@example.com");
-        userService.softDelete(deleted.id(), PASSWORD);
+        TestSession admin = seedAdmin("admin9@example.com");
+        TestSession deleted = seedPlain("deleted9@example.com");
+        userService.softDelete(deleted.userId(), TestLogin.PASSWORD);
 
-        ResponseEntity<String> response = get(admin, "/" + deleted.id().value());
+        ResponseEntity<String> response = get(admin, "/" + deleted.userId().value());
 
         assertThat(response.getStatusCode().value()).isEqualTo(200);
         JsonNode data = json.readTree(response.getBody()).get("data");
-        assertThat(data.get("id").asString()).isEqualTo(deleted.id().value().toString());
+        assertThat(data.get("id").asString()).isEqualTo(deleted.userId().value().toString());
         assertThat(data.get("is_deleted").asBoolean()).isTrue();
     }
 
     @Test
     void getUser_unknownId_returns404() throws Exception {
-        User admin = seedAdmin("admin10@example.com");
+        TestSession admin = seedAdmin("admin10@example.com");
 
         ResponseEntity<String> response = get(admin, "/" + UuidCreator.getTimeOrderedEpoch());
 
@@ -352,13 +347,9 @@ class AdminUserControllerIT {
         return ids;
     }
 
-    private ResponseEntity<String> search(User authenticatedAs, String query, String jsonBody) {
+    private ResponseEntity<String> search(TestSession authenticatedAs, String query, String jsonBody) {
         HttpHeaders headers = new HttpHeaders();
-        String sessionToken = seedSession(authenticatedAs);
-        headers.add(HttpHeaders.COOKIE,
-                SessionCookieFactory.COOKIE_NAME + "=" + sessionToken
-                        + "; " + CsrfCookieFactory.COOKIE_NAME + "=" + CSRF_VALUE);
-        headers.add("X-CSRF-Token", CSRF_VALUE);
+        headers.addAll(authenticatedAs.headers());
         headers.setContentType(MediaType.APPLICATION_JSON);
         return http.exchange(
                 "http://localhost:" + port + ENDPOINT + query,
@@ -367,29 +358,20 @@ class AdminUserControllerIT {
                 String.class);
     }
 
-    private ResponseEntity<String> get(User authenticatedAs, String pathAndQuery) {
-        HttpHeaders headers = new HttpHeaders();
-        String sessionToken = seedSession(authenticatedAs);
-        headers.add(HttpHeaders.COOKIE, SessionCookieFactory.COOKIE_NAME + "=" + sessionToken);
+    private ResponseEntity<String> get(TestSession authenticatedAs, String pathAndQuery) {
         return http.exchange(
                 "http://localhost:" + port + ENDPOINT + pathAndQuery,
                 HttpMethod.GET,
-                new HttpEntity<>(headers),
+                new HttpEntity<>(authenticatedAs.headers()),
                 String.class);
     }
 
-    private User seedAdmin(String email) {
-        User u = userService.createUnverified(email, PASSWORD);
-        User verified = userService.markVerified(u.id());
-        Instant now = verified.createdAt();
-        return userRepository.save(new User(verified.id(), verified.email(), verified.passwordHash(),
-                verified.isVerified(), verified.isSuspended(), verified.isDeleted(), true,
-                now, now, null));
+    private TestSession seedAdmin(String email) {
+        return testLogin.login(email, true);
     }
 
-    private User seedPlain(String email) {
-        User u = userService.createUnverified(email, PASSWORD);
-        return userService.markVerified(u.id());
+    private TestSession seedPlain(String email) {
+        return testLogin.login(email);
     }
 
     private void suspend(UserId id) {
@@ -401,27 +383,7 @@ class AdminUserControllerIT {
                 user.isDeleted(), user.isAdmin(), user.createdAt(), user.updatedAt(), user.deletedAt());
     }
 
-    private String seedSession(User user) {
-        String token = "admin-user-it-session-" + UuidCreator.getTimeOrderedEpoch();
-        Instant now = Instant.now();
-        sessionRepository.save(new Session(
-                new SessionId(UuidCreator.getTimeOrderedEpoch()),
-                user.id(),
-                sha256Hex(token),
-                "10.0.0.1",
-                "IT-Agent",
-                now,
-                now.plus(Duration.ofDays(30)),
-                now));
-        return token;
-    }
-
-    private static String sha256Hex(String value) {
-        try {
-            byte[] hash = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
-        }
+    private Map<String, ?> sessionsFor(TestSession session) {
+        return sessions.findByPrincipalName(session.userId().value().toString());
     }
 }

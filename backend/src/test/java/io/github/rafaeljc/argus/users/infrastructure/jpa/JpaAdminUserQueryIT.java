@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.github.rafaeljc.argus.common.application.PageResult;
 import io.github.rafaeljc.argus.common.domain.UserId;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import io.github.rafaeljc.argus.users.application.AdminUserSearchCriteria;
 import io.github.rafaeljc.argus.users.application.UserService;
 import io.github.rafaeljc.argus.users.application.port.AdminUserQuery;
@@ -21,7 +22,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
-@Import(PostgresContainer.class)
+@Import({PostgresContainer.class, RedisContainer.class})
 @ActiveProfiles("test")
 @SpringBootTest
 class JpaAdminUserQueryIT {

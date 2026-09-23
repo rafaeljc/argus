@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.github.rafaeljc.argus.common.domain.ResourceNotFoundException;
 import io.github.rafaeljc.argus.common.domain.UserId;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import io.github.rafaeljc.argus.users.application.port.UserRepository;
 import io.github.rafaeljc.argus.users.domain.User;
 import java.time.Instant;
@@ -14,7 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 
-@Import(PostgresContainer.class)
+@Import({PostgresContainer.class, RedisContainer.class})
 @SpringBootTest
 class UserServiceIT {
 

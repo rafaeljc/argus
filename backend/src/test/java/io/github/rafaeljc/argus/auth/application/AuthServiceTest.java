@@ -5,9 +5,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.github.f4b6a3.uuid.UuidCreator;
-import io.github.rafaeljc.argus.common.domain.SessionId;
 import io.github.rafaeljc.argus.common.domain.UserId;
-import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,7 +16,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class AuthServiceTest {
 
     private static final UserId USER_ID = new UserId(UuidCreator.getTimeOrderedEpoch());
-    private static final SessionId SESSION_ID = new SessionId(UuidCreator.getTimeOrderedEpoch());
     private static final String EMAIL = "alice@example.com";
     private static final String PASSWORD = "correct horse battery staple";
 
@@ -30,9 +27,6 @@ class AuthServiceTest {
 
     @Mock
     private Logout logout;
-
-    @Mock
-    private GetSessionStatus getSessionStatus;
 
     @Mock
     private VerifyEmail verifyEmail;
@@ -47,8 +41,7 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AuthService(
-                signUp, login, logout, getSessionStatus, verifyEmail, requestPasswordReset, completePasswordReset);
+        service = new AuthService(signUp, login, logout, verifyEmail, requestPasswordReset, completePasswordReset);
     }
 
     @Test
@@ -63,29 +56,19 @@ class AuthServiceTest {
 
     @Test
     void login_delegatesToLoginUseCase_returnsResultUnchanged() {
-        LoginResult expected = new LoginResult(SESSION_ID, USER_ID, "token", "csrf", Instant.now());
-        when(login.execute(EMAIL, PASSWORD, "10.0.0.1", "IT-Agent")).thenReturn(expected);
+        LoginResult expected = new LoginResult(USER_ID, true);
+        when(login.execute(EMAIL, PASSWORD)).thenReturn(expected);
 
-        LoginResult result = service.login(EMAIL, PASSWORD, "10.0.0.1", "IT-Agent");
+        LoginResult result = service.login(EMAIL, PASSWORD);
 
         assertThat(result).isSameAs(expected);
     }
 
     @Test
     void logout_delegatesToLogoutUseCase() {
-        service.logout(SESSION_ID, USER_ID);
+        service.logout(USER_ID);
 
-        verify(logout).execute(SESSION_ID, USER_ID);
-    }
-
-    @Test
-    void getSessionStatus_delegatesToGetSessionStatusUseCase_returnsResultUnchanged() {
-        SessionStatusResult expected = new SessionStatusResult(USER_ID, Instant.now());
-        when(getSessionStatus.execute(SESSION_ID)).thenReturn(expected);
-
-        SessionStatusResult result = service.getSessionStatus(SESSION_ID);
-
-        assertThat(result).isSameAs(expected);
+        verify(logout).execute(USER_ID);
     }
 
     @Test

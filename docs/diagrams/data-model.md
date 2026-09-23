@@ -2,7 +2,6 @@
 
 ```mermaid
 erDiagram
-  USERS ||--o{ SESSIONS : "owns"
   USERS ||--o{ EMAIL_VERIFICATIONS : "claims"
   USERS ||--o{ PASSWORD_RESETS : "claims"
   USERS ||--o{ TRANSACTIONS : "records"
@@ -30,17 +29,6 @@ erDiagram
     timestamptz created_at
     timestamptz updated_at
     timestamptz deleted_at
-  }
-
-  SESSIONS {
-    uuid id PK
-    uuid user_id FK
-    text session_token UK
-    text ip_address
-    text user_agent
-    timestamptz created_at
-    timestamptz expires_at
-    timestamptz last_activity_at
   }
 
   EMAIL_VERIFICATIONS {

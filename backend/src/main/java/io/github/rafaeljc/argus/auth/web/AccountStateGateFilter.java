@@ -1,6 +1,7 @@
 package io.github.rafaeljc.argus.auth.web;
 
 import io.github.rafaeljc.argus.common.domain.SessionRequiredException;
+import io.github.rafaeljc.argus.common.domain.UserId;
 import io.github.rafaeljc.argus.users.application.UserService;
 import io.github.rafaeljc.argus.users.domain.AccountSuspendedException;
 import io.github.rafaeljc.argus.users.domain.EmailNotVerifiedException;
@@ -11,6 +12,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Set;
+import java.util.UUID;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -43,14 +45,14 @@ public class AccountStateGateFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        AuthenticatedSession principal = currentPrincipal();
-        if (principal == null || EXEMPT_FROM_STATE_GATE.contains(
+        UserId userId = currentUserId();
+        if (userId == null || EXEMPT_FROM_STATE_GATE.contains(
                 request.getMethod() + " " + request.getRequestURI())) {
             chain.doFilter(request, response);
             return;
         }
 
-        User user = userService.lookup(principal.userId());
+        User user = userService.lookup(userId);
         if (user.isDeleted()) {
             // Anti-enumeration: a soft-deleted user whose session row still exists is treated
             // exactly like a missing session — same 401 UNAUTHORIZED, no leak of deletion state.
@@ -71,12 +73,11 @@ public class AccountStateGateFilter extends OncePerRequestFilter {
         chain.doFilter(request, response);
     }
 
-    private static AuthenticatedSession currentPrincipal() {
+    private static UserId currentUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated()) {
             return null;
         }
-        Object principal = auth.getPrincipal();
-        return principal instanceof AuthenticatedSession session ? session : null;
+        return new UserId(UUID.fromString(auth.getName()));
     }
 }

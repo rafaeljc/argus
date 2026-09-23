@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.github.rafaeljc.argus.email.application.port.EmailGateway;
 import io.github.rafaeljc.argus.email.infrastructure.resend.ResendEmailGateway;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -15,7 +16,7 @@ import org.springframework.test.context.ActiveProfiles;
 // Boots the real `prod` context to prove a deployment sends real mail without any extra switch.
 // The datasource comes from the container via @ServiceConnection; the ARGUS_DB_* values only exist
 // so the prod placeholders resolve.
-@Import(PostgresContainer.class)
+@Import({PostgresContainer.class, RedisContainer.class})
 @SpringBootTest(
         properties = {
             "ARGUS_APP_BASE_URL=https://app.argus.example",
@@ -30,7 +31,9 @@ import org.springframework.test.context.ActiveProfiles;
             "ARGUS_DB_PORT=unused",
             "ARGUS_DB_NAME=unused",
             "ARGUS_DB_USERNAME=unused",
-            "ARGUS_DB_PASSWORD=unused"
+            "ARGUS_DB_PASSWORD=unused",
+            "ARGUS_REDIS_HOST=unused",
+            "ARGUS_REDIS_PORT=0"
         })
 @ActiveProfiles("prod")
 class EmailVendorProdWiringIT {

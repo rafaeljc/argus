@@ -7,6 +7,7 @@ import com.github.f4b6a3.uuid.UuidCreator;
 import io.github.rafaeljc.argus.common.application.TransactionalMutationLock;
 import io.github.rafaeljc.argus.common.domain.UserId;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -14,7 +15,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-@Import(PostgresContainer.class)
+@Import({PostgresContainer.class, RedisContainer.class})
 @SpringBootTest
 class PostgresTransactionalMutationLockIT {
 

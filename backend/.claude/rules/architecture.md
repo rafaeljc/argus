@@ -10,7 +10,7 @@ Nine business modules + `common`. Package root: `io.github.rafaeljc.argus`.
 | Module         | Owns (tables)                                        | Public facade                 |
 |----------------|------------------------------------------------------|-------------------------------|
 | `users`        | `users`                                              | `UserService`                 |
-| `auth`         | `sessions`, `email_verifications`, `password_resets` | `AuthService`                 |
+| `auth`         | `email_verifications`, `password_resets`             | `AuthService`                 |
 | `transactions` | `transactions`                                       | `TransactionService`          |
 | `portfolio`    | `holdings`, `portfolio_snapshots`                    | `PortfolioService`            |
 | `marketdata`   | `symbols`, `price_history`, `backfill_jobs`          | `PriceLookup`, `SymbolLookup` |

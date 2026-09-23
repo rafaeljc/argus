@@ -8,6 +8,7 @@ import io.github.rafaeljc.argus.email.application.port.OutboxRepository;
 import io.github.rafaeljc.argus.email.domain.EventType;
 import io.github.rafaeljc.argus.email.domain.OutboxMessage;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -21,7 +22,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
-@Import(PostgresContainer.class)
+@Import({PostgresContainer.class, RedisContainer.class})
 @SpringBootTest
 class OutboxRepositoryIT {
 

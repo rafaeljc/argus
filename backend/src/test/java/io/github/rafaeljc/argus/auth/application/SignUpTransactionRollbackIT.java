@@ -7,6 +7,7 @@ import static org.mockito.Mockito.doThrow;
 
 import io.github.rafaeljc.argus.email.application.EmailService;
 import io.github.rafaeljc.argus.support.containers.PostgresContainer;
+import io.github.rafaeljc.argus.support.containers.RedisContainer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -20,7 +21,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * user rows, no orphan verification tokens. This is what makes it safe to treat
  * "signup returned 201" as "the verification email will be sent."
  */
-@Import(PostgresContainer.class)
+@Import({PostgresContainer.class, RedisContainer.class})
 @SpringBootTest
 class SignUpTransactionRollbackIT {
 

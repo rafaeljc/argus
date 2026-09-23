@@ -3,10 +3,12 @@ package io.github.rafaeljc.argus.users.application;
 import io.github.rafaeljc.argus.common.application.audit.AuthAuditEvent;
 import io.github.rafaeljc.argus.common.domain.Clock;
 import io.github.rafaeljc.argus.common.domain.UserId;
+import io.github.rafaeljc.argus.users.application.event.AdminAssignmentChanged;
 import io.github.rafaeljc.argus.users.application.port.AdminAssignment;
 import io.github.rafaeljc.argus.users.domain.AccountSuspendedException;
 import io.github.rafaeljc.argus.users.domain.EmailNotVerifiedException;
 import io.github.rafaeljc.argus.users.domain.User;
+import java.util.List;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,9 +44,10 @@ public class EnsureSoleAdmin {
             throw new EmailNotVerifiedException(target.id(), target.email());
         }
 
-        int changed = adminAssignment.makeSoleAdmin(adminId, clock.now());
-        if (changed > 0) {
+        List<UserId> changed = adminAssignment.makeSoleAdmin(adminId, clock.now());
+        if (!changed.isEmpty()) {
             events.publishEvent(new AuthAuditEvent.AdminAssigned(target.id(), target.email()));
+            events.publishEvent(new AdminAssignmentChanged(changed));
         }
     }
 }
