@@ -76,12 +76,22 @@ class SoleAdminAssignmentIT {
         UserId target = verifiedUser("alice@example.com");
         existingAdmin("previous@example.com");
 
-        int first = adminAssignment.makeSoleAdmin(target, clock.now());
-        int second = adminAssignment.makeSoleAdmin(target, clock.now());
+        List<UserId> first = adminAssignment.makeSoleAdmin(target, clock.now());
+        List<UserId> second = adminAssignment.makeSoleAdmin(target, clock.now());
 
-        assertThat(first).isEqualTo(2);
-        assertThat(second).isZero();
+        assertThat(first).hasSize(2);
+        assertThat(second).isEmpty();
         assertThat(adminIds()).containsExactly(target.value());
+    }
+
+    @Test
+    void makeSoleAdmin_targetGranted_returnsTargetAndDemotedIds() {
+        UserId target = verifiedUser("alice@example.com");
+        UserId previous = existingAdmin("previous@example.com");
+
+        List<UserId> changed = adminAssignment.makeSoleAdmin(target, clock.now());
+
+        assertThat(changed).containsExactlyInAnyOrder(target, previous);
     }
 
     // The demotion sweep is deliberately unrestricted, so the post-condition is the strong global
