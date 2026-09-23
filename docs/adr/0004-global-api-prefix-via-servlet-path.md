@@ -47,35 +47,35 @@ business controllers to the version number?
 
 ## Considered Options
 
-- **Option A — Hardcode `@RequestMapping("/api/v1/...")` per controller.**
+- **Option 1 — Hardcode `@RequestMapping("/api/v1/...")` per controller.**
   Per-class cost ≥ 1 annotation; scales with N; rejected.
-- **Option B — `spring.mvc.servlet.path: /api/v1`.** Mounts Spring's
+- **Option 2 — `spring.mvc.servlet.path: /api/v1`.** Mounts Spring's
   `DispatcherServlet` (and therefore the Spring Security filter chain)
   at `/api/v1`. One YAML line.
-- **Option C — `WebMvcConfigurer.configurePathMatch().addPathPrefix("/api/v1",
+- **Option 3 — `WebMvcConfigurer.configurePathMatch().addPathPrefix("/api/v1",
   HandlerTypePredicate.forAnnotation(RestController.class))`.** Rewrites
   only `@RestController` mappings. `DispatcherServlet` and the security
   filter chain stay at root.
-- **Option D — Reverse proxy / API gateway strips `/api/v1` before
+- **Option 4 — Reverse proxy / API gateway strips `/api/v1` before
   forwarding.** The app sees `/account/me`; the prefix lives in nginx /
   Spring Cloud Gateway / AWS API GW. Requires running that layer.
-- **Option E — Custom annotation + post-processor.** Reinvents Option C.
+- **Option 5 — Custom annotation + post-processor.** Reinvents Option 3.
 
 ## Decision Outcome
 
-Chosen option: **Option B — `spring.mvc.servlet.path: /api/v1`**.
+Chosen option: **Option 2 — `spring.mvc.servlet.path: /api/v1`**.
 
-Why not Option C, which is the more surgical mechanism: C exists to
-*preserve* a difference between "where MVC is mounted" and "where the
+Why not Option 3, which is the more surgical mechanism: Option 3 exists
+to *preserve* a difference between "where MVC is mounted" and "where the
 security filter chain runs." Argus does not need that difference. The
 product is an API; everything it serves lives under `/api/v1`. Health
 probes live on the actuator port (`management.server.port: 8081`), a
-separate child context that Option B does not touch. There is no
+separate child context that Option 2 does not touch. There is no
 production traffic that should reach a path outside `/api/v1` on the
-main port. Therefore the side effect of Option B — security filter
+main port. Therefore the side effect of Option 2 — security filter
 chain scoped to `/api/v1/**` — is the correct scope, not a regression.
 
-Option B satisfies DD-1 strictly (zero per-controller cost), DD-2
+Option 2 satisfies DD-1 strictly (zero per-controller cost), DD-2
 strictly (one YAML line bumps the version), DD-3 (security scope
 matches API scope), DD-4 strictly (0 lines of Java), and DD-5 (no new
 operational dependency).
@@ -94,7 +94,7 @@ operational dependency).
   change, captured at the same time as this decision.
 - Bad, because a future non-versioned endpoint that must share the same
   `DispatcherServlet` (not actuator-style) would force a re-architecture:
-  either move to Option C, or accept the prefix on the new endpoint
+  either move to Option 3, or accept the prefix on the new endpoint
   anyway. The remediation surface is small (one YAML line + one
   `WebMvcConfigurer`), but it is real.
 
@@ -113,14 +113,14 @@ The decision is confirmed by:
 
 ## Pros and Cons of the Options
 
-### Option A — Hardcode `@RequestMapping("/api/v1/...")` per controller
+### Option 1 — Hardcode `@RequestMapping("/api/v1/...")` per controller
 
 - Good, because the prefix is locally visible on every controller.
 - Bad, because per-controller cost is one annotation that scales with N
   controllers — fails DD-1.
 - Bad, because v1→v2 is a project-wide find/replace — fails DD-2.
 
-### Option B — `spring.mvc.servlet.path` (chosen)
+### Option 2 — `spring.mvc.servlet.path` (chosen)
 
 - Good, because per-controller cost is zero (DD-1).
 - Good, because v1→v2 is one YAML line (DD-2).
@@ -130,16 +130,17 @@ The decision is confirmed by:
 - Bad, because a future non-versioned endpoint sharing the main
   `DispatcherServlet` would require revisiting this decision.
 
-### Option C — `addPathPrefix` predicate
+### Option 3 — `addPathPrefix` predicate
 
 - Good, because `DispatcherServlet` and the security filter chain stay
   at root — non-`@RestController` requests still get filter-chain
   processing.
 - Bad, because that flexibility costs ~10 lines of Java for a degree of
-  freedom Argus does not need — fails DD-4 against B.
-- Neutral on DD-1 / DD-2 — same per-controller and per-bump cost as B.
+  freedom Argus does not need — fails DD-4 against Option 2.
+- Neutral on DD-1 / DD-2 — same per-controller and per-bump cost as
+  Option 2.
 
-### Option D — Reverse proxy / API gateway prefix stripping
+### Option 4 — Reverse proxy / API gateway prefix stripping
 
 - Good, because the app code is fully decoupled from the version.
 - Bad, because it adds an operational dependency that does not exist
@@ -147,9 +148,9 @@ The decision is confirmed by:
 - Bad, because the version-bump cost moves from app config to infra
   config, which is harder to test in CI.
 
-### Option E — Custom annotation + post-processor
+### Option 5 — Custom annotation + post-processor
 
-- Bad, because it reinvents Option C with more code and a custom
+- Bad, because it reinvents Option 3 with more code and a custom
   surface to maintain — strictly worse on DD-4.
 
 ## More Information
@@ -159,11 +160,11 @@ This decision should be re-evaluated when:
 - A real non-versioned endpoint needs to share the main
   `DispatcherServlet` (e.g. a public webhook ingress that the load
   balancer routes to the main port instead of to actuator). The
-  remediation is Option C — move the prefix to a `WebMvcConfigurer`
+  remediation is Option 3 — move the prefix to a `WebMvcConfigurer`
   predicate, keep the rest.
 - The contract starts carrying multiple coexisting major versions
   (v1 and v2 served from the same deployable). The remediation is
-  Option C with a per-controller predicate, or two separate child
+  Option 3 with a per-controller predicate, or two separate child
   contexts, depending on the divergence shape.
 - Spring removes or deprecates `spring.mvc.servlet.path`.
 
