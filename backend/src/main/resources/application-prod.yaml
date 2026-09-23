@@ -18,6 +18,27 @@ spring:
       validation-timeout: 5000
       max-lifetime: 1500000
       keepalive-time: 300000
+  data:
+    redis:
+      host: ${ARGUS_REDIS_HOST}
+      port: ${ARGUS_REDIS_PORT}
+      lettuce:
+        pool:
+          # Without a pool, Lettuce multiplexes every caller over one shared connection: fine at
+          # low concurrency, but the 50 Tomcat worker threads below would all queue behind it during
+          # a slow command or reconnect instead of shedding load the way the Hikari pool does.
+          # Sized 1:1 with max Tomcat threads so no worker ever waits on another for a connection.
+          max-active: 50
+          max-idle: 10
+          min-idle: 10
+          max-wait: 2s
+  session:
+    data:
+      redis:
+        # ElastiCache blocks the CONFIG command that Spring Session's default configure-action
+        # would issue to enable keyspace notifications. The infra follow-up sets
+        # notify-keyspace-events=Egx directly on the ElastiCache parameter group instead.
+        configure-action: none
 
 server:
   # Prod runs behind a TLS-terminating LB. `framework` installs ForwardedHeaderFilter so

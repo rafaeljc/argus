@@ -31,7 +31,9 @@ import org.springframework.test.context.ActiveProfiles;
             "ARGUS_DB_PORT=unused",
             "ARGUS_DB_NAME=unused",
             "ARGUS_DB_USERNAME=unused",
-            "ARGUS_DB_PASSWORD=unused"
+            "ARGUS_DB_PASSWORD=unused",
+            "ARGUS_REDIS_HOST=unused",
+            "ARGUS_REDIS_PORT=0"
         })
 @ActiveProfiles("prod")
 class EmailVendorProdWiringIT {
