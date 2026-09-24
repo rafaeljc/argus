@@ -47,7 +47,9 @@ def build_environment(scope: Construct, config: EnvironmentConfig) -> ArgusEnvir
         config=config,
         vpc=network.vpc,
         database=data.database,
-        connection_secret=data.connection_secret,
+        database_connection_secret=data.database_connection_secret,
+        cache_security_group=data.cache_security_group,
+        cache_connection_secret=data.cache_connection_details,
     )
     edge = EdgeStack(
         scope,

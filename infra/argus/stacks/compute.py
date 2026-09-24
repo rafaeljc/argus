@@ -5,7 +5,7 @@ to already exist in ECR. Until it does, this stack cannot be created -- which is
 why the first pass stops at the foundation.
 """
 
-from aws_cdk import Duration
+from aws_cdk import ArnFormat, Duration
 from aws_cdk import aws_cloudwatch as cloudwatch
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_elasticloadbalancingv2 as elbv2
@@ -14,7 +14,7 @@ from aws_cdk import aws_rds as rds
 from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
 
-from argus.config import DATABASE, EnvironmentConfig
+from argus.config import CACHE, DATABASE, EnvironmentConfig
 from argus.constructs.alarms import CriticalAlarms
 from argus.constructs.backend_service import CONTAINER_NAME, BackendService, BackendServiceProps
 from argus.stacks.base import ArgusStack
@@ -34,18 +34,27 @@ class ComputeStack(ArgusStack):
         config: EnvironmentConfig,
         vpc: ec2.IVpc,
         database: rds.IDatabaseInstance,
-        connection_secret: secretsmanager.ISecret,
+        database_connection_secret: secretsmanager.ISecret,
+        cache_security_group: ec2.ISecurityGroup,
+        cache_connection_secret: secretsmanager.ISecret,
     ) -> None:
         super().__init__(scope, construct_id, config=config)
 
         self.backend = BackendService(
             self,
             "Backend",
-            props=BackendServiceProps(config=config, vpc=vpc, connection_secret=connection_secret),
+            props=BackendServiceProps(
+                config=config,
+                vpc=vpc,
+                database_connection_secret=database_connection_secret,
+                cache_connection_secret=cache_connection_secret,
+            ),
         )
 
         self.backend.allow_ingress_from(ec2.Peer.prefix_list(config.cloudfront_prefix_list_id))
         self._allow_the_task_to_reach_the_database(database)
+        self._allow_the_task_to_reach_the_cache(cache_security_group)
+        self._allow_the_task_to_authenticate_with_iam(config)
         self._allow_the_deploy_role_to_roll_the_service(config)
         self._alarm_on_a_service_that_stops_serving()
         self._publish_discovery()
@@ -67,6 +76,50 @@ class ComputeStack(ArgusStack):
             peer=self.backend.service.connections.security_groups[0],
             connection=ec2.Port.tcp(DATABASE.port),
             description="Backend task",
+        )
+
+    def _allow_the_task_to_reach_the_cache(self, cache_security_group: ec2.ISecurityGroup) -> None:
+        """Open 6379 from this stack rather than the data stack.
+
+        The rule has to be created in the scope that already depends on the
+        other: this stack reads the cache's connection secret, so adding the
+        rule in the data stack instead would make the two depend on each other
+        and fail synthesis with a cyclic reference.
+        """
+        security_group = ec2.SecurityGroup.from_security_group_id(
+            self, "CacheSecurityGroup", cache_security_group.security_group_id
+        )
+        security_group.add_ingress_rule(
+            peer=self.backend.service.connections.security_groups[0],
+            connection=ec2.Port.tcp(CACHE.port),
+            description="Backend task",
+        )
+
+    def _allow_the_task_to_authenticate_with_iam(self, config: EnvironmentConfig) -> None:
+        """Grant the task role the one permission IAM authentication to the cache needs.
+
+        The task role carries no other policy: nothing else in the application
+        calls AWS at runtime. The replication group id and the IAM user id are
+        both deterministic names, so they are rebuilt from the naming
+        convention rather than passed in from the data stack.
+        """
+        replication_group_arn = self.format_arn(
+            service="elasticache",
+            resource="replicationgroup",
+            resource_name=config.naming.resource("cache"),
+            arn_format=ArnFormat.COLON_RESOURCE_NAME,
+        )
+        user_arn = self.format_arn(
+            service="elasticache",
+            resource="user",
+            resource_name=config.naming.resource("backend"),
+            arn_format=ArnFormat.COLON_RESOURCE_NAME,
+        )
+        self.backend.task_definition.task_role.add_to_principal_policy(
+            iam.PolicyStatement(
+                actions=["elasticache:Connect"],
+                resources=[replication_group_arn, user_arn],
+            )
         )
 
     def _allow_the_deploy_role_to_roll_the_service(self, config: EnvironmentConfig) -> None:
