@@ -2,7 +2,7 @@ import dataclasses
 
 import pytest
 
-from argus.config import BACKEND, DATABASE, EnvironmentConfig
+from argus.config import BACKEND, CACHE, DATABASE, EnvironmentConfig
 
 CONFIG = EnvironmentConfig(
     name="prod",
@@ -37,3 +37,8 @@ def test_backend_sizing_matches_the_documented_task_shape() -> None:
 
 def test_database_retains_two_weeks_of_backups() -> None:
     assert DATABASE.backup_retention_days == 14
+
+
+def test_cache_is_sized_for_the_session_store_workload() -> None:
+    assert CACHE.node_type == "cache.t4g.micro"
+    assert CACHE.port == 6379

@@ -49,5 +49,14 @@ class DatabaseSizing:
     port: int = 5432
 
 
+@dataclass(frozen=True)
+class CacheSizing:
+    """Shape of the Redis replication group."""
+
+    node_type: str = "cache.t4g.micro"
+    port: int = 6379
+
+
 BACKEND = BackendSizing()
 DATABASE = DatabaseSizing()
+CACHE = CacheSizing()
