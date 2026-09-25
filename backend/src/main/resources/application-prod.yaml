@@ -22,6 +22,15 @@ spring:
     redis:
       host: ${ARGUS_REDIS_HOST}
       port: ${ARGUS_REDIS_PORT}
+      # The cluster only accepts the IAM-authenticated backend user; the `default` user is
+      # disabled with no password. RedisAuthConfig resolves the actual password (a signed
+      # connect token, re-minted per connection) via a RedisCredentialsProviderFactory.
+      username: ${ARGUS_REDIS_USERNAME}
+      ssl:
+        # transit_encryption_mode is "required" on the replication group: a plaintext connection
+        # is refused outright. Peer verification stays at its default (true) -- ElastiCache
+        # presents a publicly trusted certificate, so no truststore or startTls is needed.
+        enabled: true
       lettuce:
         pool:
           # Without a pool, Lettuce multiplexes every caller over one shared connection: fine at
@@ -57,6 +66,10 @@ server:
     max-connections: 200
 
 argus:
+  redis:
+    # The presigning host for the IAM connect token, not a connection target: ElastiCacheTokenFactory
+    # signs the request against this name, separately from spring.data.redis.host/port.
+    cache-name: ${ARGUS_REDIS_CACHE_NAME}
   app-base-url: ${ARGUS_APP_BASE_URL}
   admin:
     user-id: ${ARGUS_ADMIN_USER_ID}

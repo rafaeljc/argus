@@ -136,8 +136,7 @@ session/CSRF/admin-authorization subsystem and its tests.
   the `CONFIG` command Spring Session's default `configure-action`
   would issue to enable keyspace notifications; `application-prod.yaml`
   sets `configure-action: none`, and the ElastiCache parameter group
-  must set `notify-keyspace-events=Egx` directly — tracked as
-  infrastructure follow-up work, not a backend concern.
+  must set `notify-keyspace-events=Egx` directly.
 
 ### Confirmation
 
