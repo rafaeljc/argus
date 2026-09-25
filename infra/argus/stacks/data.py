@@ -44,10 +44,13 @@ CACHE_ENGINE = "redis"
 CACHE_ENGINE_VERSION = "7.1"
 CACHE_PARAMETER_GROUP_FAMILY = "redis7"
 
-# ElastiCache requires a user named "default" in every user group. Left at the
-# AWS-managed default (nopass, +@all), it would make the IAM-authenticated user
-# below decorative: anything reaching the port could authenticate as it with no
-# token at all.
+# Every user group must hold a user *named* "default". The *id* "default" is the
+# one ElastiCache creates per account and region, which can be neither created
+# nor modified -- and which, left in the group on its managed "on ~* +@all",
+# would make the IAM-authenticated user below decorative: anything reaching the
+# port could authenticate as it with no token at all. Only the name is fixed, so
+# the group gets its own disabled user under it and the managed one never joins.
+# https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Clusters.RBAC.html
 DEFAULT_USER_NAME = "default"
 DEFAULT_USER_ACCESS_STRING = "off -@all"
 
@@ -193,7 +196,8 @@ class DataStack(ArgusStack):
             self,
             "CacheDefaultUser",
             engine=CACHE_ENGINE,
-            user_id=DEFAULT_USER_NAME,
+            # Any id but "default"; only the name has to be.
+            user_id=self.naming.resource("cache-default"),
             user_name=DEFAULT_USER_NAME,
             access_string=DEFAULT_USER_ACCESS_STRING,
             no_password_required=True,
@@ -217,7 +221,9 @@ class DataStack(ArgusStack):
             "CacheUserGroup",
             engine=CACHE_ENGINE,
             user_group_id=self.naming.resource("cache-users"),
-            user_ids=[user.user_id for user in self.cache_users],
+            # Ref, not the literal id: it is the same string, but it is also the
+            # dependency that orders the users ahead of the group.
+            user_ids=[user.ref for user in self.cache_users],
         )
 
     def _cache(self, config: EnvironmentConfig, vpc: ec2.IVpc) -> elasticache.CfnReplicationGroup:

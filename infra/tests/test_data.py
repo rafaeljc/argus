@@ -224,6 +224,10 @@ def test_the_default_user_is_locked_out(template: Template) -> None:
 
     assert default["AccessString"] == "off -@all"
     assert default["NoPasswordRequired"] is True
+    # Only the *name* has to be "default". The id belongs to the user
+    # ElastiCache creates per account and region, which can be neither created
+    # nor modified, so claiming it is a create that can never succeed.
+    assert default["UserId"] != "default"
 
 
 def test_the_backend_user_authenticates_with_iam(template: Template) -> None:
