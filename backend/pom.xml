@@ -31,6 +31,7 @@
 		<resilience4j.version>2.4.0</resilience4j.version>
 		<bucket4j.version>8.10.1</bucket4j.version>
 		<uuid-creator.version>6.1.1</uuid-creator.version>
+		<awssdk.version>2.54.14</awssdk.version>
 		<bouncycastle.version>1.79</bouncycastle.version>
 		<logstash-logback-encoder.version>8.0</logstash-logback-encoder.version>
 		<archunit.version>1.4.1</archunit.version>
@@ -44,6 +45,18 @@
 		     this for its own context. -->
 		<test.spring.profiles.active>test</test.spring.profiles.active>
 	</properties>
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>software.amazon.awssdk</groupId>
+				<artifactId>bom</artifactId>
+				<version>${awssdk.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -109,6 +122,18 @@
 			<groupId>io.github.resilience4j</groupId>
 			<artifactId>resilience4j-spring-boot4</artifactId>
 			<version>${resilience4j.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>auth</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>http-auth-aws</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>regions</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>com.bucket4j</groupId>
