@@ -128,10 +128,10 @@ def test_every_configured_value_is_injected_as_a_secret(template: Template) -> N
     assert {secret["Name"] for secret in container["Secrets"]} == EXPECTED_SECRETS
 
 
-def test_the_only_plain_environment_variable_selects_the_profile(template: Template) -> None:
-    environment = _container(template)["Environment"]
+def test_only_plain_environment_variables_select_the_profile_and_region(template: Template) -> None:
+    environment = {entry["Name"]: entry["Value"] for entry in _container(template)["Environment"]}
 
-    assert environment == [{"Name": "SPRING_PROFILES_ACTIVE", "Value": "prod"}]
+    assert environment == {"SPRING_PROFILES_ACTIVE": "prod", "AWS_REGION": "us-east-1"}
 
 
 def test_the_container_runs_the_image_recorded_in_the_parameter(template: Template) -> None:
