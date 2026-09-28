@@ -33,11 +33,12 @@ flowchart TB
         subgraph app ["PRIVATE_WITH_EGRESS"]
             alb["<b>ALB</b> internal · listener :80<br/>SG ingress: CloudFront prefix list only"]
             svc["<b>ECS Fargate service</b><br/>no DesiredCount in template<br/>circuit breaker + rollback<br/>min 0% / max 100%<br/>AssignPublicIp DISABLED"]
-            task["<b>Task</b> 1024 cpu / 2048 MiB<br/>:8080 traffic · :8081 management<br/>13 secrets · 30 day logs"]
+            task["<b>Task</b> 1024 cpu / 2048 MiB<br/>:8080 traffic · :8081 management<br/>18 secrets · 30 day logs"]
         end
 
         subgraph data ["PRIVATE_ISOLATED"]
             rds[("<b>RDS Postgres 18</b> argus-prod-db<br/>db.t4g.micro · 20 GiB gp3<br/>encrypted · single-AZ · 14d backups")]
+            redis[("<b>ElastiCache Redis 7.1</b> argus-prod-cache<br/>cache.t4g.micro · single node<br/>encrypted · IAM auth · no cluster mode")]
         end
     end
 
@@ -49,6 +50,7 @@ flowchart TB
     alb -->|":8080 traffic · :8081 health"| svc
     svc --- task
     task -->|":5432"| rds
+    task -->|":6379 TLS"| redis
     task -.->|egress| nat --> igw --> external
 ```
 
@@ -77,7 +79,7 @@ exists in ECR and ECR does not exist until CDK has run.
 |---|---|---|
 | `argus-prod-foundation` | 1 | ECR repository, GitHub OIDC provider, the two deploy roles, SNS alarm topic |
 | `argus-prod-network` | 2 | VPC, subnets, NAT instance |
-| `argus-prod-data` | 2 | RDS instance and its secret |
+| `argus-prod-data` | 2 | RDS instance and its secret, ElastiCache replication group and its connection secret |
 | `argus-prod-compute` | 2 | ALB, ECS cluster, task definition, service |
 | `argus-prod-edge` | 2 | S3 bucket, ACM certificate, CloudFront, Route 53 record |
 
@@ -136,6 +138,19 @@ one prefix and no workflow ever names a CloudFormation stack.
 ECS injects each field of a secret as its own variable and cannot concatenate,
 so the backend assembles its JDBC url from the five database fields.
 
+`argus/prod/cache` — created by CDK, no credential
+
+| JSON key | Variable |
+|---|---|
+| `host` | `ARGUS_REDIS_HOST` |
+| `port` | `ARGUS_REDIS_PORT` |
+| `username` | `ARGUS_REDIS_USERNAME` |
+| `cache-name` | `ARGUS_REDIS_CACHE_NAME` |
+
+No password field: the backend authenticates to Redis with an IAM-enabled
+ElastiCache user rather than a stored credential, so this secret carries only
+the connection details needed to reach and identify it.
+
 ## Repository variables
 
 | Variable | Value |
@@ -164,6 +179,11 @@ deploy — at the cost of a few seconds with nothing serving.
 domain to the browser preload list is close to irreversible: browsers then
 refuse plaintext for it and every subdomain regardless of the header, and
 removal takes months. Deferred until the domain and its subdomains are settled.
+
+**A single ElastiCache node, no cluster mode, no replica.** The cheapest
+topology that still serves the session-store workload: a single point of
+failure, accepted because sessions are disposable — a lost node re-authenticates
+every user rather than causing data loss.
 
 **Four resources are retained** and survive both stack deletion and replacement:
 the RDS instance, its secret, the frontend bucket, and the ECR repository. Each
