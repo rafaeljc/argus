@@ -1,3 +1,4 @@
+import json
 from collections.abc import Mapping
 from typing import Any
 
@@ -29,6 +30,10 @@ EXPECTED_SECRETS = {
     "ARGUS_DB_NAME",
     "ARGUS_DB_USERNAME",
     "ARGUS_DB_PASSWORD",
+    "ARGUS_REDIS_HOST",
+    "ARGUS_REDIS_PORT",
+    "ARGUS_REDIS_USERNAME",
+    "ARGUS_REDIS_CACHE_NAME",
 }
 
 
@@ -43,7 +48,9 @@ def stack(config: EnvironmentConfig) -> ComputeStack:
         config=config,
         vpc=network.vpc,
         database=data.database,
-        connection_secret=data.connection_secret,
+        database_connection_secret=data.database_connection_secret,
+        cache_security_group=data.cache_security_group,
+        cache_connection_secret=data.cache_connection_details,
     )
 
 
@@ -121,10 +128,10 @@ def test_every_configured_value_is_injected_as_a_secret(template: Template) -> N
     assert {secret["Name"] for secret in container["Secrets"]} == EXPECTED_SECRETS
 
 
-def test_the_only_plain_environment_variable_selects_the_profile(template: Template) -> None:
-    environment = _container(template)["Environment"]
+def test_only_plain_environment_variables_select_the_profile_and_region(template: Template) -> None:
+    environment = {entry["Name"]: entry["Value"] for entry in _container(template)["Environment"]}
 
-    assert environment == [{"Name": "SPRING_PROFILES_ACTIVE", "Value": "prod"}]
+    assert environment == {"SPRING_PROFILES_ACTIVE": "prod", "AWS_REGION": "us-east-1"}
 
 
 def test_the_container_runs_the_image_recorded_in_the_parameter(template: Template) -> None:
@@ -180,6 +187,11 @@ def test_the_task_may_reach_the_database(template: Template) -> None:
     assert any(rule.get("ToPort") == 5432 for rule in _ingress_rules(template))
 
 
+def test_the_task_may_reach_the_cache(template: Template) -> None:
+    """The rule belongs to this stack: adding it in the data stack would be a cycle."""
+    assert any(rule.get("ToPort") == 6379 for rule in _ingress_rules(template))
+
+
 # --- deployment permissions ----------------------------------------------------------------
 
 
@@ -200,6 +212,14 @@ def test_the_backend_role_may_prune_the_revisions_it_accumulates(template: Templ
     granted = _granted_actions(template)
 
     assert {"ecs:ListTaskDefinitions", "ecs:DeregisterTaskDefinition"} <= granted
+
+
+def test_the_task_may_authenticate_with_iam_instead_of_a_password(template: Template) -> None:
+    statement = _statement_granting(template, "elasticache:Connect")
+
+    resources = [json.dumps(resource) for resource in _as_list(statement["Resource"])]
+    assert any(":replicationgroup:argus-prod-cache" in resource for resource in resources)
+    assert any(":user:argus-prod-backend" in resource for resource in resources)
 
 
 # --- discovery -----------------------------------------------------------------------------
@@ -259,6 +279,17 @@ def _granted_actions(template: Template) -> set[str]:
         for statement in policy["Properties"]["PolicyDocument"]["Statement"]
         for action in _as_list(statement["Action"])
     }
+
+
+def _statement_granting(template: Template, action: str) -> Resource:
+    statements: list[Resource] = [
+        statement
+        for policy in template.find_resources("AWS::IAM::Policy").values()
+        for statement in policy["Properties"]["PolicyDocument"]["Statement"]
+        if action in _as_list(statement["Action"])
+    ]
+    assert len(statements) == 1, f"expected one statement granting {action}, got {statements}"
+    return statements[0]
 
 
 def _as_list(action: Any) -> list[str]:

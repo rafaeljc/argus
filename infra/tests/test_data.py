@@ -6,7 +6,7 @@ from aws_cdk import App
 from aws_cdk.assertions import Template
 
 from argus.config import EnvironmentConfig
-from argus.stacks.data import DataStack
+from argus.stacks.data import SESSION_CREATED_CHANNEL_PATTERN, DataStack
 from argus.stacks.network import NetworkStack
 
 Resource = Mapping[str, Any]
@@ -136,7 +136,7 @@ def test_the_conditions_that_take_the_database_down_are_alarmed(template: Templa
         for alarm in template.find_resources("AWS::CloudWatch::Alarm").values()
     }
 
-    assert alarmed == {"CPUUtilization", "FreeStorageSpace", "DatabaseConnections"}
+    assert {"CPUUtilization", "FreeStorageSpace", "DatabaseConnections"} <= alarmed
 
 
 def test_running_out_of_disk_alarms_on_the_way_down(template: Template) -> None:
@@ -147,6 +147,179 @@ def test_running_out_of_disk_alarms_on_the_way_down(template: Template) -> None:
     )
 
     assert storage["ComparisonOperator"] == "LessThanOrEqualToThreshold"
+
+
+# --- the cache -------------------------------------------------------------------------------
+
+
+def test_the_cache_engine_is_redis_not_valkey(template: Template) -> None:
+    template.has_resource_properties(
+        "AWS::ElastiCache::ReplicationGroup", {"Engine": "redis", "EngineVersion": "7.1"}
+    )
+
+
+def test_the_cache_has_no_cluster_mode_and_no_replica(template: Template) -> None:
+    # The cheapest topology that still serves the workload: one node, no
+    # failover target, no second AZ to fail over into.
+    template.has_resource_properties(
+        "AWS::ElastiCache::ReplicationGroup",
+        {
+            "NumCacheClusters": 1,
+            "AutomaticFailoverEnabled": False,
+            "MultiAZEnabled": False,
+        },
+    )
+
+
+def test_the_cache_is_sized_for_the_session_store_workload(template: Template) -> None:
+    template.has_resource_properties(
+        "AWS::ElastiCache::ReplicationGroup", {"CacheNodeType": "cache.t4g.micro"}
+    )
+
+
+def test_traffic_to_the_cache_is_encrypted_in_transit(template: Template) -> None:
+    # Mandatory, and also a prerequisite of the IAM authentication below.
+    template.has_resource_properties(
+        "AWS::ElastiCache::ReplicationGroup",
+        {"TransitEncryptionEnabled": True, "TransitEncryptionMode": "required"},
+    )
+
+
+def test_the_cache_data_at_rest_is_encrypted(template: Template) -> None:
+    template.has_resource_properties(
+        "AWS::ElastiCache::ReplicationGroup", {"AtRestEncryptionEnabled": True}
+    )
+
+
+def test_the_cache_is_never_reachable_from_outside_its_security_group(
+    template: Template,
+) -> None:
+    # No inline ingress on the cache's own group -- the compute stack opens
+    # 6379 for the task, mirroring how it opens 5432 for the database.
+    groups = template.find_resources("AWS::EC2::SecurityGroup")
+    cache_group = next(
+        group
+        for group in groups.values()
+        if "cache" in group["Properties"].get("GroupDescription", "").lower()
+    )
+
+    assert cache_group["Properties"].get("SecurityGroupIngress", []) == []
+
+
+def test_the_cache_sits_in_the_isolated_tier(stacks: tuple[Template, Template]) -> None:
+    network, data = stacks
+    subnet_ids = _only_resource(data, "AWS::ElastiCache::SubnetGroup")["Properties"]["SubnetIds"]
+
+    placed_in = {_resolve_import(network, subnet_id) for subnet_id in subnet_ids}
+
+    assert placed_in == set(_subnets_named(network, "database"))
+
+
+def test_the_default_user_is_locked_out(template: Template) -> None:
+    # ElastiCache requires a user named "default" in every user group. Left at
+    # the AWS-managed default (nopass, +@all) it would make the IAM user
+    # decorative -- anything reaching the port could authenticate as it.
+    users = _cache_user_properties(template)
+    default = next(user for user in users if user["UserName"] == "default")
+
+    assert default["AccessString"] == "off -@all"
+    assert default["NoPasswordRequired"] is True
+    # Only the *name* has to be "default". The id belongs to the user
+    # ElastiCache creates per account and region, which can be neither created
+    # nor modified, so claiming it is a create that can never succeed.
+    assert default["UserId"] != "default"
+
+
+def test_the_backend_user_authenticates_with_iam(template: Template) -> None:
+    users = _cache_user_properties(template)
+    backend = next(user for user in users if user["UserName"] != "default")
+
+    assert backend["AuthenticationMode"] == {"Type": "iam"}
+    # Identical id and name are required for IAM-enabled users.
+    assert backend["UserId"] == backend["UserName"]
+    assert "PASSWORD" not in backend and "Passwords" not in backend
+
+
+def test_the_backend_user_may_subscribe_to_the_session_created_channel(
+    template: Template,
+) -> None:
+    # Spring Session PSUBSCRIBEs to this while the context is still refreshing;
+    # without the literal pattern the backend exits on NOPERM before serving.
+    users = _cache_user_properties(template)
+    backend = next(user for user in users if user["UserName"] != "default")
+
+    assert f"&{SESSION_CREATED_CHANNEL_PATTERN}" in backend["AccessString"]
+
+
+def test_the_user_group_holds_both_users(template: Template) -> None:
+    group = _only_resource(template, "AWS::ElastiCache::UserGroup")
+
+    assert len(group["Properties"]["UserIds"]) == 2
+
+
+def test_the_parameter_group_enables_keyspace_notifications_for_spring_session(
+    template: Template,
+) -> None:
+    # application-prod.yaml sets configure-action: none because ElastiCache
+    # blocks the CONFIG command Spring Session would otherwise issue itself.
+    template.has_resource_properties(
+        "AWS::ElastiCache::ParameterGroup",
+        {"Properties": {"notify-keyspace-events": "Egx"}},
+    )
+
+
+def test_nothing_may_reach_the_cache_until_the_compute_stack_grants_it(
+    template: Template,
+) -> None:
+    ingress = [
+        rule["Properties"]
+        for rule in template.find_resources("AWS::EC2::SecurityGroupIngress").values()
+    ]
+    for group in template.find_resources("AWS::EC2::SecurityGroup").values():
+        ingress.extend(group["Properties"].get("SecurityGroupIngress", []))
+
+    assert ingress == []
+
+
+def test_the_cache_is_disposable_unlike_the_database(template: Template) -> None:
+    # Sessions are disposable -- losing them logs everyone out -- so unlike the
+    # database this carries no explicit removal policy, which leaves
+    # CloudFormation's own default of Delete in place.
+    resource = _only_resource(template, "AWS::ElastiCache::ReplicationGroup")
+    assert resource.get("DeletionPolicy", "Delete") == "Delete"
+
+
+def test_the_conditions_that_take_the_cache_down_are_alarmed(template: Template) -> None:
+    alarms = [
+        alarm["Properties"]
+        for alarm in template.find_resources("AWS::CloudWatch::Alarm").values()
+        if alarm["Properties"]["Namespace"] == "AWS/ElastiCache"
+    ]
+
+    assert {alarm["MetricName"] for alarm in alarms} == {
+        "EngineCPUUtilization",
+        "DatabaseMemoryUsagePercentage",
+        "CurrConnections",
+    }
+    for alarm in alarms:
+        assert alarm["Dimensions"] == [{"Name": "CacheClusterId", "Value": "argus-prod-cache-001"}]
+
+
+def test_the_cache_connection_secret_is_disposable(template: Template) -> None:
+    # Unlike argus/prod/db: it holds no credential, only connection details
+    # that can be rebuilt from this stack.
+    secret = next(
+        secret["Properties"]
+        for secret in template.find_resources("AWS::SecretsManager::Secret").values()
+        if secret["Properties"].get("Name", "").endswith("/cache")
+    )
+
+    assert "GenerateSecretString" not in secret
+
+
+def _cache_user_properties(template: Template) -> list[Resource]:
+    users = template.find_resources("AWS::ElastiCache::User")
+    return [user["Properties"] for user in users.values()]
 
 
 def _only_resource(template: Template, resource_type: str) -> Resource:

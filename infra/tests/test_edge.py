@@ -28,7 +28,9 @@ def stack(config: EnvironmentConfig) -> EdgeStack:
         config=config,
         vpc=network.vpc,
         database=data.database,
-        connection_secret=data.connection_secret,
+        database_connection_secret=data.database_connection_secret,
+        cache_security_group=data.cache_security_group,
+        cache_connection_secret=data.cache_connection_details,
     )
     return EdgeStack(
         app, "argus-prod-edge", config=config, load_balancer=compute.backend.load_balancer

@@ -1,13 +1,17 @@
 """The backend running behind an internal load balancer.
 
-The contract with the application is the three tables below: every value the
+The contract with the application is the four tables below: every value the
 backend reads from its environment arrives as an ECS *secret*, resolved by the
 agent at task start. Nothing configurable is baked into the image, and nothing
-sensitive appears in the task definition.
+sensitive appears in the task definition. The one exception is `AWS_REGION`,
+injected as a plain variable alongside `SPRING_PROFILES_ACTIVE`: it tells the
+AWS SDK where it is running so it can sign ElastiCache IAM auth requests,
+rather than configuring the application itself.
 
 The database url is assembled by the application from five separate fields
 because ECS injects each field of a secret as its own variable and cannot
-concatenate them.
+concatenate them. The cache connection is assembled from four fields for the
+same reason.
 """
 
 from dataclasses import dataclass
@@ -56,6 +60,15 @@ DATABASE_FIELDS = {
     "ARGUS_DB_PASSWORD": "password",
 }
 
+# Fields of the cache connection secret assembled by the data stack. No
+# password: authentication is IAM.
+CACHE_FIELDS = {
+    "ARGUS_REDIS_HOST": "host",
+    "ARGUS_REDIS_PORT": "port",
+    "ARGUS_REDIS_USERNAME": "username",
+    "ARGUS_REDIS_CACHE_NAME": "cache-name",
+}
+
 
 @dataclass(frozen=True)
 class BackendServiceProps:
@@ -63,7 +76,8 @@ class BackendServiceProps:
 
     config: EnvironmentConfig
     vpc: ec2.IVpc
-    connection_secret: secretsmanager.ISecret
+    database_connection_secret: secretsmanager.ISecret
+    cache_connection_secret: secretsmanager.ISecret
 
 
 class BackendService(Construct):
@@ -110,7 +124,7 @@ class BackendService(Construct):
             CONTAINER_NAME,
             container_name=CONTAINER_NAME,
             image=ecs.ContainerImage.from_ecr_repository(repository, config.image_tag),
-            environment={"SPRING_PROFILES_ACTIVE": config.name},
+            environment={"SPRING_PROFILES_ACTIVE": config.name, "AWS_REGION": config.region},
             secrets=self._secrets(config),
             logging=ecs.LogDrivers.aws_logs(
                 stream_prefix=CONTAINER_NAME,
@@ -148,8 +162,18 @@ class BackendService(Construct):
         )
         secrets.update(
             {
-                variable: ecs.Secret.from_secrets_manager(self._props.connection_secret, field)
+                variable: ecs.Secret.from_secrets_manager(
+                    self._props.database_connection_secret, field
+                )
                 for variable, field in DATABASE_FIELDS.items()
+            }
+        )
+        secrets.update(
+            {
+                variable: ecs.Secret.from_secrets_manager(
+                    self._props.cache_connection_secret, field
+                )
+                for variable, field in CACHE_FIELDS.items()
             }
         )
         return secrets
