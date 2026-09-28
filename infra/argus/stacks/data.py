@@ -60,7 +60,13 @@ DEFAULT_USER_ACCESS_STRING = "off -@all"
 # Spring Boot's Redis health indicator issues INFO, which sits in @dangerous,
 # and -@dangerous would fail the readiness probe the ALB depends on.
 # ElastiCache blocks the genuinely destructive admin commands on its own.
-BACKEND_USER_ACCESS_STRING = "on ~argus:* &__key*@0__:* +@all"
+#
+# Redis matches a PSUBSCRIBE pattern against the ACL literally rather than as a
+# glob, so the session-created channel has to be spelled out exactly as Spring
+# Session builds it from spring.session.data.redis.namespace and the database
+# index -- a broader &argus:* is still refused with NOPERM.
+SESSION_CREATED_CHANNEL_PATTERN = "argus:session:event:0:created:*"
+BACKEND_USER_ACCESS_STRING = f"on ~argus:* &__key*@0__:* &{SESSION_CREATED_CHANNEL_PATTERN} +@all"
 
 
 class DataStack(ArgusStack):

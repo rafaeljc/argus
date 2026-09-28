@@ -6,7 +6,7 @@ from aws_cdk import App
 from aws_cdk.assertions import Template
 
 from argus.config import EnvironmentConfig
-from argus.stacks.data import DataStack
+from argus.stacks.data import SESSION_CREATED_CHANNEL_PATTERN, DataStack
 from argus.stacks.network import NetworkStack
 
 Resource = Mapping[str, Any]
@@ -238,6 +238,17 @@ def test_the_backend_user_authenticates_with_iam(template: Template) -> None:
     # Identical id and name are required for IAM-enabled users.
     assert backend["UserId"] == backend["UserName"]
     assert "PASSWORD" not in backend and "Passwords" not in backend
+
+
+def test_the_backend_user_may_subscribe_to_the_session_created_channel(
+    template: Template,
+) -> None:
+    # Spring Session PSUBSCRIBEs to this while the context is still refreshing;
+    # without the literal pattern the backend exits on NOPERM before serving.
+    users = _cache_user_properties(template)
+    backend = next(user for user in users if user["UserName"] != "default")
+
+    assert f"&{SESSION_CREATED_CHANNEL_PATTERN}" in backend["AccessString"]
 
 
 def test_the_user_group_holds_both_users(template: Template) -> None:
