@@ -25,17 +25,21 @@ from aws_cdk import aws_secretsmanager as secretsmanager
 from constructs import Construct
 
 from argus.config import CACHE, DATABASE, EnvironmentConfig
-from argus.constructs.alarms import CriticalAlarms
+from argus.constructs.alarms import CriticalAlarms, cache_metric
 from argus.retention import Durability
 from argus.stacks.base import ArgusStack
 
 DATABASE_ENGINE_VERSION = rds.PostgresEngineVersion.VER_18
 
-CPU_ALARM_PERCENT = 80
-FREE_STORAGE_ALARM_BYTES = 2 * 1024**3
+DATABASE_CPU_ALARM_PERCENT = 80
+DATABASE_FREE_STORAGE_ALARM_BYTES = 2 * 1024**3
 # db.t4g.micro allows a little over 100; alarm before the application starts
 # seeing connection refusals.
-CONNECTIONS_ALARM_COUNT = 80
+DATABASE_CONNECTIONS_ALARM_COUNT = 80
+
+CACHE_CPU_ALARM_PERCENT = 80
+CACHE_MEMORY_ALARM_PERCENT = 80
+CACHE_CONNECTIONS_ALARM_COUNT = 80
 
 # ElastiCache's Redis OSS ceiling: 7.2 and above is Valkey only. Kept as its own
 # engine version rather than a shared constant with Postgres -- the two engines
@@ -81,15 +85,17 @@ class DataStack(ArgusStack):
         vpc: ec2.IVpc,
     ) -> None:
         super().__init__(scope, construct_id, config=config)
+        self._alarms = CriticalAlarms(self, self.naming)
 
         self.database_credentials = self._database_credentials(config)
         self.database = self._database(vpc)
-        self._alarm_on_conditions_that_precede_an_outage()
+        self._alarm_on_database_conditions_that_precede_an_outage()
 
         self.cache_security_group = self._cache_security_group(vpc)
         self.cache_users = self._cache_users(config)
         self.cache_user_group = self._cache_user_group(config)
         self.cache = self._cache(config, vpc)
+        self._alarm_on_cache_conditions_that_precede_an_outage()
         self.cache_connection_details = self._cache_connection_details(config)
 
     def _database_credentials(self, config: EnvironmentConfig) -> rds.DatabaseSecret:
@@ -163,27 +169,53 @@ class DataStack(ArgusStack):
             raise ValueError("the database was created without credentials")
         return attached
 
-    def _alarm_on_conditions_that_precede_an_outage(self) -> None:
-        alarms = CriticalAlarms(self, self.naming)
-        alarms.add(
+    def _alarm_on_database_conditions_that_precede_an_outage(self) -> None:
+        self._alarms.add(
             "db-cpu-saturated",
             metric=self.database.metric_cpu_utilization(),
-            threshold=CPU_ALARM_PERCENT,
+            threshold=DATABASE_CPU_ALARM_PERCENT,
             description="The database has been CPU bound long enough to slow every request.",
         )
-        alarms.add(
+        self._alarms.add(
             "db-storage-exhausted",
             metric=self.database.metric_free_storage_space(),
-            threshold=FREE_STORAGE_ALARM_BYTES,
+            threshold=DATABASE_FREE_STORAGE_ALARM_BYTES,
             comparison_operator=cloudwatch.ComparisonOperator.LESS_THAN_OR_EQUAL_TO_THRESHOLD,
             description="The database is running out of disk and will stop accepting writes.",
         )
-        alarms.add(
+        self._alarms.add(
             "db-connections-exhausted",
             metric=self.database.metric_database_connections(),
-            threshold=CONNECTIONS_ALARM_COUNT,
+            threshold=DATABASE_CONNECTIONS_ALARM_COUNT,
             description="The database is close to refusing new connections.",
         )
+
+    def _alarm_on_cache_conditions_that_precede_an_outage(self) -> None:
+        # The dimension below is a plain string, not a token derived from
+        # self.cache, so CloudFormation has no implicit ordering between these
+        # alarms and the replication group -- add_dependency states it explicitly.
+        cache_cluster_id = f"{self.cache.replication_group_id}-001"
+        cpu_alarm = self._alarms.add(
+            "cache-cpu-saturated",
+            metric=cache_metric(cache_cluster_id, "EngineCPUUtilization"),
+            threshold=CACHE_CPU_ALARM_PERCENT,
+            description="The cache has been CPU bound long enough to slow every session read.",
+        )
+        memory_alarm = self._alarms.add(
+            "cache-memory-exhausted",
+            metric=cache_metric(cache_cluster_id, "DatabaseMemoryUsagePercentage"),
+            threshold=CACHE_MEMORY_ALARM_PERCENT,
+            description="The cache is running out of memory and will start evicting live sessions.",
+        )
+        connections_alarm = self._alarms.add(
+            "cache-connections-exhausted",
+            metric=cache_metric(cache_cluster_id, "CurrConnections"),
+            threshold=CACHE_CONNECTIONS_ALARM_COUNT,
+            description="The cache is close to refusing new connections.",
+        )
+        cpu_alarm.node.add_dependency(self.cache)
+        memory_alarm.node.add_dependency(self.cache)
+        connections_alarm.node.add_dependency(self.cache)
 
     def _cache_security_group(self, vpc: ec2.IVpc) -> ec2.SecurityGroup:
         # Declared explicitly, unlike every other security group in this

@@ -136,7 +136,7 @@ def test_the_conditions_that_take_the_database_down_are_alarmed(template: Templa
         for alarm in template.find_resources("AWS::CloudWatch::Alarm").values()
     }
 
-    assert alarmed == {"CPUUtilization", "FreeStorageSpace", "DatabaseConnections"}
+    assert {"CPUUtilization", "FreeStorageSpace", "DatabaseConnections"} <= alarmed
 
 
 def test_running_out_of_disk_alarms_on_the_way_down(template: Template) -> None:
@@ -287,6 +287,22 @@ def test_the_cache_is_disposable_unlike_the_database(template: Template) -> None
     # CloudFormation's own default of Delete in place.
     resource = _only_resource(template, "AWS::ElastiCache::ReplicationGroup")
     assert resource.get("DeletionPolicy", "Delete") == "Delete"
+
+
+def test_the_conditions_that_take_the_cache_down_are_alarmed(template: Template) -> None:
+    alarms = [
+        alarm["Properties"]
+        for alarm in template.find_resources("AWS::CloudWatch::Alarm").values()
+        if alarm["Properties"]["Namespace"] == "AWS/ElastiCache"
+    ]
+
+    assert {alarm["MetricName"] for alarm in alarms} == {
+        "EngineCPUUtilization",
+        "DatabaseMemoryUsagePercentage",
+        "CurrConnections",
+    }
+    for alarm in alarms:
+        assert alarm["Dimensions"] == [{"Name": "CacheClusterId", "Value": "argus-prod-cache-001"}]
 
 
 def test_the_cache_connection_secret_is_disposable(template: Template) -> None:

@@ -76,5 +76,13 @@ def instance_status_check(instance_id: str) -> cloudwatch.Metric:
     )
 
 
+def cache_metric(cache_cluster_id: str, metric_name: str) -> cloudwatch.Metric:
+    return cloudwatch.Metric(
+        namespace="AWS/ElastiCache",
+        metric_name=metric_name,
+        dimensions_map={"CacheClusterId": cache_cluster_id},
+    )
+
+
 def _construct_id(name: str) -> str:
     return "".join(word.capitalize() for word in name.split("-")) + "Alarm"
