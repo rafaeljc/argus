@@ -142,12 +142,19 @@
 		</dependency>
 		<dependency>
 			<groupId>com.bucket4j</groupId>
+			<artifactId>bucket4j-redis</artifactId>
+			<version>${bucket4j.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.bucket4j</groupId>
 			<artifactId>bucket4j-caffeine</artifactId>
 			<version>${bucket4j.version}</version>
+			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>com.github.ben-manes.caffeine</groupId>
 			<artifactId>caffeine</artifactId>
+			<scope>test</scope>
 		</dependency>
 
 		<dependency>

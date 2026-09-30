@@ -13,6 +13,7 @@ import java.util.Objects;
 
 public class Bucket4jRateLimiter implements RateLimiter {
 
+    private static final String KEY_PREFIX = "argus:rate-limit:";
     private static final long ONE_SECOND_IN_NANOS = 1_000_000_000L;
 
     private final Map<String, BucketConfiguration> configurations;
@@ -31,7 +32,7 @@ public class Bucket4jRateLimiter implements RateLimiter {
         if (configuration == null) {
             throw new IllegalArgumentException("unknown rate-limit bucket: " + bucketName);
         }
-        String compositeKey = bucketName + ":" + key;
+        String compositeKey = KEY_PREFIX + bucketName + ":" + key;
         long limit = configuration.getBandwidths()[0].getCapacity();
         ConsumptionProbe probe = proxyManager.builder()
                 .build(compositeKey, () -> configuration)
