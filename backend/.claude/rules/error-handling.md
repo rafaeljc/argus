@@ -165,7 +165,7 @@ class ApiErrorHandler {
 
     @ExceptionHandler(Throwable.class)
     ResponseEntity<ErrorEnvelope> fallback(Throwable ex) {
-        var traceId = MDC.get("traceId");
+        var traceId = MDC.get("trace_id");
         log.error("unhandled exception [{}]", traceId, ex);
         return ResponseEntity.status(500).body(envelope("INTERNAL_ERROR", "Internal error", List.of()));
     }

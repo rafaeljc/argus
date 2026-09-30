@@ -35,7 +35,7 @@ public class ApiErrorHandler {
     private static final String CODE_INTERNAL_ERROR = "INTERNAL_ERROR";
 
     private static final String FALLBACK_DETAIL = "invalid";
-    private static final String TRACE_ID_KEY = "traceId";
+    private static final String TRACE_ID_KEY = "trace_id";
 
     @ExceptionHandler(DomainException.class)
     public ResponseEntity<ErrorEnvelope> handleDomain(DomainException ex) {
