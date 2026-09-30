@@ -26,9 +26,11 @@ public class BucketResolver {
         String uri = request.getRequestURI();
         String method = request.getMethod();
 
-        // IP-keyed buckets read request.getRemoteAddr(). Behind the upstream LB this resolves to
-        // the LB's address, so IP buckets currently degenerate to a single global bucket per
-        // endpoint. Trusting X-Forwarded-For is deferred to the deployment-hardening PR.
+        // IP-keyed buckets read request.getRemoteAddr(). server.forward-headers-strategy: native
+        // installs Tomcat's RemoteIpValve, which rewrites this to the trusted-hop client IP --
+        // walking X-Forwarded-For right-to-left and stopping at the first entry outside its
+        // trusted-proxy range, so a client-forged prefix can't spoof the value read here. In
+        // profiles with no trusted hop in front, this is simply the socket peer.
         if ("POST".equals(method)) {
             if (SIGNUP_PATH.equals(uri)) {
                 return new BucketSelection("auth.signup", request.getRemoteAddr());

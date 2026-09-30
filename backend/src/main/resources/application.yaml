@@ -54,6 +54,12 @@ spring:
 server:
   port: 8080
   shutdown: graceful
+  # Every deployment sits behind a trusted hop (CloudFront + ALB in prod, or nothing in
+  # local/test, where the "hop" is just loopback). Tomcat's RemoteIpValve only rewrites
+  # getRemoteAddr() when the real TCP peer matches its trusted internalProxies range, walking
+  # X-Forwarded-For right-to-left and stopping at the first entry outside that range — so a
+  # client-supplied prefix can't spoof the resolved address in any profile.
+  forward-headers-strategy: native
   servlet:
     session:
       cookie:

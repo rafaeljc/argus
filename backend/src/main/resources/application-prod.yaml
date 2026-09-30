@@ -50,11 +50,6 @@ spring:
         configure-action: none
 
 server:
-  # Prod runs behind a TLS-terminating LB. `framework` installs ForwardedHeaderFilter so
-  # getRemoteAddr() / getScheme() reflect the original client via X-Forwarded-* headers.
-  # Only safe in environments with a trusted hop in front — left at default (none) elsewhere
-  # so direct clients can't spoof their IP.
-  forward-headers-strategy: framework
   tomcat:
     # Sized to the 1 vCPU Fargate task: the 200-connection framework default lets requests pile
     # up far beyond what the 10-connection datasource pool can serve, so load sheds here instead
