@@ -11,6 +11,8 @@
         <encoder class="net.logstash.logback.encoder.LogstashEncoder">
             <timeZone>UTC</timeZone>
             <includeMdcKeyName>trace_id</includeMdcKeyName>
+            <includeMdcKeyName>ip_address</includeMdcKeyName>
+            <includeMdcKeyName>user_agent</includeMdcKeyName>
             <jsonGeneratorDecorator class="net.logstash.logback.mask.MaskingJsonGeneratorDecorator">
                 <defaultMask>****</defaultMask>
                 <path>password</path>
