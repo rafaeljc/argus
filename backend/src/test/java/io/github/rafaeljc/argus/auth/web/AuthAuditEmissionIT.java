@@ -31,12 +31,12 @@ import org.springframework.test.context.TestPropertySource;
 @AutoConfigureTestRestTemplate
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @TestPropertySource(properties = {
-        "argus.rate-limit.buckets.[RL.auth.signup].capacity=1000",
-        "argus.rate-limit.buckets.[RL.auth.signup].refill-tokens=1000",
-        "argus.rate-limit.buckets.[RL.auth.signup].refill-duration=PT1M",
-        "argus.rate-limit.buckets.[RL.unauth.global].capacity=1000",
-        "argus.rate-limit.buckets.[RL.unauth.global].refill-tokens=1000",
-        "argus.rate-limit.buckets.[RL.unauth.global].refill-duration=PT1M"
+        "argus.rate-limit.buckets.[auth.signup].capacity=1000",
+        "argus.rate-limit.buckets.[auth.signup].refill-tokens=1000",
+        "argus.rate-limit.buckets.[auth.signup].refill-duration=PT1M",
+        "argus.rate-limit.buckets.[unauth.global].capacity=1000",
+        "argus.rate-limit.buckets.[unauth.global].refill-tokens=1000",
+        "argus.rate-limit.buckets.[unauth.global].refill-duration=PT1M"
 })
 class AuthAuditEmissionIT {
 

@@ -125,12 +125,12 @@ On 429 also add `Retry-After`.
 
 Categories (per NFR-Sec7 / Sec7b):
 
-- `RL.auth.signup` — 5/h/IP
-- `RL.auth.login` — 10/15min/IP, exponential backoff
-- `RL.auth.reset` — 3/h/email
-- `RL.unauth.global` — 100/min/IP (pre-login)
-- `RL.read` — 300/min/user, capped at 600/min/IP
-- `RL.write` — 60/min/user
+- `auth.signup` — 5/h/IP
+- `auth.login` — 10/15min/IP, exponential backoff
+- `auth.reset` — 3/h/email
+- `unauth.global` — 100/min/IP (pre-login)
+- `read` — 300/min/user, capped at 600/min/IP
+- `write` — 60/min/user
 
 ## Validation
 

@@ -31,27 +31,27 @@ public class BucketResolver {
         // endpoint. Trusting X-Forwarded-For is deferred to the deployment-hardening PR.
         if ("POST".equals(method)) {
             if (SIGNUP_PATH.equals(uri)) {
-                return new BucketSelection("RL.auth.signup", request.getRemoteAddr());
+                return new BucketSelection("auth.signup", request.getRemoteAddr());
             }
             if (LOGIN_PATH.equals(uri)) {
-                return new BucketSelection("RL.auth.login", request.getRemoteAddr());
+                return new BucketSelection("auth.login", request.getRemoteAddr());
             }
             if (PASSWORD_RESET_REQUEST_PATH.equals(uri)) {
-                return new BucketSelection("RL.auth.reset", request.getRemoteAddr());
+                return new BucketSelection("auth.reset", request.getRemoteAddr());
             }
             if (UNAUTH_PUBLIC_POSTS.contains(uri)) {
-                return new BucketSelection("RL.unauth.global", request.getRemoteAddr());
+                return new BucketSelection("unauth.global", request.getRemoteAddr());
             }
         }
 
         if (userId.isPresent()) {
             // POST /admin/users is a search, not a write: the body carries the email filter so
-            // it stays off access logs, but the request is read-only and rated RL.read.
+            // it stays off access logs, but the request is read-only and rated "read".
             boolean isReadPost = "POST".equals(method) && ADMIN_USERS_SEARCH_PATH.equals(uri);
-            String bucketName = READ_METHODS.contains(method) || isReadPost ? "RL.read" : "RL.write";
+            String bucketName = READ_METHODS.contains(method) || isReadPost ? "read" : "write";
             return new BucketSelection(bucketName, userId.get());
         }
 
-        return new BucketSelection("RL.unauth.global", request.getRemoteAddr());
+        return new BucketSelection("unauth.global", request.getRemoteAddr());
     }
 }

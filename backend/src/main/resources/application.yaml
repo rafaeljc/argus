@@ -188,29 +188,29 @@ argus:
     zone: America/New_York
   rate-limit:
     # Bucket keys are wrapped in "[...]" so Spring's relaxed binder treats the dots as part of
-    # the map key instead of nesting (RL.auth.signup -> RL -> auth -> signup). Do not unquote.
+    # the map key instead of nesting (auth.signup -> auth -> signup). Do not unquote.
     buckets:
-      "[RL.auth.signup]":
+      "[auth.signup]":
         capacity: 5
         refill-tokens: 5
         refill-duration: PT1H
-      "[RL.auth.login]":
+      "[auth.login]":
         capacity: 10
         refill-tokens: 10
         refill-duration: PT15M
-      "[RL.auth.reset]":
+      "[auth.reset]":
         capacity: 5
         refill-tokens: 5
         refill-duration: PT1H
-      "[RL.unauth.global]":
+      "[unauth.global]":
         capacity: 100
         refill-tokens: 100
         refill-duration: PT1M
-      "[RL.read]":
+      "[read]":
         capacity: 300
         refill-tokens: 300
         refill-duration: PT1M
-      "[RL.write]":
+      "[write]":
         capacity: 60
         refill-tokens: 60
         refill-duration: PT1M
