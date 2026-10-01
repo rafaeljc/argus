@@ -54,6 +54,12 @@ spring:
 server:
   port: 8080
   shutdown: graceful
+  # Every deployment sits behind a trusted hop (CloudFront + ALB in prod, or nothing in
+  # local/test, where the "hop" is just loopback). Tomcat's RemoteIpValve only rewrites
+  # getRemoteAddr() when the real TCP peer matches its trusted internalProxies range, walking
+  # X-Forwarded-For right-to-left and stopping at the first entry outside that range — so a
+  # client-supplied prefix can't spoof the resolved address in any profile.
+  forward-headers-strategy: native
   servlet:
     session:
       cookie:
@@ -188,29 +194,29 @@ argus:
     zone: America/New_York
   rate-limit:
     # Bucket keys are wrapped in "[...]" so Spring's relaxed binder treats the dots as part of
-    # the map key instead of nesting (RL.auth.signup -> RL -> auth -> signup). Do not unquote.
+    # the map key instead of nesting (auth.signup -> auth -> signup). Do not unquote.
     buckets:
-      "[RL.auth.signup]":
+      "[auth.signup]":
         capacity: 5
         refill-tokens: 5
         refill-duration: PT1H
-      "[RL.auth.login]":
+      "[auth.login]":
         capacity: 10
         refill-tokens: 10
         refill-duration: PT15M
-      "[RL.auth.reset]":
+      "[auth.reset]":
         capacity: 5
         refill-tokens: 5
         refill-duration: PT1H
-      "[RL.unauth.global]":
+      "[unauth.global]":
         capacity: 100
         refill-tokens: 100
         refill-duration: PT1M
-      "[RL.read]":
+      "[read]":
         capacity: 300
         refill-tokens: 300
         refill-duration: PT1M
-      "[RL.write]":
+      "[write]":
         capacity: 60
         refill-tokens: 60
         refill-duration: PT1M

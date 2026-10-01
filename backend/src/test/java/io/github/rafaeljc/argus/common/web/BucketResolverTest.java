@@ -20,7 +20,7 @@ class BucketResolverTest {
     void resolve_signupPost_returnsSignupBucketKeyedByIp() {
         BucketSelection selection = resolver.resolve(request("POST", "/api/v1/auth/signup"), UNAUTHENTICATED);
 
-        assertThat(selection.bucketName()).isEqualTo("RL.auth.signup");
+        assertThat(selection.bucketName()).isEqualTo("auth.signup");
         assertThat(selection.key()).isEqualTo(IP);
     }
 
@@ -28,7 +28,7 @@ class BucketResolverTest {
     void resolve_loginPost_returnsLoginBucketKeyedByIp() {
         BucketSelection selection = resolver.resolve(request("POST", "/api/v1/auth/login"), UNAUTHENTICATED);
 
-        assertThat(selection.bucketName()).isEqualTo("RL.auth.login");
+        assertThat(selection.bucketName()).isEqualTo("auth.login");
         assertThat(selection.key()).isEqualTo(IP);
     }
 
@@ -37,7 +37,7 @@ class BucketResolverTest {
         BucketSelection selection =
                 resolver.resolve(request("POST", "/api/v1/auth/verify-email"), UNAUTHENTICATED);
 
-        assertThat(selection.bucketName()).isEqualTo("RL.unauth.global");
+        assertThat(selection.bucketName()).isEqualTo("unauth.global");
         assertThat(selection.key()).isEqualTo(IP);
     }
 
@@ -46,7 +46,7 @@ class BucketResolverTest {
         BucketSelection selection =
                 resolver.resolve(request("POST", "/api/v1/auth/password-reset-requests"), UNAUTHENTICATED);
 
-        assertThat(selection.bucketName()).isEqualTo("RL.auth.reset");
+        assertThat(selection.bucketName()).isEqualTo("auth.reset");
         assertThat(selection.key()).isEqualTo(IP);
     }
 
@@ -55,7 +55,7 @@ class BucketResolverTest {
         BucketSelection selection =
                 resolver.resolve(request("POST", "/api/v1/auth/password-resets"), UNAUTHENTICATED);
 
-        assertThat(selection.bucketName()).isEqualTo("RL.unauth.global");
+        assertThat(selection.bucketName()).isEqualTo("unauth.global");
         assertThat(selection.key()).isEqualTo(IP);
     }
 
@@ -63,7 +63,7 @@ class BucketResolverTest {
     void resolve_authenticatedGet_returnsReadBucketKeyedByUserId() {
         BucketSelection selection = resolver.resolve(request("GET", "/api/v1/account/me"), AUTHENTICATED);
 
-        assertThat(selection.bucketName()).isEqualTo("RL.read");
+        assertThat(selection.bucketName()).isEqualTo("read");
         assertThat(selection.key()).isEqualTo(USER_ID);
     }
 
@@ -71,7 +71,7 @@ class BucketResolverTest {
     void resolve_authenticatedHead_returnsReadBucketKeyedByUserId() {
         BucketSelection selection = resolver.resolve(request("HEAD", "/api/v1/account/me"), AUTHENTICATED);
 
-        assertThat(selection.bucketName()).isEqualTo("RL.read");
+        assertThat(selection.bucketName()).isEqualTo("read");
         assertThat(selection.key()).isEqualTo(USER_ID);
     }
 
@@ -79,7 +79,7 @@ class BucketResolverTest {
     void resolve_authenticatedPost_returnsWriteBucketKeyedByUserId() {
         BucketSelection selection = resolver.resolve(request("POST", "/api/v1/transactions"), AUTHENTICATED);
 
-        assertThat(selection.bucketName()).isEqualTo("RL.write");
+        assertThat(selection.bucketName()).isEqualTo("write");
         assertThat(selection.key()).isEqualTo(USER_ID);
     }
 
@@ -87,7 +87,7 @@ class BucketResolverTest {
     void resolve_authenticatedAdminUsersSearchPost_returnsReadBucketKeyedByUserId() {
         BucketSelection selection = resolver.resolve(request("POST", "/api/v1/admin/users"), AUTHENTICATED);
 
-        assertThat(selection.bucketName()).isEqualTo("RL.read");
+        assertThat(selection.bucketName()).isEqualTo("read");
         assertThat(selection.key()).isEqualTo(USER_ID);
     }
 
@@ -96,7 +96,7 @@ class BucketResolverTest {
         BucketSelection selection =
                 resolver.resolve(request("DELETE", "/api/v1/alert-rules/abc"), AUTHENTICATED);
 
-        assertThat(selection.bucketName()).isEqualTo("RL.write");
+        assertThat(selection.bucketName()).isEqualTo("write");
         assertThat(selection.key()).isEqualTo(USER_ID);
     }
 
@@ -104,7 +104,7 @@ class BucketResolverTest {
     void resolve_unauthenticatedGet_returnsUnauthGlobalKeyedByIp() {
         BucketSelection selection = resolver.resolve(request("GET", "/api/v1/auth/status"), UNAUTHENTICATED);
 
-        assertThat(selection.bucketName()).isEqualTo("RL.unauth.global");
+        assertThat(selection.bucketName()).isEqualTo("unauth.global");
         assertThat(selection.key()).isEqualTo(IP);
     }
 
@@ -112,7 +112,7 @@ class BucketResolverTest {
     void resolve_unauthenticatedPostToUnknownPath_returnsUnauthGlobalKeyedByIp() {
         BucketSelection selection = resolver.resolve(request("POST", "/api/v1/foo"), UNAUTHENTICATED);
 
-        assertThat(selection.bucketName()).isEqualTo("RL.unauth.global");
+        assertThat(selection.bucketName()).isEqualTo("unauth.global");
         assertThat(selection.key()).isEqualTo(IP);
     }
 

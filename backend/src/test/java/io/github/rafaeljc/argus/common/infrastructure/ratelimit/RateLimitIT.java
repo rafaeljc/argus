@@ -59,7 +59,7 @@ class RateLimitIT {
         assertThat(first.getStatusCode().value()).isEqualTo(200);
         assertThat(second.getStatusCode().value()).isEqualTo(200);
 
-        // RL.read bucket: capacity 300, user-keyed, greedy refill of 300 tokens per minute
+        // read bucket: capacity 300, user-keyed, greedy refill of 300 tokens per minute
         // (~5 tokens/s). Two consecutive reads from the same user share one bucket; the
         // invariant asserted is that the second call sees no more tokens than the first —
         // an exact decrement is not asserted because wall-clock jitter between requests can

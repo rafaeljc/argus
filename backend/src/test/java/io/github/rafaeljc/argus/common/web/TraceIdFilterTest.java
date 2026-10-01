@@ -16,7 +16,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 
 class TraceIdFilterTest {
 
-    private static final String TRACE_ID_KEY = "traceId";
+    private static final String TRACE_ID_KEY = "trace_id";
 
     private final TraceIdFilter filter = new TraceIdFilter();
 

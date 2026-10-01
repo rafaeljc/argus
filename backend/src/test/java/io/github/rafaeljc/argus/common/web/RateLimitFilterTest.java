@@ -66,7 +66,7 @@ class RateLimitFilterTest {
 
     @Test
     void doFilter_belowLimit_setsHeadersAndProceeds() throws Exception {
-        when(rateLimiter.tryConsume("RL.auth.signup", IP))
+        when(rateLimiter.tryConsume("auth.signup", IP))
                 .thenReturn(new ConsumptionResult(true, 5L, 4L, 0L, 600L));
 
         filter.doFilter(request, response, chain);
@@ -81,7 +81,7 @@ class RateLimitFilterTest {
 
     @Test
     void doFilter_exhausted_setsHeadersAndDispatchesRateLimitExceeded() throws Exception {
-        when(rateLimiter.tryConsume("RL.auth.signup", IP))
+        when(rateLimiter.tryConsume("auth.signup", IP))
                 .thenReturn(new ConsumptionResult(false, 5L, 0L, 30L, 600L));
 
         filter.doFilter(request, response, chain);
@@ -100,7 +100,7 @@ class RateLimitFilterTest {
         UserId userId = authenticate();
         request.setMethod("GET");
         request.setRequestURI("/api/v1/account/me");
-        when(rateLimiter.tryConsume("RL.read", userId.value().toString()))
+        when(rateLimiter.tryConsume("read", userId.value().toString()))
                 .thenReturn(new ConsumptionResult(true, 300L, 299L, 0L, 60L));
 
         filter.doFilter(request, response, chain);

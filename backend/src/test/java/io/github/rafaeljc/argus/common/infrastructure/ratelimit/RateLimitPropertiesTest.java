@@ -32,32 +32,32 @@ class RateLimitPropertiesTest {
     @Test
     void construct_populatedMap_exposesBuckets() {
         RateLimitProperties properties = new RateLimitProperties(
-                Map.of("RL.auth.signup", SIGNUP, "RL.auth.login", LOGIN));
+                Map.of("auth.signup", SIGNUP, "auth.login", LOGIN));
 
         assertThat(properties.buckets())
                 .hasSize(2)
-                .containsEntry("RL.auth.signup", SIGNUP)
-                .containsEntry("RL.auth.login", LOGIN);
+                .containsEntry("auth.signup", SIGNUP)
+                .containsEntry("auth.login", LOGIN);
     }
 
     @Test
     void buckets_returnedMapIsImmutable() {
         Map<String, BucketDefinition> mutable = new HashMap<>();
-        mutable.put("RL.auth.signup", SIGNUP);
+        mutable.put("auth.signup", SIGNUP);
         RateLimitProperties properties = new RateLimitProperties(mutable);
 
-        assertThatThrownBy(() -> properties.buckets().put("RL.auth.login", LOGIN))
+        assertThatThrownBy(() -> properties.buckets().put("auth.login", LOGIN))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
 
     @Test
     void buckets_inputMutationDoesNotLeakIntoProperties() {
         Map<String, BucketDefinition> mutable = new HashMap<>();
-        mutable.put("RL.auth.signup", SIGNUP);
+        mutable.put("auth.signup", SIGNUP);
         RateLimitProperties properties = new RateLimitProperties(mutable);
 
-        mutable.put("RL.auth.login", LOGIN);
+        mutable.put("auth.login", LOGIN);
 
-        assertThat(properties.buckets()).hasSize(1).containsOnlyKeys("RL.auth.signup");
+        assertThat(properties.buckets()).hasSize(1).containsOnlyKeys("auth.signup");
     }
 }
