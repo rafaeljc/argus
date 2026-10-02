@@ -96,6 +96,11 @@ class BackendService(Construct):
             # answers a request straight off the internet.
             internet_facing=False,
             vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
+            # preserve leaves CloudFront as the only writer of X-Forwarded-For. CloudFront
+            # always appends the viewer IP last, so the backend's RemoteIpValve (server.
+            # forward-headers-strategy: native) can trust the rightmost entry. The default,
+            # append, would have the ALB add its own peer after that -- see ADR-0007.
+            xff_header_processing_mode=elbv2.XffHeaderProcessingMode.PRESERVE,
         )
         self.cluster = ecs.Cluster(
             self,
