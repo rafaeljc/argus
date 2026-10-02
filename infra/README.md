@@ -35,7 +35,7 @@ activating anything — but it does mean the virtualenv must live at `infra/.ven
 exactly as created above.
 
 ```bash
-npx cdk synth --all
+npx aws-cdk synth --all
 ```
 
 `cdk synth` is the real integration test: it type-checks the whole construct
@@ -90,8 +90,8 @@ rejects an empty `String`, hence the `none` sentinel -- see
 ### 2. Pass one
 
 ```bash
-npx cdk bootstrap          # once per account and region
-npx cdk deploy argus-prod-foundation
+npx aws-cdk bootstrap          # once per account and region
+npx aws-cdk deploy argus-prod-foundation
 ```
 
 Then set the repository variables from the roles it created:
@@ -127,8 +127,8 @@ aws ssm put-parameter --name /argus/prod/image-tag --value "$SHA" --overwrite
 ### 4. Pass two
 
 ```bash
-npx cdk diff --all         # always, before deploying
-npx cdk deploy --all
+npx aws-cdk diff --all         # always, before deploying
+npx aws-cdk deploy --all
 ```
 
 Confirm the ECS service reaches steady state, then run CD Backend and CD
@@ -177,7 +177,7 @@ successor.
 
 ## Changing the infrastructure
 
-Run `npx cdk diff --all` first, every time. Two things in the output are a
+Run `npx aws-cdk diff --all` first, every time. Two things in the output are a
 stop-and-think:
 
 * `requires replacement` on any resource in the table below
@@ -237,7 +237,7 @@ remember the snapshot then outlives everything else here.
 ### 2. Destroy the stacks
 
 ```bash
-npx cdk destroy --all
+npx aws-cdk destroy --all
 ```
 
 ### 3. Delete what was retained
