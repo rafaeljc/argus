@@ -41,7 +41,7 @@ class BackendSizing:
 class DatabaseSizing:
     """Shape of the Postgres instance."""
 
-    instance_class: str = "t4g.micro"
+    instance_class: str = "t3.micro"
     allocated_storage_gib: int = 20
     backup_retention_days: int = 14
     database_name: str = "argus"

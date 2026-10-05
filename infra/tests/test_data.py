@@ -30,15 +30,15 @@ def template(stacks: tuple[Template, Template]) -> Template:
 
 def test_the_engine_matches_the_one_the_backend_is_tested_against(template: Template) -> None:
     template.has_resource_properties(
-        "AWS::RDS::DBInstance", {"Engine": "postgres", "EngineVersion": "18"}
+        "AWS::RDS::DBInstance", {"Engine": "postgres", "EngineVersion": "18.3"}
     )
 
 
-def test_minor_versions_are_patched_automatically_but_majors_are_not(template: Template) -> None:
-    # A major upgrade can break the application; a minor one carries fixes.
+def test_the_engine_version_only_moves_on_a_deliberate_deploy(template: Template) -> None:
+    # Neither minor nor major upgrades happen behind the pinned version's back.
     template.has_resource_properties(
         "AWS::RDS::DBInstance",
-        {"AutoMinorVersionUpgrade": True, "AllowMajorVersionUpgrade": False},
+        {"AutoMinorVersionUpgrade": False, "AllowMajorVersionUpgrade": False},
     )
 
 
@@ -46,7 +46,7 @@ def test_the_instance_is_sized_for_the_budget(template: Template) -> None:
     template.has_resource_properties(
         "AWS::RDS::DBInstance",
         {
-            "DBInstanceClass": "db.t4g.micro",
+            "DBInstanceClass": "db.t3.micro",
             "AllocatedStorage": "20",
             "StorageType": "gp3",
             "MultiAZ": False,
@@ -155,6 +155,12 @@ def test_running_out_of_disk_alarms_on_the_way_down(template: Template) -> None:
 def test_the_cache_engine_is_redis_not_valkey(template: Template) -> None:
     template.has_resource_properties(
         "AWS::ElastiCache::ReplicationGroup", {"Engine": "redis", "EngineVersion": "7.1"}
+    )
+
+
+def test_the_cache_engine_version_only_moves_on_a_deliberate_deploy(template: Template) -> None:
+    template.has_resource_properties(
+        "AWS::ElastiCache::ReplicationGroup", {"AutoMinorVersionUpgrade": False}
     )
 
 
