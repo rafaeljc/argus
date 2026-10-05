@@ -28,12 +28,13 @@ from argus.config import CACHE, DATABASE, EnvironmentConfig
 from argus.constructs.alarms import CriticalAlarms, cache_metric
 from argus.retention import Durability
 from argus.stacks.base import ArgusStack
+from argus.stacks.network import PRIMARY_AVAILABILITY_ZONE
 
-DATABASE_ENGINE_VERSION = rds.PostgresEngineVersion.VER_18
+DATABASE_ENGINE_VERSION = rds.PostgresEngineVersion.VER_18_3
 
 DATABASE_CPU_ALARM_PERCENT = 80
 DATABASE_FREE_STORAGE_ALARM_BYTES = 2 * 1024**3
-# db.t4g.micro allows a little over 100; alarm before the application starts
+# db.t3.micro allows a little over 100; alarm before the application starts
 # seeing connection refusals.
 DATABASE_CONNECTIONS_ALARM_COUNT = 80
 
@@ -121,6 +122,9 @@ class DataStack(ArgusStack):
             engine=rds.DatabaseInstanceEngine.postgres(version=DATABASE_ENGINE_VERSION),
             instance_type=ec2.InstanceType(DATABASE.instance_class),
             vpc=vpc,
+            # Colocate with the NAT instance and cache -- see
+            # network.PRIMARY_AVAILABILITY_ZONE.
+            availability_zone=PRIMARY_AVAILABILITY_ZONE,
             # Created here rather than generated, because the instance's RETAIN
             # would otherwise propagate to it. A subnet group is a list of
             # subnet ids -- nothing to lose, and a retained one with a generated
@@ -151,7 +155,9 @@ class DataStack(ArgusStack):
             backup_retention=Duration.days(DATABASE.backup_retention_days),
             delete_automated_backups=False,
             deletion_protection=True,
-            auto_minor_version_upgrade=True,
+            # DATABASE_ENGINE_VERSION is pinned to an exact minor; AWS must not
+            # move it during a maintenance window behind that pin's back.
+            auto_minor_version_upgrade=False,
             allow_major_version_upgrade=False,
             removal_policy=Durability.RETAINED.removal_policy,
         )
@@ -303,7 +309,12 @@ class DataStack(ArgusStack):
             transit_encryption_mode="required",
             at_rest_encryption_enabled=True,
             snapshot_retention_limit=0,
-            auto_minor_version_upgrade=True,
+            # CACHE_ENGINE_VERSION is pinned to an exact minor; AWS must not
+            # move it during a maintenance window behind that pin's back.
+            auto_minor_version_upgrade=False,
+            # Colocate with the database and NAT instance -- see
+            # network.PRIMARY_AVAILABILITY_ZONE.
+            preferred_cache_cluster_a_zs=[PRIMARY_AVAILABILITY_ZONE],
         )
 
     def _cache_connection_details(self, config: EnvironmentConfig) -> secretsmanager.Secret:

@@ -162,6 +162,19 @@ def test_only_cloudfront_may_reach_the_load_balancer(template: Template) -> None
     assert sources == {CLOUDFRONT_PREFIX_LIST}
 
 
+def test_the_load_balancer_does_not_rewrite_the_forwarded_for_header(template: Template) -> None:
+    template.has_resource_properties(
+        "AWS::ElasticLoadBalancingV2::LoadBalancer",
+        Match.object_like(
+            {
+                "LoadBalancerAttributes": Match.array_with(
+                    [{"Key": "routing.http.xff_header_processing.mode", "Value": "preserve"}]
+                )
+            }
+        ),
+    )
+
+
 def test_health_is_checked_on_the_management_port(template: Template) -> None:
     template.has_resource_properties(
         "AWS::ElasticLoadBalancingV2::TargetGroup",

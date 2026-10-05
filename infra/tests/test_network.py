@@ -6,7 +6,7 @@ from aws_cdk import App
 from aws_cdk.assertions import Match, Template
 
 from argus.config import EnvironmentConfig
-from argus.stacks.network import NetworkStack
+from argus.stacks.network import NAT_AMI_ID, NetworkStack
 
 VPC_CIDR = "10.0.0.0/16"
 
@@ -58,16 +58,10 @@ def test_egress_runs_on_the_smallest_graviton_instance(template: Template) -> No
     template.has_resource_properties("AWS::EC2::Instance", {"InstanceType": "t4g.nano"})
 
 
-def test_the_nat_instance_boots_an_image_matching_its_architecture(template: Template) -> None:
-    """A t4g is Graviton; an x86 image would leave it unbootable."""
-    image_parameters = [
-        parameter["Default"]
-        for parameter in template.to_json().get("Parameters", {}).values()
-        if str(parameter.get("Default", "")).startswith("/aws/service/ami")
-    ]
-
-    assert image_parameters, "expected the AMI to resolve through an SSM parameter"
-    assert all("arm64" in default for default in image_parameters)
+def test_the_nat_instance_boots_a_pinned_image(template: Template) -> None:
+    # A literal AMI ID, not an SSM "latest" alias -- a redeploy must not be
+    # able to silently swap the only path off the VPC.
+    template.has_resource_properties("AWS::EC2::Instance", {"ImageId": NAT_AMI_ID})
 
 
 def test_only_the_vpc_may_route_through_the_nat_instance(template: Template) -> None:

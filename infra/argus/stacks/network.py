@@ -20,8 +20,21 @@ from argus.constructs.alarms import CriticalAlarms, instance_status_check
 from argus.stacks.base import ArgusStack
 
 VPC_CIDR = "10.0.0.0/16"
-AVAILABILITY_ZONES = 2
+# Everything that can run in one AZ is pinned to this one -- the database,
+# cache and NAT instance -- to avoid cross-AZ data transfer charges on every
+# DB query and every NAT-routed packet.
+PRIMARY_AVAILABILITY_ZONE = "us-east-1a"
+# Carried only because RDS requires a subnet group spanning two distinct AZs
+# even for a single-AZ instance. Nothing is meant to run here.
+SECONDARY_AVAILABILITY_ZONE = "us-east-1b"
 NAT_INSTANCE_TYPE = "t4g.nano"
+# al2023-ami-2023.12.20260930.0-kernel-6.18-arm64, published 2026-09-29, for
+# the environment's configured region. Pinned instead of resolved through the
+# SSM "latest" alias, so a redeploy never silently replaces the only path off
+# the VPC. Bump deliberately: resolve
+# /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64 in
+# that region and update this constant.
+NAT_AMI_ID = "ami-065b1b834d2a83a7a"
 
 PUBLIC_TIER = "public"
 APPLICATION_TIER = "application"
@@ -40,13 +53,21 @@ class NetworkStack(ArgusStack):
             "Vpc",
             vpc_name=self.naming.resource("vpc"),
             ip_addresses=ec2.IpAddresses.cidr(VPC_CIDR),
-            max_azs=AVAILABILITY_ZONES,
+            availability_zones=[PRIMARY_AVAILABILITY_ZONE, SECONDARY_AVAILABILITY_ZONE],
             # The database resolves its own endpoint by name, and so does
             # anything reaching Secrets Manager.
             enable_dns_support=True,
             enable_dns_hostnames=True,
             nat_gateway_provider=nat_provider,
             nat_gateways=1,
+            # Otherwise CDK is free to put the one NAT instance in either AZ's
+            # public subnet -- pin it to PRIMARY_AVAILABILITY_ZONE explicitly.
+            # subnet_type is required alongside availability_zones: without
+            # it the selector is ambiguous across tiers, and NAT placement
+            # must land on the public one specifically.
+            nat_gateway_subnets=ec2.SubnetSelection(
+                subnet_type=ec2.SubnetType.PUBLIC, availability_zones=[PRIMARY_AVAILABILITY_ZONE]
+            ),
             subnet_configuration=[
                 ec2.SubnetConfiguration(
                     name=PUBLIC_TIER, subnet_type=ec2.SubnetType.PUBLIC, cidr_mask=24
@@ -75,12 +96,8 @@ class NetworkStack(ArgusStack):
     def _nat_provider(self) -> ec2.NatInstanceProviderV2:
         return ec2.NatProvider.instance_v2(
             instance_type=ec2.InstanceType(NAT_INSTANCE_TYPE),
-            # A t4g is Graviton, so the image has to be ARM. Resolved through
-            # an SSM parameter at deploy time rather than cached into context,
-            # so a redeploy always picks up the current patched AMI.
-            machine_image=ec2.MachineImage.latest_amazon_linux2023(
-                cpu_type=ec2.AmazonLinuxCpuType.ARM_64
-            ),
+            # A t4g is Graviton, so the image has to be ARM -- see NAT_AMI_ID.
+            machine_image=ec2.MachineImage.generic_linux({self.region: NAT_AMI_ID}),
             default_allowed_traffic=ec2.NatTrafficDirection.OUTBOUND_ONLY,
         )
 
